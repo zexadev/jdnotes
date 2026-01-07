@@ -1,13 +1,18 @@
 {
   "name": "jdnotes",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "release": "powershell -ExecutionPolicy Bypass -File ./scripts/build-release.ps1",
+    "release:bat": "scripts\\build-release.bat",
+    "signer:generate": "tauri signer generate -w ./~/.tauri/jdnotes.key"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
@@ -32,7 +37,9 @@
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-sql": "^2.0.0",
+    "@tauri-apps/plugin-updater": "^2.9.0",
     "@tiptap/core": "^3.14.0",
     "@tiptap/extension-bubble-menu": "^3.14.0",
     "@tiptap/extension-code-block": "^3.14.0",

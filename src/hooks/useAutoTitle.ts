@@ -15,7 +15,7 @@ export function useAutoTitle(): UseAutoTitleReturn {
   const [isGenerating, setIsGenerating] = useState(false)
 
   const generateTitleAndTags = useCallback(async (content: string, currentTitle?: string): Promise<GenerateResult> => {
-    const settings = getSettings()
+    const settings = await getSettings()
 
     if (!settings.aiApiKey) {
       return {}

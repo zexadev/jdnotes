@@ -1,4 +1,4 @@
-use crate::db;
+use crate::db::{self, AISettings};
 use crate::models::ExportData;
 
 // ============= 架构说明 =============
@@ -125,4 +125,40 @@ pub async fn import_from_indexeddb(data: serde_json::Value) -> Result<serde_json
 #[tauri::command]
 pub async fn get_database_url(app: tauri::AppHandle) -> Result<String, String> {
     db::get_database_url(&app)
+}
+
+// ============= AI 设置管理 =============
+
+/// 获取 AI 设置
+#[tauri::command]
+pub async fn get_ai_settings(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let settings = db::get_ai_settings(&app)?;
+    Ok(serde_json::json!({
+        "aiBaseUrl": settings.base_url,
+        "aiApiKey": settings.api_key,
+        "aiModel": settings.model
+    }))
+}
+
+/// 保存 AI 设置
+#[tauri::command]
+pub async fn save_ai_settings(
+    app: tauri::AppHandle,
+    base_url: String,
+    api_key: String,
+    model: String,
+) -> Result<(), String> {
+    let settings = AISettings {
+        base_url,
+        api_key,
+        model,
+    };
+    db::save_ai_settings(&app, settings)?;
+    Ok(())
+}
+
+/// 获取配置文件路径
+#[tauri::command]
+pub async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
+    db::get_config_file_path(&app)
 }

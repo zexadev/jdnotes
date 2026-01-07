@@ -3,13 +3,12 @@
  * 解决 tiptap-markdown 扩展的类型安全问题
  */
 
+import '@tiptap/core'
+
 declare module '@tiptap/core' {
-  interface EditorStorage {
+  interface Storage {
     markdown: {
       getMarkdown: () => string
     }
   }
 }
-
-// 确保这是一个模块
-export {}

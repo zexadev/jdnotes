@@ -105,7 +105,7 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
 
   const startStream = useCallback(
     async (action: AIAction, text: string, customPrompt?: string, context?: AIContext, templateType?: TemplateType) => {
-      const settings = getSettings()
+      const settings = await getSettings()
 
       if (!settings.aiApiKey) {
         const errorMsg = '请在设置中配置 API Key'

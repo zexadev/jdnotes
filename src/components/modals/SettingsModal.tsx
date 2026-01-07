@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2 } from 'lucide-react'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
+import { useUpdater } from '../../hooks/useUpdater'
 import { dbOperations } from '../../lib/db'
 import {
   isPermissionGranted,
@@ -21,6 +22,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>('default')
   const [isCheckingPermission, setIsCheckingPermission] = useState(true)
+  
+  // 软件更新
+  const updater = useUpdater()
   
   // 数据库管理状态
   const [dbInfo, setDbInfo] = useState<{
@@ -423,13 +427,138 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             </div>
           </div>
 
+          {/* 软件更新 */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              软件更新
+            </h3>
+            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              {/* 当前版本 */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  当前版本
+                </span>
+                <span className="text-xs font-mono text-gray-700 dark:text-gray-300">
+                  v{updater.currentVersion || '0.1.0'}
+                </span>
+              </div>
+
+              {/* 更新状态显示 */}
+              {updater.status === 'idle' && (
+                <button
+                  onClick={updater.checkForUpdates}
+                  className="w-full px-4 py-2.5 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  检查更新
+                </button>
+              )}
+
+              {updater.status === 'checking' && (
+                <div className="flex items-center justify-center gap-2 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  正在检查更新...
+                </div>
+              )}
+
+              {updater.status === 'not-available' && (
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 py-2 text-sm text-green-600 dark:text-green-400">
+                    <CheckCircle className="h-4 w-4" />
+                    已是最新版本
+                  </div>
+                  <button
+                    onClick={updater.checkForUpdates}
+                    className="mt-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  >
+                    再次检查
+                  </button>
+                </div>
+              )}
+
+              {updater.status === 'available' && updater.updateInfo && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      新版本
+                    </span>
+                    <span className="text-xs font-mono text-green-600 dark:text-green-400">
+                      v{updater.updateInfo.version}
+                    </span>
+                  </div>
+                  {updater.updateInfo.body && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 p-2 rounded max-h-24 overflow-y-auto">
+                      {updater.updateInfo.body}
+                    </div>
+                  )}
+                  <button
+                    onClick={updater.downloadAndInstall}
+                    className="w-full px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    下载并安装
+                  </button>
+                </div>
+              )}
+
+              {updater.status === 'downloading' && updater.progress && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span>下载中...</span>
+                    <span>{updater.progress.percentage}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className="bg-[#5E6AD2] h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${updater.progress.percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 text-center">
+                    {(updater.progress.downloaded / 1024 / 1024).toFixed(1)} MB / {(updater.progress.total / 1024 / 1024).toFixed(1)} MB
+                  </p>
+                </div>
+              )}
+
+              {updater.status === 'ready' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2 py-2 text-sm text-green-600 dark:text-green-400">
+                    <CheckCircle className="h-4 w-4" />
+                    下载完成
+                  </div>
+                  <button
+                    onClick={updater.installUpdate}
+                    className="w-full px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    立即安装并重启
+                  </button>
+                </div>
+              )}
+
+              {updater.status === 'error' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2 py-2 text-sm text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-4 w-4" />
+                    {updater.error || '更新失败'}
+                  </div>
+                  <button
+                    onClick={updater.checkForUpdates}
+                    className="w-full px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* 关于区域 */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
               关于
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              JD Notes v1.1.0 (SQLite)
+              JD Notes v{updater.currentVersion || '0.1.0'} (SQLite)
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               一个简洁高效的本地笔记应用

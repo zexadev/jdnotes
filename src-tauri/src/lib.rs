@@ -11,6 +11,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // 设置日志插件（仅在开发模式）
             if cfg!(debug_assertions) {
@@ -56,6 +58,10 @@ pub fn run() {
             commands::export_database_json,
             commands::import_database_json,
             commands::import_from_indexeddb,
+            // AI 设置
+            commands::get_ai_settings,
+            commands::save_ai_settings,
+            commands::get_config_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
