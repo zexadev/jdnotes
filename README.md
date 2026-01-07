@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/app-icon.png" width="128" height="128" alt="JD Notes Logo">
+  <img src="./app-icon.png" width="128" height="128" alt="JD Notes Logo">
 </p>
 
 <h1 align="center">JD Notes</h1>
