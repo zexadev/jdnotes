@@ -77,7 +77,7 @@ export function MainContent({
           <div className="flex items-center justify-between px-12 py-4 border-b border-black/[0.03] dark:border-white/[0.06] editor-header-glass sticky top-0 z-10">
             <nav className="text-[13px] text-slate-400">
               <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors">
-                收件箱
+                全部笔记
               </span>
               <span className="mx-2">/</span>
               <span className="text-slate-900 dark:text-slate-100">

@@ -92,9 +92,11 @@ function App() {
       await initializeDefaultNotes()
       // 恢复可能因意外关闭而丢失的数据
       await recoverPendingSaves()
+      // 初始化后刷新笔记列表
+      await refreshNotes()
     }
     initialize()
-  }, [])
+  }, [refreshNotes])
 
   // 当前选中的笔记
   const activeNote = useMemo(() => {
@@ -108,7 +110,7 @@ function App() {
     setLocalTitle(note.title)
     setLocalContent(note.content)
     setIsEditing(false) // 切换笔记时默认进入阅读模式
-    // 如果当前在日历视图，切换回收件箱
+    // 如果当前在日历视图，切换回全部笔记
     if (currentView === 'calendar') {
       setCurrentView('inbox')
     }
@@ -240,7 +242,11 @@ function App() {
       />
 
       {/* 设置模态框 */}
-      <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onDataChange={refreshNotes}
+      />
 
       <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
         <Sidebar

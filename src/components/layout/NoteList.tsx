@@ -34,14 +34,14 @@ export function NoteList({
           {searchQuery
             ? `搜索: "${searchQuery}"`
             : currentView === 'inbox'
-              ? '收件箱'
+              ? '全部笔记'
               : currentView === 'favorites'
                 ? '收藏'
                 : currentView === 'trash'
                   ? '废纸篓'
                   : currentView.startsWith('tag-')
                     ? `标签: ${currentView.slice(4)}`
-                    : '收件箱'}
+                    : '全部笔记'}
         </h2>
         {currentView !== 'trash' && (
           <button

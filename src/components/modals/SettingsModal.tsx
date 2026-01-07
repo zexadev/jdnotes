@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { useUpdater } from '../../hooks/useUpdater'
 import { dbOperations } from '../../lib/db'
@@ -11,17 +11,20 @@ import {
 import { save, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import { ExportModal } from './ExportModal'
 
 interface SettingsModalProps {
   open: boolean
   onClose: () => void
+  onDataChange?: () => void  // 数据变化时回调（导入数据后刷新页面）
 }
 
-export function SettingsModal({ open, onClose }: SettingsModalProps) {
+export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProps) {
   const { settings, updateSetting } = useSettings()
   const [showApiKey, setShowApiKey] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>('default')
   const [isCheckingPermission, setIsCheckingPermission] = useState(true)
+  const [showExportModal, setShowExportModal] = useState(false)
   
   // 软件更新
   const updater = useUpdater()
@@ -134,6 +137,8 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         const result = await dbOperations.importJSON(jsonData)
         showMessage('success', `导入成功！共导入 ${result.notes} 条笔记，${result.messages} 条消息`)
         loadDatabaseInfo()
+        // 通知父组件刷新数据
+        onDataChange?.()
       }
     } catch (e) {
       console.error('Import failed:', e)
@@ -348,6 +353,16 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 更改存储位置
               </button>
 
+              {/* 选择性导出 */}
+              <button
+                onClick={() => setShowExportModal(true)}
+                disabled={isLoading}
+                className="w-full px-4 py-2.5 text-sm text-left text-[#5E6AD2] hover:bg-[#5E6AD2]/10 rounded-lg flex items-center gap-3 transition-colors disabled:opacity-50"
+              >
+                <FileOutput className="h-4 w-4" />
+                选择性导出笔记
+              </button>
+
               {/* 导出数据 */}
               <button
                 onClick={handleExport}
@@ -355,7 +370,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                 className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg flex items-center gap-3 transition-colors disabled:opacity-50"
               >
                 <Download className="h-4 w-4 text-gray-400" />
-                导出数据（JSON）
+                导出全部数据（JSON）
               </button>
 
               {/* 导入数据 */}
@@ -579,6 +594,12 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           </button>
         </div>
       </div>
+
+      {/* 导出选择模态框 */}
+      <ExportModal
+        open={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
     </div>
   )
 }

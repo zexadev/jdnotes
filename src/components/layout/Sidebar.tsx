@@ -1,5 +1,5 @@
 import {
-  Inbox,
+  FileText,
   Star,
   Trash2,
   Search,
@@ -76,8 +76,8 @@ export function Sidebar({
       {/* 导航链接 */}
       <nav className="px-3 space-y-1">
         <SidebarItem
-          icon={Inbox}
-          label="收件箱"
+          icon={FileText}
+          label="全部笔记"
           active={currentView === 'inbox'}
           count={counts.inbox}
           onClick={() => onViewChange('inbox')}
