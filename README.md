@@ -173,7 +173,7 @@
   </tr>
   <tr>
     <td rowspan="3"><strong>后端</strong></td>
-    <td><img src="https://img.shields.io/badge/-Tauri%202.9-24C8D8?style=flat-square&logo=tauri&logoColor=white" /></td>
+    <td><img src="https://img.shields.io/badge/-Tauri%202-24C8D8?style=flat-square&logo=tauri&logoColor=white" /></td>
     <td>跨平台桌面应用框架</td>
   </tr>
   <tr>
