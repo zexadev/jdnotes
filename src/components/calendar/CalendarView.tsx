@@ -1,8 +1,8 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useMemo } from 'react'
 import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeFile } from '@tauri-apps/plugin-fs'
 import { useCalendar } from '../../hooks/useCalendar'
 import { CalendarHeader } from './CalendarHeader'
 import { MonthView } from './MonthView'
@@ -52,58 +52,109 @@ export function CalendarView({ onSelectNote }: CalendarViewProps) {
     [calendar]
   )
 
-  // 导出日历
+  // 计算当前视图的时间范围
+  const timeRange = useMemo(() => {
+    const { view, currentDate } = calendar
+    const start = new Date(currentDate)
+    const end = new Date(currentDate)
+
+    if (view === 'month') {
+      // 月视图：当月第一天到最后一天
+      start.setDate(1)
+      start.setHours(0, 0, 0, 0)
+      end.setMonth(end.getMonth() + 1, 0)
+      end.setHours(23, 59, 59, 999)
+    } else if (view === 'week') {
+      // 周视图：本周一到周日
+      const day = start.getDay()
+      const diff = day === 0 ? -6 : 1 - day
+      start.setDate(start.getDate() + diff)
+      start.setHours(0, 0, 0, 0)
+      end.setDate(start.getDate() + 6)
+      end.setHours(23, 59, 59, 999)
+    } else {
+      // 日视图：当天
+      start.setHours(0, 0, 0, 0)
+      end.setHours(23, 59, 59, 999)
+    }
+
+    return { start, end }
+  }, [calendar.view, calendar.currentDate])
+
+  // 获取当前时间范围内的笔记
+  const notesInRange = useMemo(() => {
+    if (!calendar.notes) return []
+    
+    return calendar.notes.filter((note) => {
+      const noteDate = new Date(
+        calendar.dateField === 'createdAt' ? note.createdAt : note.updatedAt
+      )
+      return noteDate >= timeRange.start && noteDate <= timeRange.end
+    })
+  }, [calendar.notes, calendar.dateField, timeRange])
+
+  // 获取时间范围描述
+  const getTimeRangeLabel = useCallback(() => {
+    const { view, currentDate } = calendar
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth() + 1
+
+    if (view === 'month') {
+      return `${year}年${month}月`
+    } else if (view === 'week') {
+      const startStr = `${timeRange.start.getMonth() + 1}月${timeRange.start.getDate()}日`
+      const endStr = `${timeRange.end.getMonth() + 1}月${timeRange.end.getDate()}日`
+      return `${startStr} - ${endStr}`
+    } else {
+      return `${year}年${month}月${currentDate.getDate()}日`
+    }
+  }, [calendar.view, calendar.currentDate, timeRange])
+
+  // 导出当前时间范围的笔记
   const handleExport = useCallback(async () => {
-    if (!calendarRef.current) return
+    if (notesInRange.length === 0) {
+      alert('当前时间范围内没有笔记可导出')
+      return
+    }
 
     try {
-      // 显示导出中提示
-      const loadingDiv = document.createElement('div')
-      loadingDiv.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
-      loadingDiv.innerHTML = `
-        <div class="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-xl">
-          <div class="text-center">
-            <div class="animate-spin h-8 w-8 border-4 border-[#5E6AD2] border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p class="text-slate-600 dark:text-slate-300">正在导出...</p>
-          </div>
-        </div>
-      `
-      document.body.appendChild(loadingDiv)
+      // 显示导出格式选择对话框
+      const format = await showExportDialog(getTimeRangeLabel(), notesInRange.length)
+      if (!format) return
 
-      // 等待一帧以确保 DOM 更新
-      await new Promise((resolve) => requestAnimationFrame(resolve))
+      const dateStr = formatExportDate(calendar.currentDate)
+      const viewName = calendar.view === 'month' ? 'month' : calendar.view === 'week' ? 'week' : 'day'
 
-      const canvas = await html2canvas(calendarRef.current, {
-        backgroundColor: null,
-        scale: 2,
-        logging: false,
-        useCORS: true,
-      })
+      if (format === 'markdown') {
+        // 导出为 Markdown
+        const content = generateMarkdownContent(notesInRange, getTimeRangeLabel())
+        const filePath = await save({
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+          defaultPath: `notes-${viewName}-${dateStr}.md`
+        })
 
-      // 提供导出选项
-      const format = await showExportDialog()
+        if (filePath) {
+          const encoder = new TextEncoder()
+          await writeFile(filePath, encoder.encode(content))
+        }
+      } else if (format === 'json') {
+        // 导出为 JSON
+        const content = JSON.stringify(notesInRange, null, 2)
+        const filePath = await save({
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+          defaultPath: `notes-${viewName}-${dateStr}.json`
+        })
 
-      if (format === 'png') {
-        // 导出为 PNG
-        const link = document.createElement('a')
-        link.download = `calendar-${formatExportDate(calendar.currentDate)}.png`
-        link.href = canvas.toDataURL('image/png')
-        link.click()
-      } else if (format === 'pdf') {
-        // 导出为 PDF
-        const imgWidth = 210 // A4 宽度 (mm)
-        const imgHeight = (canvas.height * imgWidth) / canvas.width
-        const pdf = new jsPDF('p', 'mm', 'a4')
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight)
-        pdf.save(`calendar-${formatExportDate(calendar.currentDate)}.pdf`)
+        if (filePath) {
+          const encoder = new TextEncoder()
+          await writeFile(filePath, encoder.encode(content))
+        }
       }
-
-      document.body.removeChild(loadingDiv)
     } catch (error) {
       console.error('Export failed:', error)
-      alert('导出失败，请重试')
+      alert('导出失败: ' + (error instanceof Error ? error.message : String(error)))
     }
-  }, [calendar.currentDate])
+  }, [calendar.currentDate, calendar.view, notesInRange, getTimeRangeLabel])
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -173,31 +224,76 @@ function formatExportDate(date: Date): string {
   return date.toISOString().split('T')[0]
 }
 
+// 生成 Markdown 内容
+function generateMarkdownContent(notes: Note[], timeRangeLabel: string): string {
+  const lines: string[] = []
+  
+  lines.push(`# 笔记导出 - ${timeRangeLabel}`)
+  lines.push('')
+  lines.push(`> 导出时间: ${new Date().toLocaleString('zh-CN')}`)
+  lines.push(`> 共 ${notes.length} 篇笔记`)
+  lines.push('')
+  lines.push('---')
+  lines.push('')
+
+  notes.forEach((note, index) => {
+    lines.push(`## ${index + 1}. ${note.title || '无标题'}`)
+    lines.push('')
+    
+    // 元信息
+    const tags = note.tags || []
+    if (tags.length > 0) {
+      lines.push(`**标签**: ${tags.map((t: string) => `\`${t}\``).join(' ')}`)
+      lines.push('')
+    }
+    
+    lines.push(`**创建时间**: ${new Date(note.createdAt).toLocaleString('zh-CN')}`)
+    lines.push(`**更新时间**: ${new Date(note.updatedAt).toLocaleString('zh-CN')}`)
+    lines.push('')
+    
+    // 内容
+    if (note.content) {
+      lines.push('### 内容')
+      lines.push('')
+      lines.push(note.content)
+      lines.push('')
+    }
+    
+    lines.push('---')
+    lines.push('')
+  })
+
+  return lines.join('\n')
+}
+
 // 显示导出格式选择对话框
-function showExportDialog(): Promise<'png' | 'pdf' | null> {
+function showExportDialog(timeRangeLabel: string, noteCount: number): Promise<'markdown' | 'json' | null> {
   return new Promise((resolve) => {
     const dialog = document.createElement('div')
     dialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
     dialog.innerHTML = `
-      <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-xl w-80">
-        <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">选择导出格式</h3>
+      <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-xl w-96">
+        <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">导出笔记</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          ${timeRangeLabel} · 共 ${noteCount} 篇笔记
+        </p>
         <div class="space-y-2">
-          <button id="export-png" class="w-full py-3 px-4 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3">
+          <button id="export-markdown" class="w-full py-3 px-4 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3">
             <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <div>
-              <div class="font-medium">PNG 图片</div>
-              <div class="text-xs text-slate-400">适合分享和预览</div>
+              <div class="font-medium">Markdown 文件</div>
+              <div class="text-xs text-slate-400">适合阅读和分享</div>
             </div>
           </button>
-          <button id="export-pdf" class="w-full py-3 px-4 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3">
+          <button id="export-json" class="w-full py-3 px-4 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3">
             <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
             </svg>
             <div>
-              <div class="font-medium">PDF 文档</div>
-              <div class="text-xs text-slate-400">适合打印和存档</div>
+              <div class="font-medium">JSON 文件</div>
+              <div class="text-xs text-slate-400">适合备份和导入</div>
             </div>
           </button>
         </div>
@@ -211,14 +307,14 @@ function showExportDialog(): Promise<'png' | 'pdf' | null> {
       document.body.removeChild(dialog)
     }
 
-    dialog.querySelector('#export-png')?.addEventListener('click', () => {
+    dialog.querySelector('#export-markdown')?.addEventListener('click', () => {
       cleanup()
-      resolve('png')
+      resolve('markdown')
     })
 
-    dialog.querySelector('#export-pdf')?.addEventListener('click', () => {
+    dialog.querySelector('#export-json')?.addEventListener('click', () => {
       cleanup()
-      resolve('pdf')
+      resolve('json')
     })
 
     dialog.querySelector('#export-cancel')?.addEventListener('click', () => {
