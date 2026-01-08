@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText } from 'lucide-react'
 import { useSettings, PROVIDER_PRESETS, OPENAI_COMPATIBLE_PRESETS } from '../../hooks/useSettings'
 import type { AIProvider } from '../../hooks/useSettings'
@@ -213,32 +214,42 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
     }
   }, [open, onClose])
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* 遮罩层 */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* 模态框 */}
-      <div className="relative z-10 w-full max-w-md mx-4 bg-white dark:bg-dark-sidebar rounded-xl border border-gray-200 dark:border-gray-800 shadow-2xl max-h-[90vh] overflow-y-auto">
-        {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-dark-sidebar">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            设置
-          </h2>
-          <button
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* 遮罩层 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          />
 
-        {/* 操作消息提示 */}
+          {/* 模态框 */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="relative z-10 w-full max-w-md mx-4 bg-white dark:bg-dark-sidebar rounded-xl border border-gray-200 dark:border-gray-800 shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            {/* 头部 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-dark-sidebar z-20">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                设置
+              </h2>
+              <button
+                onClick={onClose}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* 操作消息提示 */}
         {operationMessage && (
           <div className={`mx-6 mt-4 px-4 py-2 rounded-lg text-sm whitespace-pre-line ${
             operationMessage.type === 'success' 
@@ -656,28 +667,30 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
           </div>
         </div>
 
-        {/* 底部 */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 sticky bottom-0 bg-white dark:bg-dark-sidebar">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
-          >
-            完成
-          </button>
+            {/* 底部 */}
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 sticky bottom-0 bg-white dark:bg-dark-sidebar z-20">
+              <button
+                onClick={onClose}
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-gray-900 dark:bg-gray-100 dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
+              >
+                完成
+              </button>
+            </div>
+          </motion.div>
+
+          {/* 导出选择模态框 */}
+          <ExportModal
+            open={showExportModal}
+            onClose={() => setShowExportModal(false)}
+          />
+
+          {/* 更新日志模态框 */}
+          <ChangelogModal
+            open={showChangelogModal}
+            onClose={() => setShowChangelogModal(false)}
+          />
         </div>
-      </div>
-
-      {/* 导出选择模态框 */}
-      <ExportModal
-        open={showExportModal}
-        onClose={() => setShowExportModal(false)}
-      />
-
-      {/* 更新日志模态框 */}
-      <ChangelogModal
-        open={showChangelogModal}
-        onClose={() => setShowChangelogModal(false)}
-      />
-    </div>
+      )}
+    </AnimatePresence>
   )
 }

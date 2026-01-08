@@ -1,4 +1,5 @@
 import { Star, Trash2, RotateCcw, X } from 'lucide-react'
+import { motion } from 'framer-motion'
 import type { Note } from '../../lib/db'
 import { formatDate, extractPreview } from '../../lib/utils'
 
@@ -24,7 +25,14 @@ export function NoteCard({
   const preview = extractPreview(note.content)
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      whileHover={{ scale: 1.01, transition: { duration: 0.2 } }}
+      whileTap={{ scale: 0.99, transition: { duration: 0.1 } }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
       className={`note-list-item group relative w-full text-left px-3 py-3 border-b border-black/[0.03] dark:border-white/[0.06] cursor-pointer ${
         active
           ? 'note-card-active'
@@ -105,6 +113,6 @@ export function NoteCard({
           </button>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

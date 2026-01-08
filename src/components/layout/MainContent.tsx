@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Star, Eye, PenLine, Sparkles, Bell, X } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
@@ -71,133 +72,158 @@ export function MainContent({
 
   return (
     <main className="flex-1 bg-[#F9FBFC] dark:bg-[#0B0D11] h-full overflow-hidden flex flex-col transition-colors duration-300">
-      {activeNoteId !== null ? (
-        <>
-          {/* 编辑器头部 - 毛玻璃效果 */}
-          <div className="flex items-center justify-between px-12 py-4 border-b border-black/[0.03] dark:border-white/[0.06] editor-header-glass sticky top-0 z-10">
-            <nav className="text-[13px] text-slate-400">
-              <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors">
-                全部笔记
-              </span>
-              <span className="mx-2">/</span>
-              <span className="text-slate-900 dark:text-slate-100">
-                {localTitle || '无标题'}
-              </span>
-            </nav>
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] text-slate-400">
-                最后编辑于 {formatDate(activeNote?.updatedAt ?? new Date())}
-              </span>
-              {/* 收藏按钮 */}
-              <button
-                onClick={() => activeNoteId && onToggleFavorite(activeNoteId)}
-                className={`p-1.5 rounded-lg transition-colors duration-200 btn-press ${
-                  activeNote?.isFavorite === 1
-                    ? 'text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
-                    : 'text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
-                }`}
-                title={activeNote?.isFavorite === 1 ? '取消收藏' : '收藏'}
-              >
-                <Star
-                  className={`h-4 w-4 ${activeNote?.isFavorite === 1 ? 'fill-[#5E6AD2]' : ''}`}
-                  strokeWidth={1.5}
-                />
-              </button>
-              {/* 提醒按钮 */}
-              <div className="relative">
-                <button
-                  ref={reminderButtonRef}
-                  onClick={() => setShowReminderPicker(!showReminderPicker)}
-                  className={`p-1.5 rounded-lg transition-colors duration-200 btn-press ${
-                    hasReminder
-                      ? 'text-amber-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
-                      : 'text-slate-400 hover:text-amber-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+      <AnimatePresence mode="wait">
+        {activeNoteId !== null ? (
+          <motion.div
+            key={activeNoteId}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="flex-1 flex flex-col h-full overflow-hidden"
+          >
+            {/* 编辑器头部 - 毛玻璃效果 */}
+            <div className="flex items-center justify-between px-12 py-4 border-b border-black/[0.03] dark:border-white/[0.06] editor-header-glass sticky top-0 z-10">
+              <nav className="text-[13px] text-slate-400">
+                <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors">
+                  全部笔记
+                </span>
+                <span className="mx-2">/</span>
+                <span className="text-slate-900 dark:text-slate-100">
+                  {localTitle || '无标题'}
+                </span>
+              </nav>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-slate-400">
+                  最后编辑于 {formatDate(activeNote?.updatedAt ?? new Date())}
+                </span>
+                {/* 收藏按钮 */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => activeNoteId && onToggleFavorite(activeNoteId)}
+                  className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                    activeNote?.isFavorite === 1
+                      ? 'text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+                      : 'text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
                   }`}
-                  title={hasReminder ? '查看/修改提醒' : '设置提醒'}
+                  title={activeNote?.isFavorite === 1 ? '取消收藏' : '收藏'}
                 >
-                  <Bell
-                    className={`h-4 w-4 ${hasReminder ? 'fill-amber-500' : ''}`}
+                  <Star
+                    className={`h-4 w-4 ${activeNote?.isFavorite === 1 ? 'fill-[#5E6AD2]' : ''}`}
                     strokeWidth={1.5}
                   />
-                </button>
-                {/* 提醒选择器弹出框 */}
-                {showReminderPicker && (
-                  <div
-                    ref={reminderPopupRef}
-                    className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-black/[0.06] dark:border-white/[0.06] p-4 z-50"
+                </motion.button>
+                {/* 提醒按钮 */}
+                <div className="relative">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    ref={reminderButtonRef}
+                    onClick={() => setShowReminderPicker(!showReminderPicker)}
+                    className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                      hasReminder
+                        ? 'text-amber-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+                        : 'text-slate-400 hover:text-amber-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+                    }`}
+                    title={hasReminder ? '查看/修改提醒' : '设置提醒'}
                   >
-                    <ReminderPickerPopup
-                      noteId={activeNoteId}
-                      hasReminder={!!hasReminder}
-                      reminderDate={activeNote?.reminderDate}
-                      onSetReminder={(date) => {
-                        onSetReminder?.(activeNoteId, date)
-                        setShowReminderPicker(false)
-                      }}
-                      onClearReminder={() => {
-                        onClearReminder?.(activeNoteId)
-                        setShowReminderPicker(false)
-                      }}
-                      onClose={() => setShowReminderPicker(false)}
+                    <Bell
+                      className={`h-4 w-4 ${hasReminder ? 'fill-amber-500' : ''}`}
+                      strokeWidth={1.5}
                     />
-                  </div>
-                )}
+                  </motion.button>
+                  {/* 提醒选择器弹出框 */}
+                  {showReminderPicker && (
+                    <div
+                      ref={reminderPopupRef}
+                      className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-black/[0.06] dark:border-white/[0.06] p-4 z-50"
+                    >
+                      <ReminderPickerPopup
+                        noteId={activeNoteId}
+                        hasReminder={!!hasReminder}
+                        reminderDate={activeNote?.reminderDate}
+                        onSetReminder={(date) => {
+                          onSetReminder?.(activeNoteId, date)
+                          setShowReminderPicker(false)
+                        }}
+                        onClearReminder={() => {
+                          onClearReminder?.(activeNoteId)
+                          setShowReminderPicker(false)
+                        }}
+                        onClose={() => setShowReminderPicker(false)}
+                      />
+                    </div>
+                  )}
+                </div>
+                {/* 模式切换按钮 */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onToggleEdit}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors duration-200"
+                  title={isEditing ? '切换到阅读模式' : '切换到编辑模式'}
+                >
+                  {isEditing ? (
+                    <Eye className="h-4 w-4" strokeWidth={1.5} />
+                  ) : (
+                    <PenLine className="h-4 w-4" strokeWidth={1.5} />
+                  )}
+                </motion.button>
+                {/* AI 助手按钮 */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onToggleChat}
+                  className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                    isChatOpen
+                      ? 'text-[#5E6AD2] bg-[#5E6AD2]/10'
+                      : 'text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+                  }`}
+                  title="AI 助手 (⌘J)"
+                >
+                  <Sparkles className="h-4 w-4" strokeWidth={1.5} />
+                </motion.button>
               </div>
-              {/* 模式切换按钮 */}
-              <button
-                onClick={onToggleEdit}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors duration-200 btn-press"
-                title={isEditing ? '切换到阅读模式' : '切换到编辑模式'}
-              >
-                {isEditing ? (
-                  <Eye className="h-4 w-4" strokeWidth={1.5} />
-                ) : (
-                  <PenLine className="h-4 w-4" strokeWidth={1.5} />
-                )}
-              </button>
-              {/* AI 助手按钮 */}
-              <button
-                onClick={onToggleChat}
-                className={`p-1.5 rounded-lg transition-colors duration-200 btn-press ${
-                  isChatOpen
-                    ? 'text-[#5E6AD2] bg-[#5E6AD2]/10'
-                    : 'text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
-                }`}
-                title="AI 助手 (⌘J)"
-              >
-                <Sparkles className="h-4 w-4" strokeWidth={1.5} />
-              </button>
             </div>
-          </div>
 
-          {/* 标签输入区域 */}
-          <div className="px-12 py-2 border-b border-black/[0.03] dark:border-white/[0.06]">
-            <TagsInput
+            {/* 标签输入区域 */}
+            <div className="px-12 py-2 border-b border-black/[0.03] dark:border-white/[0.06]">
+              <TagsInput
+                tags={activeNote?.tags ?? []}
+                onChange={onTagsChange}
+                disabled={!isEditing}
+              />
+            </div>
+
+            {/* Tiptap 编辑器 */}
+            <Editor
+              key={`editor-${activeNoteId}`}
+              title={localTitle}
+              content={localContent}
               tags={activeNote?.tags ?? []}
-              onChange={onTagsChange}
-              disabled={!isEditing}
+              isEditing={isEditing}
+              createdAt={activeNote?.createdAt ?? new Date()}
+              updatedAt={activeNote?.updatedAt ?? new Date()}
+              onTitleChange={onTitleChange}
+              onContentChange={onContentChange}
+              onTagsChange={onTagsChange}
+              contentToInsert={contentToInsert}
+              onContentInserted={onContentInserted}
             />
-          </div>
-
-          {/* Tiptap 编辑器 */}
-          <Editor
-            key={`editor-${activeNoteId}`}
-            title={localTitle}
-            content={localContent}
-            tags={activeNote?.tags ?? []}
-            isEditing={isEditing}
-            createdAt={activeNote?.createdAt ?? new Date()}
-            updatedAt={activeNote?.updatedAt ?? new Date()}
-            onTitleChange={onTitleChange}
-            onContentChange={onContentChange}
-            onTagsChange={onTagsChange}
-            contentToInsert={contentToInsert}
-            onContentInserted={onContentInserted}
-          />
-        </>
-      ) : (
-        <EmptyState onCreateNote={onCreateNote} />
-      )}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex-1 flex flex-col h-full"
+          >
+            <EmptyState onCreateNote={onCreateNote} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

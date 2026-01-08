@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { X, Send, Sparkles, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useChat } from '../../hooks/useChat'
 import { type ChatMessage } from '../../lib/db'
 import { ChatMessageItem } from './ChatMessageItem'
@@ -164,7 +165,12 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
       {/* Messages */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
         {displayMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex flex-col items-center justify-center h-full text-center"
+          >
             <Sparkles className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-3" strokeWidth={1} />
             <p className="text-[13px] text-slate-400 dark:text-slate-500">
               有什么可以帮你的？
@@ -172,49 +178,66 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
               我可以帮你分析笔记内容、回答问题
             </p>
-          </div>
+          </motion.div>
         ) : (
           <div className="space-y-1">
-            {displayMessages.map((msg, index) => {
-              const isTemp = !('id' in msg) || msg.id === undefined
-              const isCurrentStreaming = isTemp && msg.role === 'assistant'
+            <AnimatePresence mode="popLayout" initial={false}>
+              {displayMessages.map((msg, index) => {
+                const isTemp = !('id' in msg) || msg.id === undefined
+                const isCurrentStreaming = isTemp && msg.role === 'assistant'
 
-              return (
-                <ChatMessageItem
-                  key={isTemp ? `temp-${index}` : msg.id}
-                  message={msg as ChatMessage}
-                  isStreaming={isCurrentStreaming}
-                  isTemporary={isTemp}
-                  isAnyStreaming={isStreaming || isStreamingActive}
-                  onCopy={handleCopy}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onRetry={handleRetry}
-                  onInsertToNote={onInsertToNote}
-                />
-              )
-            })}
+                return (
+                  <motion.div
+                    key={isTemp ? `temp-${index}` : msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    layout
+                  >
+                    <ChatMessageItem
+                      message={msg as ChatMessage}
+                      isStreaming={isCurrentStreaming}
+                      isTemporary={isTemp}
+                      isAnyStreaming={isStreaming || isStreamingActive}
+                      onCopy={handleCopy}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onRetry={handleRetry}
+                      onInsertToNote={onInsertToNote}
+                    />
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
             
             {/* 等待 AI 回复的加载动画 */}
-            {isWaitingForResponse && (
-              <div className="py-3 ai-thinking-indicator">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    AI
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="ai-thinking-dots">
-                    <span className="ai-dot"></span>
-                    <span className="ai-dot"></span>
-                    <span className="ai-dot"></span>
+            <AnimatePresence>
+              {isWaitingForResponse && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="py-3 ai-thinking-indicator"
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      AI
+                    </span>
                   </div>
-                  <span className="text-[12px] text-slate-400 dark:text-slate-500 ml-1">
-                    思考中...
-                  </span>
-                </div>
-              </div>
-            )}
+                  <div className="flex items-center gap-1.5">
+                    <div className="ai-thinking-dots">
+                      <span className="ai-dot"></span>
+                      <span className="ai-dot"></span>
+                      <span className="ai-dot"></span>
+                    </div>
+                    <span className="text-[12px] text-slate-400 dark:text-slate-500 ml-1">
+                      思考中...
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
         <div ref={messagesEndRef} />

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, Clock, X, ExternalLink } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   isPermissionGranted,
   requestPermission,
@@ -133,103 +134,98 @@ export function ReminderNotification({
   if (visibleReminders.length === 0) return null
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
-      {/* 批量关闭按钮 */}
-      {visibleReminders.length > 1 && (
-        <button
-          onClick={handleDismissAll}
-          className="text-[12px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 mb-1"
-        >
-          关闭所有 ({visibleReminders.length})
-        </button>
-      )}
+    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm pointer-events-none">
+      <div className="pointer-events-auto">
+        {/* 批量关闭按钮 */}
+        {visibleReminders.length > 1 && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleDismissAll}
+            className="text-[12px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 mb-1 ml-auto block"
+          >
+            关闭所有 ({visibleReminders.length})
+          </motion.button>
+        )}
 
-      {/* 提醒列表 */}
-      {visibleReminders.map((note) => (
-        <div
-          key={note.id}
-          className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-black/[0.06] dark:border-white/[0.06] p-4 animate-slide-in"
-        >
-          <div className="flex items-start gap-3">
-            {/* 图标 - 根据类型显示不同颜色 */}
-            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-              note.reminderType === 'due'
-                ? 'bg-red-100 dark:bg-red-500/20'
-                : 'bg-amber-100 dark:bg-amber-500/20'
-            }`}>
-              {note.reminderType === 'due' ? (
-                <Bell className="h-5 w-5 text-red-600 dark:text-red-400" strokeWidth={1.5} />
-              ) : (
-                <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" strokeWidth={1.5} />
-              )}
-            </div>
-
-            {/* 内容 */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className={`text-[11px] font-medium tracking-wider ${
+        {/* 提醒列表 */}
+        <AnimatePresence mode="popLayout">
+          {visibleReminders.map((note) => (
+            <motion.div
+              key={note.id}
+              layout
+              initial={{ opacity: 0, x: 100, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-black/[0.06] dark:border-white/[0.06] p-4 mb-2"
+            >
+              <div className="flex items-start gap-3">
+                {/* 图标 - 根据类型显示不同颜色 */}
+                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
                   note.reminderType === 'due'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-amber-600 dark:text-amber-400'
+                    ? 'bg-red-100 dark:bg-red-500/20'
+                    : 'bg-amber-100 dark:bg-amber-500/20'
                 }`}>
-                  {note.reminderType === 'due'
-                    ? '⏰ 时间到了'
-                    : `⏳ 还有 ${note.reminderDate ? formatTimeRemaining(note.reminderDate) : ''}`}
-                </span>
-                <button
-                  onClick={() => handleDismiss(note.id)}
-                  className="p-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded"
-                >
-                  <X className="h-4 w-4 text-slate-400" strokeWidth={1.5} />
-                </button>
+                  {note.reminderType === 'due' ? (
+                    <Bell className="h-5 w-5 text-red-600 dark:text-red-400" strokeWidth={1.5} />
+                  ) : (
+                    <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" strokeWidth={1.5} />
+                  )}
+                </div>
+
+                {/* 内容 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-[11px] font-medium tracking-wider ${
+                      note.reminderType === 'due'
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-amber-600 dark:text-amber-400'
+                    }`}>
+                      {note.reminderType === 'due'
+                        ? '⏰ 时间到了'
+                        : `⏳ 还有 ${note.reminderDate ? formatTimeRemaining(note.reminderDate) : ''}`}
+                    </span>
+                    <button
+                      onClick={() => handleDismiss(note.id)}
+                      className="p-1 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded"
+                    >
+                      <X className="h-4 w-4 text-slate-400" strokeWidth={1.5} />
+                    </button>
+                  </div>
+
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                    {note.title || '无标题'}
+                  </h4>
+
+                  {note.reminderDate && (
+                    <p className="text-[12px] text-slate-500 mt-1">
+                      {new Date(note.reminderDate).toLocaleString('zh-CN', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      onSelectNote(note)
+                      handleDismiss(note.id)
+                    }}
+                    className="mt-2 text-[13px] text-[#5E6AD2] hover:text-[#5E6AD2]/80 font-medium flex items-center gap-1"
+                  >
+                    查看笔记
+                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </button>
+                </div>
               </div>
-
-              <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-                {note.title || '无标题'}
-              </h4>
-
-              {note.reminderDate && (
-                <p className="text-[12px] text-slate-500 mt-1">
-                  {new Date(note.reminderDate).toLocaleString('zh-CN', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-              )}
-
-              <button
-                onClick={() => {
-                  onSelectNote(note)
-                  handleDismiss(note.id)
-                }}
-                className="mt-2 text-[13px] text-[#5E6AD2] hover:text-[#5E6AD2]/80 font-medium flex items-center gap-1"
-              >
-                查看笔记
-                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </button>
-            </div>
-          </div>
-        </div>
-      ))}
-
-      {/* 动画样式 */}
-      <style>{`
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateX(100%);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
-        }
-      `}</style>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

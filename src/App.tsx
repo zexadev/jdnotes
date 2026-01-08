@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { initializeDefaultNotes, noteOperations, type Note } from './lib/db'
 import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks'
 import { CommandMenu } from './components/modals/CommandMenu'
@@ -7,6 +8,8 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { SettingsModal } from './components/modals/SettingsModal'
 import { AIChatSidebar } from './components/ai/AIChatSidebar'
 import { CalendarView, ReminderNotification } from './components/calendar'
+import { ToastContainer } from './components/common/Toast'
+import { toast } from './lib/toast'
 
 // 视图类型
 type ViewType = 'inbox' | 'favorites' | 'trash' | 'calendar' | `tag-${string}`
@@ -21,6 +24,14 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
+  const [toasts, setToasts] = useState(toast.getToasts())
+
+  // 订阅 toast 变化
+  useEffect(() => {
+    return toast.subscribe(() => {
+      setToasts([...toast.getToasts()])
+    })
+  }, [])
 
   // 追踪已知存在的笔记 ID（用于区分新建和删除）
   const knownNoteIdsRef = useRef<Set<number>>(new Set())
@@ -300,62 +311,78 @@ function App() {
           onOpenSettings={() => setShowSettings(true)}
         />
 
-        {/* 日历视图 */}
-        {currentView === 'calendar' ? (
-          <div className="flex-1 h-full overflow-hidden">
-            <CalendarView
-              onSelectNote={handleSelectNote}
-              onBack={() => setCurrentView('inbox')}
-            />
-          </div>
-        ) : (
-          <>
-            <NoteList
-              searchQuery={searchQuery}
-              currentView={currentView}
-              notes={notes}
-              activeNoteId={activeNoteId}
-              onSelectNote={handleSelectNote}
-              onCreateNote={handleCreateNote}
-              onDeleteNote={handleDeleteNote}
-              onRestoreNote={handleRestoreNote}
-              onPermanentDelete={handlePermanentDelete}
-            />
-
-            {/* 右侧编辑器 + AI 侧栏 */}
-            <div className="flex-1 flex h-full overflow-hidden">
-              <MainContent
+        <AnimatePresence mode="wait">
+          {/* 日历视图 */}
+          {currentView === 'calendar' ? (
+            <motion.div
+              key="calendar"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 h-full overflow-hidden"
+            >
+              <CalendarView
+                onSelectNote={handleSelectNote}
+                onBack={() => setCurrentView('inbox')}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="notes"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 flex h-full overflow-hidden"
+            >
+              <NoteList
+                searchQuery={searchQuery}
+                currentView={currentView}
+                notes={notes}
                 activeNoteId={activeNoteId}
-                activeNote={activeNote}
-                localTitle={localTitle}
-                localContent={localContent}
-                isEditing={isEditing}
-                isChatOpen={isChatOpen}
-                contentToInsert={contentToInsert}
-                onTitleChange={handleTitleChange}
-                onContentChange={handleContentChange}
-                onTagsChange={handleTagsChange}
-                onToggleFavorite={handleToggleFavorite}
-                onToggleEdit={() => setIsEditing(!isEditing)}
-                onToggleChat={toggleChat}
+                onSelectNote={handleSelectNote}
                 onCreateNote={handleCreateNote}
-                onContentInserted={handleContentInserted}
-                onSetReminder={handleSetReminder}
-                onClearReminder={handleClearReminder}
+                onDeleteNote={handleDeleteNote}
+                onRestoreNote={handleRestoreNote}
+                onPermanentDelete={handlePermanentDelete}
               />
 
-              {/* AI 聊天侧栏 */}
-              <AIChatSidebar
-                isOpen={isChatOpen}
-                onClose={() => setIsChatOpen(false)}
-                noteId={activeNoteId}
-                noteTitle={localTitle}
-                noteContent={localContent}
-                onInsertToNote={handleInsertToNote}
-              />
-            </div>
-          </>
-        )}
+              {/* 右侧编辑器 + AI 侧栏 */}
+              <div className="flex-1 flex h-full overflow-hidden">
+                <MainContent
+                  activeNoteId={activeNoteId}
+                  activeNote={activeNote}
+                  localTitle={localTitle}
+                  localContent={localContent}
+                  isEditing={isEditing}
+                  isChatOpen={isChatOpen}
+                  contentToInsert={contentToInsert}
+                  onTitleChange={handleTitleChange}
+                  onContentChange={handleContentChange}
+                  onTagsChange={handleTagsChange}
+                  onToggleFavorite={handleToggleFavorite}
+                  onToggleEdit={() => setIsEditing(!isEditing)}
+                  onToggleChat={toggleChat}
+                  onCreateNote={handleCreateNote}
+                  onContentInserted={handleContentInserted}
+                  onSetReminder={handleSetReminder}
+                  onClearReminder={handleClearReminder}
+                />
+
+                {/* AI 聊天侧栏 */}
+                <AIChatSidebar
+                  isOpen={isChatOpen}
+                  onClose={() => setIsChatOpen(false)}
+                  noteId={activeNoteId}
+                  noteTitle={localTitle}
+                  noteContent={localContent}
+                  onInsertToNote={handleInsertToNote}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 提醒通知组件 */}
@@ -364,6 +391,9 @@ function App() {
         onSelectNote={handleSelectNote}
         onDismiss={handleDismissReminder}
       />
+
+      {/* 全局 Toast 容器 */}
+      <ToastContainer toasts={toasts} removeToast={toast.remove} />
     </>
   )
 }

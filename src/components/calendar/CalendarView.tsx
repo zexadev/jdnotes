@@ -1,6 +1,7 @@
 import { useCallback, useRef, useMemo } from 'react'
 import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
 import type { DragEndEvent } from '@dnd-kit/core'
+import { motion, AnimatePresence } from 'framer-motion'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { useCalendar } from '../../hooks/useCalendar'
@@ -181,38 +182,67 @@ export function CalendarView({ onSelectNote }: CalendarViewProps) {
         />
 
         <div ref={calendarRef} className="flex-1 overflow-hidden" id="calendar-content">
-          {calendar.view === 'month' && (
-            <MonthView
-              currentDate={calendar.currentDate}
-              notes={calendar.notes || []}
-              distribution={calendar.distribution}
-              selectedDate={calendar.selectedDate}
-              showHeatmap={calendar.showHeatmap}
-              dateField={calendar.dateField}
-              onSelectDate={calendar.goToDate}
-              onSelectNote={onSelectNote}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            {calendar.view === 'month' && (
+              <motion.div
+                key="month"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="h-full"
+              >
+                <MonthView
+                  currentDate={calendar.currentDate}
+                  notes={calendar.notes || []}
+                  distribution={calendar.distribution}
+                  selectedDate={calendar.selectedDate}
+                  showHeatmap={calendar.showHeatmap}
+                  dateField={calendar.dateField}
+                  onSelectDate={calendar.goToDate}
+                  onSelectNote={onSelectNote}
+                />
+              </motion.div>
+            )}
 
-          {calendar.view === 'week' && (
-            <WeekView
-              currentDate={calendar.currentDate}
-              notes={calendar.notes || []}
-              dateField={calendar.dateField}
-              onSelectNote={onSelectNote}
-            />
-          )}
+            {calendar.view === 'week' && (
+              <motion.div
+                key="week"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="h-full"
+              >
+                <WeekView
+                  currentDate={calendar.currentDate}
+                  notes={calendar.notes || []}
+                  dateField={calendar.dateField}
+                  onSelectNote={onSelectNote}
+                />
+              </motion.div>
+            )}
 
-          {calendar.view === 'day' && (
-            <DayView
-              currentDate={calendar.currentDate}
-              notes={calendar.notes || []}
-              dateField={calendar.dateField}
-              onSelectNote={onSelectNote}
-              onSetReminder={calendar.setNoteReminder}
-              onClearReminder={calendar.clearNoteReminder}
-            />
-          )}
+            {calendar.view === 'day' && (
+              <motion.div
+                key="day"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="h-full"
+              >
+                <DayView
+                  currentDate={calendar.currentDate}
+                  notes={calendar.notes || []}
+                  dateField={calendar.dateField}
+                  onSelectNote={onSelectNote}
+                  onSetReminder={calendar.setNoteReminder}
+                  onClearReminder={calendar.clearNoteReminder}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </DndContext>

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
 
@@ -54,7 +55,9 @@ export function EditorHeader({
         </div>
         {/* AI 生成标题和标签按钮 */}
         {isEditing && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={onGenerateMeta}
             disabled={isGeneratingMeta}
             className="mt-2 p-1.5 text-slate-400 hover:text-[#5E6AD2] hover:bg-[#5E6AD2]/10 rounded-lg transition-colors disabled:opacity-50"
@@ -65,7 +68,7 @@ export function EditorHeader({
             ) : (
               <Sparkles className="h-4 w-4" strokeWidth={1.5} />
             )}
-          </button>
+          </motion.button>
         )}
       </div>
 

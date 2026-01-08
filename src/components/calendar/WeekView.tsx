@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { motion } from 'framer-motion'
 import { DraggableNote } from './CalendarCell'
 import { isSameDay } from '../../hooks/useCalendar'
 import { formatDateKey, type Note } from '../../lib/db'
@@ -55,14 +56,21 @@ export function WeekView({
   return (
     <div className="p-6 h-full overflow-auto">
       <div className="grid grid-cols-7 gap-4 min-h-[600px]">
-        {weekDays.map((date) => (
-          <WeekDayColumn
+        {weekDays.map((date, index) => (
+          <motion.div
             key={date.toISOString()}
-            date={date}
-            notes={notesByDay.get(formatDateKey(date)) || []}
-            isToday={isSameDay(date, today)}
-            onSelectNote={onSelectNote}
-          />
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, delay: index * 0.05 }}
+            className="h-full"
+          >
+            <WeekDayColumn
+              date={date}
+              notes={notesByDay.get(formatDateKey(date)) || []}
+              isToday={isSameDay(date, today)}
+              onSelectNote={onSelectNote}
+            />
+          </motion.div>
         ))}
       </div>
     </div>
@@ -112,12 +120,18 @@ function WeekDayColumn({
 
       {/* 笔记列表 */}
       <div className="flex-1 overflow-y-auto space-y-2">
-        {notes.map((note) => (
-          <DraggableNote
+        {notes.map((note, index) => (
+          <motion.div
             key={note.id}
-            note={note}
-            onClick={() => onSelectNote(note)}
-          />
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2, delay: index * 0.05 }}
+          >
+            <DraggableNote
+              note={note}
+              onClick={() => onSelectNote(note)}
+            />
+          </motion.div>
         ))}
 
         {/* 空状态 */}

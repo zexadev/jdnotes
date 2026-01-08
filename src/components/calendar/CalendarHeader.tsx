@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, Calendar, Download, Flame } from 'lucide-react'
+import { motion } from 'framer-motion'
 import type { CalendarView, DateField } from '../../hooks/useCalendar'
 import { getWeekNumber } from '../../hooks/useCalendar'
 
@@ -54,26 +55,32 @@ export function CalendarHeader({
           </h2>
 
           <div className="flex items-center gap-1 ml-2">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={onPrevious}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
               title="上一页"
             >
               <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={onNext}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
               title="下一页"
             >
               <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={onToday}
               className="ml-2 px-3 py-1.5 text-[13px] font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded-lg transition-colors"
             >
               今天
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -81,7 +88,9 @@ export function CalendarHeader({
         <div className="flex items-center gap-2">
           {/* 热力图切换（仅月视图） */}
           {view === 'month' && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => onHeatmapToggle(!showHeatmap)}
               className={`p-2 rounded-lg transition-colors ${
                 showHeatmap
@@ -91,17 +100,19 @@ export function CalendarHeader({
               title="热力图视图"
             >
               <Flame className="h-4 w-4" strokeWidth={1.5} />
-            </button>
+            </motion.button>
           )}
 
           {/* 导出按钮 */}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={onExport}
             className="p-2 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
             title="导出日历"
           >
             <Download className="h-4 w-4" strokeWidth={1.5} />
-          </button>
+          </motion.button>
 
           {/* 时间字段切换 */}
           <div className="flex items-center gap-1 bg-white/50 dark:bg-white/[0.03] rounded-lg p-1 ml-2">

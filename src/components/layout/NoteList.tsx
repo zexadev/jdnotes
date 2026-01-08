@@ -1,6 +1,8 @@
 import { Plus } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
 import { NoteCard } from '../common/NoteCard'
 import { NoNotesState } from '../common/EmptyState'
+import { NoteCardSkeleton } from '../common/Skeleton'
 import type { Note } from '../../lib/db'
 
 interface NoteListProps {
@@ -8,6 +10,7 @@ interface NoteListProps {
   currentView: string
   notes: Note[]
   activeNoteId: number | null
+  isLoading?: boolean
   onSelectNote: (note: Note) => void
   onCreateNote: () => void
   onDeleteNote: (id: number) => void
@@ -20,6 +23,7 @@ export function NoteList({
   currentView,
   notes,
   activeNoteId,
+  isLoading = false,
   onSelectNote,
   onCreateNote,
   onDeleteNote,
@@ -56,21 +60,29 @@ export function NoteList({
 
       {/* 笔记列表 */}
       <div className="flex-1 overflow-y-auto">
-        {!notes || notes.length === 0 ? (
+        {isLoading ? (
+          <>
+            <NoteCardSkeleton />
+            <NoteCardSkeleton />
+            <NoteCardSkeleton />
+          </>
+        ) : !notes || notes.length === 0 ? (
           <NoNotesState onCreateNote={onCreateNote} />
         ) : (
-          notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              active={note.id === activeNoteId}
-              onClick={() => onSelectNote(note)}
-              onDelete={() => onDeleteNote(note.id)}
-              onRestore={() => onRestoreNote(note.id)}
-              onPermanentDelete={() => onPermanentDelete(note.id)}
-              isTrashView={currentView === 'trash'}
-            />
-          ))
+          <AnimatePresence mode="popLayout">
+            {notes.map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                active={note.id === activeNoteId}
+                onClick={() => onSelectNote(note)}
+                onDelete={() => onDeleteNote(note.id)}
+                onRestore={() => onRestoreNote(note.id)}
+                onPermanentDelete={() => onPermanentDelete(note.id)}
+                isTrashView={currentView === 'trash'}
+              />
+            ))}
+          </AnimatePresence>
         )}
       </div>
     </div>

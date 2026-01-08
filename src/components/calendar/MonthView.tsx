@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { CalendarCell, DraggableNote } from './CalendarCell'
 import { isSameDay } from '../../hooks/useCalendar'
 import { formatDateKey, type Note } from '../../lib/db'
@@ -139,17 +140,23 @@ export function MonthView({
         {/* 日历网格 */}
         <div className="grid grid-cols-7 gap-2">
           {calendarDays.map((day, index) => (
-            <CalendarCell
+            <motion.div
               key={index}
-              date={day.date}
-              isCurrentMonth={day.isCurrentMonth}
-              isToday={day.isToday}
-              isSelected={selectedDate ? isSameDay(day.date, selectedDate) : false}
-              noteCount={day.noteCount}
-              showHeatmap={showHeatmap}
-              notes={day.notes}
-              onClick={() => onSelectDate(day.date)}
-            />
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2, delay: index * 0.005 }}
+            >
+              <CalendarCell
+                date={day.date}
+                isCurrentMonth={day.isCurrentMonth}
+                isToday={day.isToday}
+                isSelected={selectedDate ? isSameDay(day.date, selectedDate) : false}
+                noteCount={day.noteCount}
+                showHeatmap={showHeatmap}
+                notes={day.notes}
+                onClick={() => onSelectDate(day.date)}
+              />
+            </motion.div>
           ))}
         </div>
 
@@ -170,34 +177,48 @@ export function MonthView({
       </div>
 
       {/* 选中日期的笔记列表侧栏 */}
-      {selectedDate && (
-        <div className="w-80 border-l border-black/[0.03] dark:border-white/[0.06] p-4 overflow-y-auto">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {selectedDate.getMonth() + 1}月{selectedDate.getDate()}日
-            </h3>
-            <p className="text-[12px] text-slate-400 mt-1">
-              {selectedDateNotes.length} 篇笔记
-            </p>
-          </div>
+      <AnimatePresence mode="wait">
+        {selectedDate && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.2 }}
+            className="w-80 border-l border-black/[0.03] dark:border-white/[0.06] p-4 overflow-y-auto"
+          >
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {selectedDate.getMonth() + 1}月{selectedDate.getDate()}日
+              </h3>
+              <p className="text-[12px] text-slate-400 mt-1">
+                {selectedDateNotes.length} 篇笔记
+              </p>
+            </div>
 
-          {selectedDateNotes.length > 0 ? (
-            <div className="space-y-2">
-              {selectedDateNotes.map((note) => (
-                <DraggableNote
-                  key={note.id}
-                  note={note}
-                  onClick={() => onSelectNote(note)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-[13px] text-slate-400">暂无笔记</p>
-            </div>
-          )}
-        </div>
-      )}
+            {selectedDateNotes.length > 0 ? (
+              <div className="space-y-2">
+                {selectedDateNotes.map((note, index) => (
+                  <motion.div
+                    key={note.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: index * 0.05 }}
+                  >
+                    <DraggableNote
+                      note={note}
+                      onClick={() => onSelectNote(note)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-[13px] text-slate-400">暂无笔记</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

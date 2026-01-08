@@ -464,9 +464,27 @@ body {
 }
 
 /* 按钮点击效果 */
+.btn-press {
+  transition: all 0.2s ease;
+}
+
+.btn-press:hover {
+  transform: translateY(-1px);
+}
+
 .btn-press:active {
   transform: scale(0.95);
   transition: transform 0.1s ease-out;
+}
+
+/* 输入框聚焦效果 */
+.input-focus {
+  transition: all 0.2s ease;
+}
+
+.input-focus:focus {
+  transform: scale(1.01);
+  box-shadow: 0 0 0 2px rgba(94, 106, 210, 0.2);
 }
 
 /* 侧边栏渐变背景 */
