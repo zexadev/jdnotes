@@ -86,6 +86,15 @@ function App() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [toggleChat])
 
+  // 禁用浏览器默认右键菜单
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+    }
+    document.addEventListener('contextmenu', handleContextMenu)
+    return () => document.removeEventListener('contextmenu', handleContextMenu)
+  }, [])
+
   // 初始化默认数据并恢复未保存的数据
   useEffect(() => {
     const initialize = async () => {
