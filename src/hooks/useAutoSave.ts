@@ -5,7 +5,9 @@ interface UseAutoSaveOptions {
   noteId: number | null
   title: string
   content: string
+  isEditing: boolean // 是否处于编辑模式，只有编辑模式下才触发自动保存
   delay?: number
+  onSave?: () => void // 保存成功后的回调
 }
 
 // 待保存数据的类型
@@ -77,7 +79,9 @@ export function useAutoSave({
   noteId,
   title,
   content,
+  isEditing,
   delay = 500,
+  onSave,
 }: UseAutoSaveOptions) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedRef = useRef({ title: '', content: '' })
@@ -88,9 +92,12 @@ export function useAutoSave({
   const currentDataRef = useRef({ noteId, title, content })
   currentDataRef.current = { noteId, title, content }
   
-  // 存储上一个 noteId，用于在切换笔记时保存旧数据
+  // 使用 ref 存储 onSave 回调，避免闭包问题
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
+  
+  // 存储上一个 noteId，用于检测笔记切换
   const prevNoteIdRef = useRef<number | null>(null)
-  const prevDataRef = useRef<{ title: string; content: string } | null>(null)
 
   // 检查是否有未保存的变化
   const hasUnsavedChanges = useCallback(() => {
@@ -107,14 +114,21 @@ export function useAutoSave({
     targetContent: string
   ) => {
     // 防止重复保存
-    if (isSavingRef.current) return
+    if (isSavingRef.current) {
+      console.log('[AutoSave] saveWithData - 跳过（正在保存中）')
+      return
+    }
     
     try {
       isSavingRef.current = true
+      console.log('[AutoSave] saveWithData - 保存笔记:', targetNoteId, '标题:', targetTitle, '内容:', targetContent.substring(0, 50) + '...')
+      
       await noteOperations.update(targetNoteId, {
         title: targetTitle,
         content: targetContent
       })
+      
+      console.log('[AutoSave] saveWithData - 保存成功')
       
       // 只有当保存的是当前笔记时才更新 lastSavedRef
       if (targetNoteId === currentDataRef.current.noteId) {
@@ -128,8 +142,11 @@ export function useAutoSave({
       if (globalPendingData?.noteId === targetNoteId) {
         globalPendingData = null
       }
+      
+      // 保存成功后调用回调，刷新列表
+      onSaveRef.current?.()
     } catch (error) {
-      console.error('Auto-save failed:', error)
+      console.error('[AutoSave] saveWithData - 保存失败:', error)
     } finally {
       isSavingRef.current = false
     }
@@ -139,16 +156,24 @@ export function useAutoSave({
   const save = useCallback(async () => {
     const { noteId: currentNoteId, title: currentTitle, content: currentContent } = currentDataRef.current
     
-    if (currentNoteId === null) return
+    console.log('[AutoSave] save - currentDataRef:', { noteId: currentNoteId, title: currentTitle, content: currentContent.substring(0, 50) + '...' })
+    console.log('[AutoSave] save - lastSavedRef:', { title: lastSavedRef.current.title, content: lastSavedRef.current.content.substring(0, 50) + '...' })
+    
+    if (currentNoteId === null) {
+      console.log('[AutoSave] save - 跳过（noteId 为 null）')
+      return
+    }
     
     // 检查是否有变化
     if (
       lastSavedRef.current.title === currentTitle &&
       lastSavedRef.current.content === currentContent
     ) {
+      console.log('[AutoSave] save - 跳过（无变化）')
       return
     }
 
+    console.log('[AutoSave] save - 有变化，准备保存')
     await saveWithData(currentNoteId, currentTitle, currentContent)
   }, [saveWithData])
 
@@ -162,12 +187,18 @@ export function useAutoSave({
     await save()
   }, [save])
 
-  // 防抖保存
+  // 防抖保存 - 只在编辑模式下触发
   useEffect(() => {
     // 跳过首次渲染
     if (isFirstRender.current) {
       isFirstRender.current = false
       lastSavedRef.current = { title, content }
+      return
+    }
+
+    // 只在编辑模式下触发自动保存
+    if (!isEditing) {
+      console.log('[AutoSave] 防抖保存 - 跳过（非编辑模式）')
       return
     }
 
@@ -194,26 +225,17 @@ export function useAutoSave({
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [noteId, title, content, delay, save, hasUnsavedChanges])
+  }, [noteId, title, content, isEditing, delay, save, hasUnsavedChanges])
 
-  // 当 noteId 变化时，先保存旧笔记的数据
+  // 当 noteId 变化时，重置状态（不再自动保存旧笔记，由调用方显式保存）
   useEffect(() => {
-    // 如果有上一个笔记，且有未保存的数据，则保存
-    if (
-      prevNoteIdRef.current !== null &&
-      prevNoteIdRef.current !== noteId &&
-      prevDataRef.current !== null
-    ) {
-      const prevId = prevNoteIdRef.current
-      const prevData = prevDataRef.current
-      
-      // 检查是否有变化
-      if (
-        lastSavedRef.current.title !== prevData.title ||
-        lastSavedRef.current.content !== prevData.content
-      ) {
-        // 保存上一个笔记的数据
-        saveWithData(prevId, prevData.title, prevData.content)
+    // 检测 noteId 是否真的变化了（而不是首次渲染）
+    if (prevNoteIdRef.current !== null && prevNoteIdRef.current !== noteId) {
+      console.log('[AutoSave] noteId 变化:', prevNoteIdRef.current, '->', noteId)
+      // 清除待执行的定时器，避免保存到错误的笔记
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
       }
     }
 
@@ -223,17 +245,17 @@ export function useAutoSave({
     // 重置状态
     isFirstRender.current = true
     lastSavedRef.current = { title, content }
-    
-    return () => {
-      // 在 noteId 变化前保存当前数据到 prevDataRef
-      prevDataRef.current = { title, content }
-    }
-  }, [noteId]) // 注意：不要将 title, content 加入依赖，否则会导致循环
+  }, [noteId, title, content])
 
-  // 更新 prevDataRef（在每次 title/content 变化时）
-  useEffect(() => {
-    prevDataRef.current = { title, content }
-  }, [title, content])
+  // 保存指定笔记的数据（供外部在切换笔记时调用）
+  const saveNoteById = useCallback(async (
+    targetNoteId: number,
+    targetTitle: string,
+    targetContent: string
+  ) => {
+    console.log('[AutoSave] saveNoteById - 保存指定笔记:', targetNoteId)
+    await saveWithData(targetNoteId, targetTitle, targetContent)
+  }, [saveWithData])
 
   // 页面可见性变化时保存
   useEffect(() => {
@@ -301,5 +323,5 @@ export function useAutoSave({
     }
   }, [])
 
-  return { save, saveImmediately, hasUnsavedChanges }
+  return { save, saveImmediately, saveNoteById, hasUnsavedChanges }
 }

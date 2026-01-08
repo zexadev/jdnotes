@@ -49,6 +49,9 @@ export function Editor({
   const contentRef = useRef(content)
   contentRef.current = content
 
+  // 用于跟踪用户输入产生的最新内容，避免不必要的 setContent 调用
+  const lastEmittedContentRef = useRef<string | null>(null)
+
   // 自动标题和标签
   const { isGenerating: isGeneratingMeta, generateTitleAndTags } = useAutoTitle()
 
@@ -158,7 +161,11 @@ export function Editor({
 
     const handleUpdate = () => {
       if (!diffState.isActive) {
-        onContentChange(editor.storage.markdown.getMarkdown())
+        // 记录用户输入产生的内容，用于后续跳过不必要的同步
+        const newContent = editor.storage.markdown.getMarkdown()
+        console.log('[Editor] handleUpdate - 用户输入:', newContent.substring(0, 50) + '...')
+        lastEmittedContentRef.current = newContent
+        onContentChange(newContent)
       }
     }
 
@@ -177,13 +184,31 @@ export function Editor({
 
   // 当 content prop 变化时更新编辑器内容
   useEffect(() => {
-    // 跳过同步标志生效时不更新
-    if (skipContentSyncRef.current) return
+    console.log('[Editor] content sync useEffect - content 变化:', content.substring(0, 50) + '...')
+    console.log('[Editor] content sync useEffect - lastEmittedContentRef:', lastEmittedContentRef.current?.substring(0, 50) + '...')
+    
+    // 跳过同步标志生效时不更新（AI 操作）
+    if (skipContentSyncRef.current) {
+      console.log('[Editor] content sync useEffect - 跳过（skipContentSyncRef）')
+      return
+    }
+    
+    // 如果 content 是由用户输入产生的，跳过同步
+    if (content === lastEmittedContentRef.current) {
+      console.log('[Editor] content sync useEffect - 跳过（用户输入产生的）')
+      lastEmittedContentRef.current = null // 重置
+      return
+    }
 
     if (editor && !editor.isDestroyed && content && !diffState.isActive) {
-      const currentHTML = editor.getHTML()
-      if (content !== currentHTML) {
+      // 使用 Markdown 格式进行比较，避免格式差异导致不必要的更新
+      const currentMarkdown = editor.storage.markdown.getMarkdown()
+      console.log('[Editor] content sync useEffect - currentMarkdown:', currentMarkdown.substring(0, 50) + '...')
+      if (content !== currentMarkdown) {
+        console.log('[Editor] content sync useEffect - 执行 setContent!')
         editor.commands.setContent(content, { emitUpdate: false })
+      } else {
+        console.log('[Editor] content sync useEffect - 内容相同，跳过')
       }
     }
   }, [content, editor, diffState.isActive])

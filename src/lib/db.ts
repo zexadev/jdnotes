@@ -256,14 +256,13 @@ export const noteOperations = {
     )
   },
 
-  // 切换收藏状态
+  // 切换收藏状态（不更新 updatedAt，因为收藏是元数据操作，不是内容修改）
   async toggleFavorite(id: number): Promise<void> {
     const db = await getDatabase()
-    const now = new Date().toISOString()
     
     await db.execute(
-      `UPDATE notes SET is_favorite = 1 - is_favorite, updated_at = ? WHERE id = ?`,
-      [now, id]
+      `UPDATE notes SET is_favorite = 1 - is_favorite WHERE id = ?`,
+      [id]
     )
   },
 
