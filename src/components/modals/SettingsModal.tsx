@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText } from 'lucide-react'
-import { useSettings } from '../../hooks/useSettings'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText, ChevronDown } from 'lucide-react'
+import { useSettings, PROVIDER_PRESETS, OPENAI_COMPATIBLE_PRESETS } from '../../hooks/useSettings'
+import type { AIProvider } from '../../hooks/useSettings'
 import { useUpdater } from '../../hooks/useUpdater'
 import { dbOperations } from '../../lib/db'
 import {
@@ -248,6 +249,62 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
               AI 配置
             </h3>
             <div className="space-y-4">
+              {/* 模型平台选择 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  模型平台
+                </label>
+                <div className="relative">
+                  <select
+                    value={settings.aiProvider}
+                    onChange={(e) => {
+                      const provider = e.target.value as AIProvider
+                      const preset = PROVIDER_PRESETS[provider]
+                      updateSetting('aiProvider', provider)
+                      updateSetting('aiBaseUrl', preset.baseUrl)
+                      updateSetting('aiModel', preset.defaultModel)
+                    }}
+                    className="w-full px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="openai">OpenAI 兼容（OpenAI / DeepSeek / 智谱 / 通义 / Moonshot）</option>
+                    <option value="anthropic">Anthropic Claude</option>
+                    <option value="google">Google Gemini</option>
+                    <option value="ollama">Ollama 本地</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  {PROVIDER_PRESETS[settings.aiProvider].description}
+                </p>
+              </div>
+
+              {/* OpenAI 兼容服务快速选择 */}
+              {settings.aiProvider === 'openai' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                    快速选择服务
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {OPENAI_COMPATIBLE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => {
+                          updateSetting('aiBaseUrl', preset.baseUrl)
+                          updateSetting('aiModel', preset.model)
+                        }}
+                        className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                          settings.aiBaseUrl === preset.baseUrl
+                            ? 'bg-[#5E6AD2] text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* API 基础 URL */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
@@ -257,7 +314,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
                   type="text"
                   value={settings.aiBaseUrl}
                   onChange={(e) => updateSetting('aiBaseUrl', e.target.value)}
-                  placeholder="https://api.deepseek.com"
+                  placeholder={PROVIDER_PRESETS[settings.aiProvider].baseUrl}
                   className="w-full px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all"
                 />
               </div>
@@ -266,13 +323,16 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                   API Key
+                  {!PROVIDER_PRESETS[settings.aiProvider].apiKeyRequired && (
+                    <span className="ml-1 text-gray-400">（可选）</span>
+                  )}
                 </label>
                 <div className="relative">
                   <input
                     type={showApiKey ? 'text' : 'password'}
                     value={settings.aiApiKey}
                     onChange={(e) => updateSetting('aiApiKey', e.target.value)}
-                    placeholder="sk-..."
+                    placeholder={PROVIDER_PRESETS[settings.aiProvider].apiKeyPlaceholder}
                     className="w-full px-3 py-2 pr-10 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all"
                   />
                   <button
@@ -298,7 +358,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
                   type="text"
                   value={settings.aiModel}
                   onChange={(e) => updateSetting('aiModel', e.target.value)}
-                  placeholder="deepseek-chat"
+                  placeholder={PROVIDER_PRESETS[settings.aiProvider].defaultModel}
                   className="w-full px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all"
                 />
               </div>

@@ -4,9 +4,26 @@ use tauri::Manager;
 
 const CONFIG_FILE: &str = "config.json";
 
+/// AI 提供商类型
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default, PartialEq)]
+pub enum AIProvider {
+    /// OpenAI 兼容格式（包括 OpenAI、DeepSeek、智谱AI、通义千问、Moonshot 等）
+    #[default]
+    OpenAICompatible,
+    /// Anthropic Claude
+    Anthropic,
+    /// Google Gemini
+    Google,
+    /// Ollama 本地模型
+    Ollama,
+}
+
 /// AI 设置结构
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct AISettings {
+    /// AI 提供商
+    #[serde(default)]
+    pub provider: AIProvider,
     /// AI API 基础 URL
     pub base_url: String,
     /// AI API Key
@@ -18,7 +35,8 @@ pub struct AISettings {
 impl Default for AISettings {
     fn default() -> Self {
         Self {
-            base_url: "https://api.deepseek.com".to_string(),
+            provider: AIProvider::OpenAICompatible,
+            base_url: "https://api.deepseek.com/v1".to_string(),
             api_key: String::new(),
             model: "deepseek-chat".to_string(),
         }
@@ -57,11 +75,79 @@ pub fn load_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
     if config_path.exists() {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| format!("读取配置文件失败: {}", e))?;
-        serde_json::from_str(&content)
-            .map_err(|e| format!("解析配置文件失败: {}", e))
+        
+        // 尝试解析配置文件
+        match serde_json::from_str::<AppConfig>(&content) {
+            Ok(config) => Ok(config),
+            Err(e) => {
+                log::warn!("配置文件解析失败，尝试迁移旧配置: {}", e);
+                
+                // 尝试解析旧配置格式（可能只有 database_path 和旧的 ai_settings）
+                if let Ok(old_config) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let mut new_config = AppConfig::default();
+                    
+                    // 迁移 database_path
+                    if let Some(db_path) = old_config.get("database_path").and_then(|v| v.as_str()) {
+                        new_config.database_path = Some(db_path.to_string());
+                    }
+                    
+                    // 迁移旧的 ai_settings
+                    if let Some(ai_settings) = old_config.get("ai_settings") {
+                        if let Some(base_url) = ai_settings.get("base_url").and_then(|v| v.as_str()) {
+                            // 如果旧的 base_url 不包含版本号，添加 /v1
+                            new_config.ai_settings.base_url = if base_url.ends_with("/v1") || base_url.contains("/v4") {
+                                base_url.to_string()
+                            } else {
+                                format!("{}/v1", base_url.trim_end_matches('/'))
+                            };
+                        }
+                        if let Some(api_key) = ai_settings.get("api_key").and_then(|v| v.as_str()) {
+                            new_config.ai_settings.api_key = api_key.to_string();
+                        }
+                        if let Some(model) = ai_settings.get("model").and_then(|v| v.as_str()) {
+                            new_config.ai_settings.model = model.to_string();
+                        }
+                        // provider 默认为 OpenAICompatible
+                    }
+                    
+                    // 保存迁移后的配置
+                    if let Err(save_err) = save_config_internal(&config_path, &new_config) {
+                        log::warn!("保存迁移后的配置失败: {}", save_err);
+                    } else {
+                        log::info!("配置迁移成功");
+                    }
+                    
+                    Ok(new_config)
+                } else {
+                    // 无法解析，备份旧文件并使用默认配置
+                    let backup_path = config_path.with_extension("json.backup");
+                    if let Err(backup_err) = fs::copy(&config_path, &backup_path) {
+                        log::warn!("备份旧配置文件失败: {}", backup_err);
+                    } else {
+                        log::info!("旧配置文件已备份到: {:?}", backup_path);
+                    }
+                    
+                    let default_config = AppConfig::default();
+                    if let Err(save_err) = save_config_internal(&config_path, &default_config) {
+                        log::warn!("保存默认配置失败: {}", save_err);
+                    }
+                    
+                    Ok(default_config)
+                }
+            }
+        }
     } else {
         Ok(AppConfig::default())
     }
+}
+
+/// 内部保存配置函数（不依赖 AppHandle）
+fn save_config_internal(config_path: &PathBuf, config: &AppConfig) -> Result<(), String> {
+    let content = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    fs::write(config_path, content)
+        .map_err(|e| format!("保存配置文件失败: {}", e))?;
+    Ok(())
 }
 
 /// 保存配置

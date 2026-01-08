@@ -133,7 +133,7 @@ function App() {
   }, [notes, activeNoteId])
 
   // 自动保存 - 只在编辑模式下触发
-  const { saveImmediately, saveNoteById, hasUnsavedChanges } = useAutoSave({
+  const { saveNoteById, hasUnsavedChanges } = useAutoSave({
     noteId: activeNoteId,
     title: localTitle,
     content: localContent,

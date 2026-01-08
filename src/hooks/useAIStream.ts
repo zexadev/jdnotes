@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { getSettings } from './useSettings'
+import type { AIProvider } from './useSettings'
 
 export type AIAction = 'refine' | 'summarize' | 'translate' | 'continue' | 'custom' | 'template'
 
@@ -86,6 +87,286 @@ function buildSystemPrompt(action: AIAction, context?: AIContext, templateType?:
   return prompt
 }
 
+// ============= OpenAI 兼容 API 调用 =============
+async function* streamOpenAICompatible(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`API 错误: ${response.status} ${response.statusText}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('无法读取响应流')
+  }
+
+  const decoder = new TextDecoder()
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const chunk = decoder.decode(value, { stream: true })
+    const lines = chunk.split('\n')
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim()
+        if (data === '[DONE]') continue
+
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content
+          if (content) {
+            yield content
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+    }
+  }
+}
+
+// ============= Anthropic Claude API 调用 =============
+async function* streamAnthropic(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  const response = await fetch(`${baseUrl}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userMessage },
+      ],
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('无法读取响应流')
+  }
+
+  const decoder = new TextDecoder()
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const chunk = decoder.decode(value, { stream: true })
+    const lines = chunk.split('\n')
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim()
+        if (!data) continue
+
+        try {
+          const parsed = JSON.parse(data)
+          // Anthropic 流式响应格式
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            yield parsed.delta.text
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+    }
+  }
+}
+
+// ============= Google Gemini API 调用 =============
+async function* streamGoogle(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userMessage }],
+        },
+      ],
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
+      },
+      generationConfig: {
+        maxOutputTokens: 4096,
+      },
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Google API 错误: ${response.status} - ${errorText}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('无法读取响应流')
+  }
+
+  const decoder = new TextDecoder()
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const chunk = decoder.decode(value, { stream: true })
+    const lines = chunk.split('\n')
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim()
+        if (!data) continue
+
+        try {
+          const parsed = JSON.parse(data)
+          // Gemini 流式响应格式
+          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
+          if (text) {
+            yield text
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+    }
+  }
+}
+
+// ============= Ollama API 调用 (OpenAI 兼容) =============
+async function* streamOllama(
+  baseUrl: string,
+  _apiKey: string,  // Ollama 不需要 API Key
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  // Ollama 使用 OpenAI 兼容格式
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Ollama API 错误: ${response.status} ${response.statusText}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('无法读取响应流')
+  }
+
+  const decoder = new TextDecoder()
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    const chunk = decoder.decode(value, { stream: true })
+    const lines = chunk.split('\n')
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim()
+        if (data === '[DONE]') continue
+
+        try {
+          const parsed = JSON.parse(data)
+          const content = parsed.choices?.[0]?.delta?.content
+          if (content) {
+            yield content
+          }
+        } catch {
+          // 忽略解析错误
+        }
+      }
+    }
+  }
+}
+
+// 根据 provider 获取流式生成器
+function getStreamGenerator(provider: AIProvider): typeof streamOpenAICompatible {
+  switch (provider) {
+    case 'anthropic':
+      return streamAnthropic
+    case 'google':
+      return streamGoogle
+    case 'ollama':
+      return streamOllama
+    case 'openai':
+    default:
+      return streamOpenAICompatible
+  }
+}
+
 export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn {
   const { onChunk, onLine, onFinish, onError } = options
   const [isStreaming, setIsStreaming] = useState(false)
@@ -107,7 +388,8 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
     async (action: AIAction, text: string, customPrompt?: string, context?: AIContext, templateType?: TemplateType) => {
       const settings = await getSettings()
 
-      if (!settings.aiApiKey) {
+      // Ollama 不需要 API Key，其他都需要
+      if (settings.aiProvider !== 'ollama' && !settings.aiApiKey) {
         const errorMsg = '请在设置中配置 API Key'
         setError(errorMsg)
         onError?.(errorMsg)
@@ -136,71 +418,33 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
       const userMessage = text
 
       try {
-        const response = await fetch(`${settings.aiBaseUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${settings.aiApiKey}`,
-          },
-          body: JSON.stringify({
-            model: settings.aiModel,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userMessage },
-            ],
-            stream: true,
-          }),
-          signal: abortControllerRef.current.signal,
-        })
+        const streamGenerator = getStreamGenerator(settings.aiProvider)
+        const stream = streamGenerator(
+          settings.aiBaseUrl,
+          settings.aiApiKey,
+          settings.aiModel,
+          systemPrompt,
+          userMessage,
+          abortControllerRef.current.signal
+        )
 
-        if (!response.ok) {
-          throw new Error(`API 错误: ${response.status} ${response.statusText}`)
-        }
-
-        const reader = response.body?.getReader()
-        if (!reader) {
-          throw new Error('无法读取响应流')
-        }
-
-        const decoder = new TextDecoder()
         let fullText = ''
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+        for await (const content of stream) {
+          fullText += content
+          setStreamText(fullText)
+          onChunk?.(content)
 
-          const chunk = decoder.decode(value, { stream: true })
-          const lines = chunk.split('\n')
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim()
-              if (data === '[DONE]') continue
-
-              try {
-                const parsed = JSON.parse(data)
-                const content = parsed.choices?.[0]?.delta?.content
-                if (content) {
-                  fullText += content
-                  setStreamText(fullText)
-                  onChunk?.(content)
-
-                  // 基于行的缓冲处理
-                  if (onLine) {
-                    lineBufferRef.current += content
-                    // 检查是否有完整的行
-                    const bufferLines = lineBufferRef.current.split('\n')
-                    // 保留最后一个可能不完整的行
-                    if (bufferLines.length > 1) {
-                      const completeLines = bufferLines.slice(0, -1)
-                      lineBufferRef.current = bufferLines[bufferLines.length - 1]
-                      completeLines.forEach(l => onLine(l + '\n'))
-                    }
-                  }
-                }
-              } catch {
-                // 忽略解析错误
-              }
+          // 基于行的缓冲处理
+          if (onLine) {
+            lineBufferRef.current += content
+            // 检查是否有完整的行
+            const bufferLines = lineBufferRef.current.split('\n')
+            // 保留最后一个可能不完整的行
+            if (bufferLines.length > 1) {
+              const completeLines = bufferLines.slice(0, -1)
+              lineBufferRef.current = bufferLines[bufferLines.length - 1]
+              completeLines.forEach(l => onLine(l + '\n'))
             }
           }
         }

@@ -1,0 +1,11 @@
+{
+  "version": "1.1.0",
+  "notes": "## v1.1.0 Updates\n\n- Feature improvements\n- Bug fixes",
+  "pub_date": "2026-01-08T05:55:13Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSSDJkNzZXOFZMVVhaaFVtbHJtZ01Qb3NKQUNBTTNESFptV29uYzREc29XdUVQaUVjOUZTeVhsM0lTTi9wck0rT2ZKV0xIaXBiMm9xY21oMlNEOFZwK3VpVWYvTjYrNlFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY3ODUxMTAzCWZpbGU6amRub3Rlc18xLjEuMF94NjQtc2V0dXAuZXhlCmNBRkhwZjZLdzlja29PMDdYYjd0QkdNSVFIcVg0bXQ0cEwzMVJmQXR4NE9pZStJb1JmQlM1S0Z3dzhPbE42Q2FqVCtWM21kTlJuQjlxU2hMMmxISkF3PT0K",
+      "url": "https://github.com/huancheng01/jdnotes/releases/download/v1.1.0/jdnotes_1.1.0_x64-setup.exe"
+    }
+  }
+}

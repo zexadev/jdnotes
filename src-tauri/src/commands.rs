@@ -133,7 +133,14 @@ pub async fn get_database_url(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub async fn get_ai_settings(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     let settings = db::get_ai_settings(&app)?;
+    let provider_str = match settings.provider {
+        db::AIProvider::OpenAICompatible => "openai",
+        db::AIProvider::Anthropic => "anthropic",
+        db::AIProvider::Google => "google",
+        db::AIProvider::Ollama => "ollama",
+    };
     Ok(serde_json::json!({
+        "aiProvider": provider_str,
         "aiBaseUrl": settings.base_url,
         "aiApiKey": settings.api_key,
         "aiModel": settings.model
@@ -144,11 +151,19 @@ pub async fn get_ai_settings(app: tauri::AppHandle) -> Result<serde_json::Value,
 #[tauri::command]
 pub async fn save_ai_settings(
     app: tauri::AppHandle,
+    provider: String,
     base_url: String,
     api_key: String,
     model: String,
 ) -> Result<(), String> {
+    let ai_provider = match provider.as_str() {
+        "anthropic" => db::AIProvider::Anthropic,
+        "google" => db::AIProvider::Google,
+        "ollama" => db::AIProvider::Ollama,
+        _ => db::AIProvider::OpenAICompatible,
+    };
     let settings = AISettings {
+        provider: ai_provider,
         base_url,
         api_key,
         model,

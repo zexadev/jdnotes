@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, FileText, Calendar, Tag, ExternalLink, RefreshCw, Loader2 } from 'lucide-react'
+import { X, FileText, Calendar, Tag, ExternalLink, Loader2 } from 'lucide-react'
 import { getVersion } from '@tauri-apps/api/app'
 
 interface ChangelogEntry {
@@ -82,7 +82,7 @@ function parseMarkdown(text: string): string {
 export function ChangelogModal({ open, onClose }: ChangelogModalProps) {
   const [currentVersion, setCurrentVersion] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
-  const [changelog, setChangelog] = useState<ChangelogEntry[]>(CHANGELOG_DATA)
+  const changelog = CHANGELOG_DATA
 
   // 获取当前版本
   useEffect(() => {

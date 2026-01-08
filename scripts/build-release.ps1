@@ -191,7 +191,8 @@ New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
 $bundleDir = "src-tauri\target\release\bundle"
 
 # NSIS installer (used for both installation and updates in Tauri 2.0)
-$nsisExe = Get-ChildItem "$bundleDir\nsis\*.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.sig$' } | Select-Object -First 1
+# Find the installer with the correct version number
+$nsisExe = Get-ChildItem "$bundleDir\nsis\*_${Version}_*.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.sig$' } | Select-Object -First 1
 $updateFile = $null
 $updateSigFile = $null
 
@@ -209,9 +210,26 @@ if ($nsisExe) {
         Write-Host "  + Copied signature file: $($updateSigFile.Name)" -ForegroundColor Green
     }
 }
+else {
+    Write-Warn "Could not find installer with version $Version"
+    Write-Host "  Looking for any .exe file as fallback..." -ForegroundColor Gray
+    $nsisExe = Get-ChildItem "$bundleDir\nsis\*.exe" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.sig$' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($nsisExe) {
+        Copy-Item $nsisExe.FullName "$releaseDir\"
+        Write-Host "  + Copied installer: $($nsisExe.Name)" -ForegroundColor Yellow
+        $updateFile = $nsisExe
+        
+        $sigFile = "$($nsisExe.FullName).sig"
+        if (Test-Path $sigFile) {
+            Copy-Item $sigFile "$releaseDir\"
+            $updateSigFile = Get-Item $sigFile
+            Write-Host "  + Copied signature file: $($updateSigFile.Name)" -ForegroundColor Yellow
+        }
+    }
+}
 
 # Also check for .nsis.zip format (older Tauri versions)
-$nsisZip = Get-ChildItem "$bundleDir\nsis\*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+$nsisZip = Get-ChildItem "$bundleDir\nsis\*_${Version}_*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($nsisZip) {
     Copy-Item $nsisZip.FullName "$releaseDir\"
     Write-Host "  + Copied update package: $($nsisZip.Name)" -ForegroundColor Green
@@ -226,7 +244,11 @@ if ($nsisZip) {
 }
 
 # MSI installer (if exists)
-$msiFile = Get-ChildItem "$bundleDir\msi\*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
+$msiFile = Get-ChildItem "$bundleDir\msi\*_${Version}_*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $msiFile) {
+    # Fallback to any MSI file, sorted by last write time
+    $msiFile = Get-ChildItem "$bundleDir\msi\*.msi" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+}
 if ($msiFile) {
     Copy-Item $msiFile.FullName "$releaseDir\"
     Write-Host "  + Copied MSI: $($msiFile.Name)" -ForegroundColor Green
