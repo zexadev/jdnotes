@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput } from 'lucide-react'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { useUpdater } from '../../hooks/useUpdater'
 import { dbOperations } from '../../lib/db'
@@ -12,6 +12,7 @@ import { save, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { ExportModal } from './ExportModal'
+import { ChangelogModal } from './ChangelogModal'
 
 interface SettingsModalProps {
   open: boolean
@@ -25,6 +26,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
   const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>('default')
   const [isCheckingPermission, setIsCheckingPermission] = useState(true)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showChangelogModal, setShowChangelogModal] = useState(false)
   
   // 软件更新
   const updater = useUpdater()
@@ -564,6 +566,15 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
                   </button>
                 </div>
               )}
+
+              {/* 查看更新日志按钮 */}
+              <button
+                onClick={() => setShowChangelogModal(true)}
+                className="w-full mt-3 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                查看更新日志
+              </button>
             </div>
           </div>
 
@@ -599,6 +610,12 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
       <ExportModal
         open={showExportModal}
         onClose={() => setShowExportModal(false)}
+      />
+
+      {/* 更新日志模态框 */}
+      <ChangelogModal
+        open={showChangelogModal}
+        onClose={() => setShowChangelogModal(false)}
       />
     </div>
   )
