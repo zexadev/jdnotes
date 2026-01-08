@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText, ChevronDown } from 'lucide-react'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText } from 'lucide-react'
 import { useSettings, PROVIDER_PRESETS, OPENAI_COMPATIBLE_PRESETS } from '../../hooks/useSettings'
 import type { AIProvider } from '../../hooks/useSettings'
+import { Select } from '../common/Select'
+import type { SelectOption } from '../common/Select'
 import { useUpdater } from '../../hooks/useUpdater'
+
+// 平台选项定义
+const PROVIDER_OPTIONS: SelectOption<AIProvider>[] = [
+  { value: 'openai', label: 'OpenAI 兼容', description: '支持 OpenAI、DeepSeek、智谱、通义、Moonshot 等' },
+  { value: 'anthropic', label: 'Anthropic Claude', description: 'Claude 官方 API' },
+  { value: 'google', label: 'Google Gemini', description: 'Google AI Studio API' },
+  { value: 'ollama', label: 'Ollama 本地', description: '本地运行的 Ollama 服务' },
+]
 import { dbOperations } from '../../lib/db'
 import {
   isPermissionGranted,
@@ -254,25 +264,16 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
                   模型平台
                 </label>
-                <div className="relative">
-                  <select
-                    value={settings.aiProvider}
-                    onChange={(e) => {
-                      const provider = e.target.value as AIProvider
-                      const preset = PROVIDER_PRESETS[provider]
-                      updateSetting('aiProvider', provider)
-                      updateSetting('aiBaseUrl', preset.baseUrl)
-                      updateSetting('aiModel', preset.defaultModel)
-                    }}
-                    className="w-full px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="openai">OpenAI 兼容（OpenAI / DeepSeek / 智谱 / 通义 / Moonshot）</option>
-                    <option value="anthropic">Anthropic Claude</option>
-                    <option value="google">Google Gemini</option>
-                    <option value="ollama">Ollama 本地</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                </div>
+                <Select
+                  value={settings.aiProvider}
+                  onChange={(provider) => {
+                    const preset = PROVIDER_PRESETS[provider]
+                    updateSetting('aiProvider', provider)
+                    updateSetting('aiBaseUrl', preset.baseUrl)
+                    updateSetting('aiModel', preset.defaultModel)
+                  }}
+                  options={PROVIDER_OPTIONS}
+                />
                 <p className="mt-1 text-xs text-gray-400">
                   {PROVIDER_PRESETS[settings.aiProvider].description}
                 </p>
