@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { initializeDefaultNotes, noteOperations, type Note } from './lib/db'
 import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks'
 import { CommandMenu } from './components/modals/CommandMenu'
-import { Sidebar, NoteList, MainContent } from './components/layout'
+import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SettingsModal } from './components/modals/SettingsModal'
 import { AIChatSidebar } from './components/ai/AIChatSidebar'
@@ -299,8 +299,13 @@ function App() {
         onDataChange={refreshNotes}
       />
 
-      <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
-        <Sidebar
+      <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
+        {/* 自定义标题栏 */}
+        <TitleBar />
+
+        {/* 主内容区域 */}
+        <div className="flex-1 flex overflow-hidden">
+          <Sidebar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           currentView={currentView}
@@ -383,6 +388,7 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* 提醒通知组件 */}

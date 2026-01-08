@@ -685,3 +685,29 @@ body {
     opacity: 0.6;
   }
 }
+
+/* ===== 自定义标题栏样式 ===== */
+
+/* 标题栏拖动区域 */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+/* 标题栏按钮不可拖动 */
+[data-tauri-drag-region] button {
+  -webkit-app-region: no-drag;
+}
+
+/* 标题栏按钮交互样式 */
+.titlebar-btn {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.titlebar-btn:focus {
+  outline: none;
+}
+
+.titlebar-btn:focus-visible {
+  outline: 2px solid #5E6AD2;
+  outline-offset: -2px;
+}
