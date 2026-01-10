@@ -237,15 +237,16 @@ export function useAutoSave({
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
+
+      // 重置状态 - 只在 noteId 真正变化时重置
+      isFirstRender.current = true
+      lastSavedRef.current = { title, content }
     }
 
     // 更新前一个笔记的引用
     prevNoteIdRef.current = noteId
-    
-    // 重置状态
-    isFirstRender.current = true
-    lastSavedRef.current = { title, content }
-  }, [noteId, title, content])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId]) // 只依赖 noteId，避免 title/content 变化时误触发
 
   // 保存指定笔记的数据（供外部在切换笔记时调用）
   const saveNoteById = useCallback(async (

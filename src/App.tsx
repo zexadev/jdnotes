@@ -157,17 +157,23 @@ function App() {
   const handleSelectNote = useCallback(async (note: Note) => {
     console.log('[App] handleSelectNote - 点击笔记:', note.id, '当前笔记:', activeNoteId, '编辑模式:', isEditing)
     console.log('[App] handleSelectNote - 当前 localContent:', localContent.substring(0, 50) + '...')
-    
-    // 只有在编辑模式下才需要保存（查看模式不会产生修改）
+
+    // 如果点击的是当前笔记,不需要切换
+    if (note.id === activeNoteId) {
+      console.log('[App] handleSelectNote - 点击的是当前笔记,无需切换')
+      return
+    }
+
+    // 只有在编辑模式下才需要保存(查看模式不会产生修改)
     if (isEditing && activeNoteId !== null && hasUnsavedChanges()) {
-      console.log('[App] handleSelectNote - 编辑模式下有未保存的变化，保存当前笔记:', activeNoteId, '内容:', localContent.substring(0, 50) + '...')
+      console.log('[App] handleSelectNote - 编辑模式下有未保存的变化,保存当前笔记:', activeNoteId, '内容:', localContent.substring(0, 50) + '...')
       // 使用 saveNoteById 显式保存当前笔记的最新内容
       await saveNoteById(activeNoteId, localTitle, localContent)
       console.log('[App] handleSelectNote - 保存完成')
     } else {
-      console.log('[App] handleSelectNote - 跳过保存（非编辑模式或无变化）')
+      console.log('[App] handleSelectNote - 跳过保存(非编辑模式或无变化)')
     }
-    
+
     // 从数据库获取最新的笔记数据
     console.log('[App] handleSelectNote - 从数据库获取笔记:', note.id)
     const latestNote = await noteOperations.get(note.id)
@@ -175,14 +181,15 @@ function App() {
       console.log('[App] handleSelectNote - 笔记不存在')
       return
     }
-    
+
     console.log('[App] handleSelectNote - 获取到笔记:', latestNote.id, '内容:', latestNote.content.substring(0, 50) + '...')
-    
+
+    // 批量更新状态,减少重渲染
     setActiveNoteId(latestNote.id)
     setLocalTitle(latestNote.title)
     setLocalContent(latestNote.content)
     setIsEditing(false) // 切换笔记时默认进入阅读模式
-    // 如果当前在日历视图，切换回全部笔记
+    // 如果当前在日历视图,切换回全部笔记
     if (currentView === 'calendar') {
       setCurrentView('inbox')
     }
