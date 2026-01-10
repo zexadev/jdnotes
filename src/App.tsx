@@ -10,9 +10,11 @@ import { AIChatSidebar } from './components/ai/AIChatSidebar'
 import { CalendarView, ReminderNotification } from './components/calendar'
 import { ToastContainer } from './components/common/Toast'
 import { toast } from './lib/toast'
+import { SettingsPage } from './pages/SettingsPage'
+import { DashboardPage } from './pages/DashboardPage'
 
 // 视图类型
-type ViewType = 'inbox' | 'favorites' | 'trash' | 'calendar' | `tag-${string}`
+type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'settings' | `tag-${string}`
 
 function App() {
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null)
@@ -20,7 +22,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
-  const [currentView, setCurrentView] = useState<ViewType>('inbox')
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [showSettings, setShowSettings] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
@@ -320,12 +322,40 @@ function App() {
           counts={counts}
           allTags={allTags}
           allNotes={allNotes || []}
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={() => setCurrentView('settings')}
         />
 
         <AnimatePresence mode="wait">
-          {/* 日历视图 */}
-          {currentView === 'calendar' ? (
+          {/* Dashboard 页面 */}
+          {currentView === 'dashboard' ? (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 h-full"
+            >
+              <DashboardPage
+                onNavigate={(view) => setCurrentView(view)}
+                onCreateNote={handleCreateNote}
+              />
+            </motion.div>
+          ) : currentView === 'settings' ? (
+            <motion.div
+              key="settings"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="flex-1 h-full overflow-hidden"
+            >
+              <SettingsPage
+                onClose={() => setCurrentView('inbox')}
+                onDataChange={refreshNotes}
+              />
+            </motion.div>
+          ) : currentView === 'calendar' ? (
             <motion.div
               key="calendar"
               initial={{ opacity: 0, x: 20 }}

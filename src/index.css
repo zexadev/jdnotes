@@ -15,6 +15,9 @@
   --color-dark-input: #1C1E23;
   /* 强调色 - Deep Sea Blue */
   --color-accent: #5E6AD2;
+  /* 新增: Ethereal Dashboard 风格颜色 */
+  --color-dashboard-surface: #161722;
+  --color-dashboard-card: #1f2029;
 }
 
 body {
@@ -23,6 +26,28 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.011em;
+}
+
+/* ===== 毛玻璃效果样式 ===== */
+.glass-panel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dark .glass-panel {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card {
+  background: rgba(30, 31, 45, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* ===== 全局滚动条样式 - 极简水感 ===== */

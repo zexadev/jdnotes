@@ -7,6 +7,7 @@ import {
   X,
   Settings,
   Calendar,
+  LayoutDashboard,
 } from 'lucide-react'
 import { SidebarItem } from '../common/SidebarItem'
 import { ThemeToggleButton } from '../common/ThemeToggleButton'
@@ -75,6 +76,12 @@ export function Sidebar({
 
       {/* 导航链接 */}
       <nav className="px-3 space-y-1">
+        <SidebarItem
+          icon={LayoutDashboard}
+          label="数据概览"
+          active={currentView === 'dashboard'}
+          onClick={() => onViewChange('dashboard')}
+        />
         <SidebarItem
           icon={FileText}
           label="全部笔记"
