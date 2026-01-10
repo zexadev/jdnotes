@@ -45,6 +45,7 @@ const CHANGELOG_DATA: ChangelogEntry[] = [
 - 从仅支持 OpenAI 扩展到支持多个主流 AI 平台
 - 优化 AI 对话体验
 ### 🐛 问题修复
+- 修复笔记中链接无法复制纯文本的问题
 - 修复自动保存依赖数组问题
 - 优化构建脚本`
   },
