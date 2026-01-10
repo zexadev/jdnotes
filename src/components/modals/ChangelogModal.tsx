@@ -16,29 +16,55 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.2.0',
+    date: '2026-01-10',
+    notes: `## ✨ 新增功能
+### 📊 数据仪表盘
+- 新增仪表盘页面，提供笔记数据可视化分析
+- 统计概览：笔记总数、今日新增、标签数量、平均字数
+- 趋势分析：30天笔记创建趋势图表
+- 分类分析：笔记分类饼图、标签云、标签使用排行
+- 活动分析：24小时活动分布、每周热力图、时段分析
+- 内容分析：字数分布统计、最近活动记录
+- 使用响应式网格布局，支持深色模式
+### ⚙️ 设置页面
+- 新增独立设置页面，包含多个设置模块
+- AI 设置：配置 AI 模型和 API
+- 数据设置：数据备份与恢复
+- 通知设置：提醒通知配置
+- 更新设置：软件版本更新管理
+- 关于设置：软件信息和开源许可
+- Markdown 指南：Markdown 语法参考
+### 🎨 界面优化
+- 新增通用 Select 下拉选择组件
+- 自定义窗口标题栏（Windows）
+- 系统托盘功能，支持后台运行
+- 优化动画效果和交互体验
+### 🤖 AI 功能增强
+- 扩展 AI 模型平台支持
+- 从仅支持 OpenAI 扩展到支持多个主流 AI 平台
+- 优化 AI 对话体验
+### 🐛 问题修复
+- 修复自动保存依赖数组问题
+- 优化构建脚本`
+  },
+  {
     version: '1.1.0',
     date: '2026-01-08',
-    notes: `## ✨ 功能增强与优化
-
-### 📤 导出功能升级
-- 新增笔记选择性导出功能
-- 日历导出改为按时间范围导出笔记（支持 Markdown/JSON 格式）
-
-### 🐛 问题修复
+    notes: `## 📤 导出功能升级
+- 新增笔记选择性导出
+- 日历导出改为按时间范围导出（Markdown/JSON）
+## 🐛 问题修复
 - 修复笔记内容丢失问题
-- 修复收藏操作不应更新时间戳的问题
-- 修复数据刷新相关问题
-
-### 💅 界面优化
+- 修复收藏操作时间戳问题
+## 💅 界面优化
 - "收件箱" 更名为 "全部笔记"
-- 禁用浏览器原生右键菜单
 - 新增更新日志功能`
   },
   {
     version: '1.0.0',
     date: '2026-01-07',
     notes: `## 🎉 首个正式版本
-
 - 📝 富文本编辑器（Markdown、代码高亮、图片）
 - 🤖 AI 智能助手（对话、续写、润色、翻译）
 - 📅 日历视图（月/周/日）
@@ -60,9 +86,9 @@ function parseMarkdown(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     // 标题
-    .replace(/^### (.+)$/gm, '<h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-2">$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mt-5 mb-3">$1</h3>')
-    .replace(/^# (.+)$/gm, '<h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mt-6 mb-4">$1</h2>')
+    .replace(/^### (.+)$/gm, '<h4 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-2 mb-1">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mt-3 mb-1">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2 class="text-lg font-bold text-gray-900 dark:text-gray-100 mt-4 mb-2">$1</h2>')
     // 无序列表
     .replace(/^- (.+)$/gm, '<li class="ml-4 text-gray-600 dark:text-gray-400">$1</li>')
     // 粗体

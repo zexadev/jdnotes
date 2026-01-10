@@ -146,6 +146,21 @@ body {
   color: #818cf8;
 }
 
+/* 链接样式 - 禁用点击,方便复制纯文本 */
+.tiptap a {
+  color: #5E6AD2;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  pointer-events: none; /* 禁用点击 */
+  cursor: text; /* 显示文本光标 */
+  user-select: text; /* 允许选择文本 */
+}
+
+.dark .tiptap a {
+  color: #818cf8;
+}
+
 /* 图片样式 - Water 风格 */
 .tiptap img {
   max-width: 100%;

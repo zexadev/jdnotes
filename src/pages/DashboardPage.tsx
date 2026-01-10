@@ -1,9 +1,7 @@
-import { motion } from 'framer-motion';
 import {
   BookOpen,
   Star,
   Clock,
-  Sparkles,
   Calendar as CalendarIcon,
 } from 'lucide-react';
 import { useDashboardStats } from '../hooks/useDashboardStats';
