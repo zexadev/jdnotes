@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.claude/settings.local.json
+.claude/skills/ui-ux-pro-max/
+release/
