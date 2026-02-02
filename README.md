@@ -5,7 +5,7 @@
 <h1 align="center">JD Notes</h1>
 
 <p align="center">
-  <strong>一款简洁强大的智能笔记应用</strong>
+  <strong>thinking is water</strong>
 </p>
 
 <p align="center">
