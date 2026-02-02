@@ -119,12 +119,6 @@ export function Editor({
         class:
           'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px]',
       },
-      // 自定义复制处理,确保复制纯文本
-      clipboardTextSerializer: ({ editor, range }) => {
-        const { from, to } = range
-        const text = editor.state.doc.textBetween(from, to, '\n\n')
-        return text
-      },
     },
     onCreate: ({ editor }) => {
       const latestContent = contentRef.current

@@ -71,26 +71,36 @@ fn get_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 /// 读取配置
 pub fn load_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
     let config_path = get_config_path(app)?;
-    
+
     if config_path.exists() {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| format!("读取配置文件失败: {}", e))?;
-        
+
         // 尝试解析配置文件
         match serde_json::from_str::<AppConfig>(&content) {
-            Ok(config) => Ok(config),
+            Ok(config) => {
+                log::info!("配置加载成功，database_path: {:?}", config.database_path);
+                Ok(config)
+            },
             Err(e) => {
                 log::warn!("配置文件解析失败，尝试迁移旧配置: {}", e);
-                
+
                 // 尝试解析旧配置格式（可能只有 database_path 和旧的 ai_settings）
                 if let Ok(old_config) = serde_json::from_str::<serde_json::Value>(&content) {
                     let mut new_config = AppConfig::default();
-                    
-                    // 迁移 database_path
-                    if let Some(db_path) = old_config.get("database_path").and_then(|v| v.as_str()) {
-                        new_config.database_path = Some(db_path.to_string());
+
+                    // 迁移 database_path - 同时处理字符串和 null 值
+                    if let Some(db_path_value) = old_config.get("database_path") {
+                        if let Some(db_path) = db_path_value.as_str() {
+                            // 值是有效的字符串
+                            if !db_path.is_empty() {
+                                log::info!("迁移 database_path: {}", db_path);
+                                new_config.database_path = Some(db_path.to_string());
+                            }
+                        }
+                        // 如果是 null，保持 database_path 为 None（使用默认路径）
                     }
-                    
+
                     // 迁移旧的 ai_settings
                     if let Some(ai_settings) = old_config.get("ai_settings") {
                         if let Some(base_url) = ai_settings.get("base_url").and_then(|v| v.as_str()) {
@@ -107,36 +117,71 @@ pub fn load_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
                         if let Some(model) = ai_settings.get("model").and_then(|v| v.as_str()) {
                             new_config.ai_settings.model = model.to_string();
                         }
-                        // provider 默认为 OpenAICompatible
+                        // 迁移 provider 字段
+                        if let Some(provider) = ai_settings.get("provider").and_then(|v| v.as_str()) {
+                            new_config.ai_settings.provider = match provider {
+                                "Anthropic" => AIProvider::Anthropic,
+                                "Google" => AIProvider::Google,
+                                "Ollama" => AIProvider::Ollama,
+                                _ => AIProvider::OpenAICompatible,
+                            };
+                        }
                     }
-                    
+
                     // 保存迁移后的配置
                     if let Err(save_err) = save_config_internal(&config_path, &new_config) {
                         log::warn!("保存迁移后的配置失败: {}", save_err);
                     } else {
-                        log::info!("配置迁移成功");
+                        log::info!("配置迁移成功，database_path: {:?}", new_config.database_path);
                     }
-                    
+
                     Ok(new_config)
                 } else {
-                    // 无法解析，备份旧文件并使用默认配置
+                    // 无法解析，尝试从备份恢复
+                    log::error!("配置文件完全无法解析");
                     let backup_path = config_path.with_extension("json.backup");
-                    if let Err(backup_err) = fs::copy(&config_path, &backup_path) {
-                        log::warn!("备份旧配置文件失败: {}", backup_err);
+                    let mut recovered_db_path: Option<String> = None;
+
+                    // 尝试从备份文件恢复 database_path
+                    if backup_path.exists() {
+                        log::info!("尝试从备份文件恢复配置: {:?}", backup_path);
+                        if let Ok(backup_content) = fs::read_to_string(&backup_path) {
+                            if let Ok(backup_value) = serde_json::from_str::<serde_json::Value>(&backup_content) {
+                                if let Some(db_path) = backup_value.get("database_path").and_then(|v| v.as_str()) {
+                                    if !db_path.is_empty() {
+                                        log::info!("从备份恢复 database_path: {}", db_path);
+                                        recovered_db_path = Some(db_path.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 备份当前损坏的配置文件（如果还没有备份）
+                    if !backup_path.exists() {
+                        if let Err(backup_err) = fs::copy(&config_path, &backup_path) {
+                            log::warn!("备份旧配置文件失败: {}", backup_err);
+                        } else {
+                            log::info!("旧配置文件已备份到: {:?}", backup_path);
+                        }
+                    }
+
+                    // 创建新配置，保留恢复的 database_path
+                    let mut new_config = AppConfig::default();
+                    new_config.database_path = recovered_db_path;
+
+                    if let Err(save_err) = save_config_internal(&config_path, &new_config) {
+                        log::warn!("保存配置失败: {}", save_err);
                     } else {
-                        log::info!("旧配置文件已备份到: {:?}", backup_path);
+                        log::info!("配置已重建，database_path: {:?}", new_config.database_path);
                     }
-                    
-                    let default_config = AppConfig::default();
-                    if let Err(save_err) = save_config_internal(&config_path, &default_config) {
-                        log::warn!("保存默认配置失败: {}", save_err);
-                    }
-                    
-                    Ok(default_config)
+
+                    Ok(new_config)
                 }
             }
         }
     } else {
+        log::info!("配置文件不存在，使用默认配置");
         Ok(AppConfig::default())
     }
 }
@@ -179,20 +224,38 @@ pub fn get_default_database_path(app: &tauri::AppHandle) -> Result<PathBuf, Stri
 /// 获取实际使用的数据库路径（考虑用户配置）
 pub fn get_database_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let config = load_config(app)?;
-    
-    if let Some(custom_path) = config.database_path {
-        let path = PathBuf::from(&custom_path);
-        // 确保目录存在
+
+    if let Some(custom_path) = &config.database_path {
+        let path = PathBuf::from(custom_path);
+
+        // 验证自定义路径
         if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建数据库目录失败: {}", e))?;
+            if parent.exists() {
+                // 目录存在，使用自定义路径
+                log::info!("使用自定义数据库路径: {:?}", path);
+                return Ok(path);
+            } else {
+                // 目录不存在，尝试创建
+                log::warn!("自定义数据库目录不存在，尝试创建: {:?}", parent);
+                match fs::create_dir_all(parent) {
+                    Ok(_) => {
+                        log::info!("成功创建数据库目录: {:?}", parent);
+                        return Ok(path);
+                    }
+                    Err(e) => {
+                        // 无法创建目录，回退到默认路径但不修改配置
+                        // 这样用户下次可以修复目录问题
+                        log::error!("无法创建自定义数据库目录: {}，回退到默认路径", e);
+                    }
+                }
             }
         }
-        Ok(path)
-    } else {
-        get_default_database_path(app)
     }
+
+    // 使用默认路径
+    let default_path = get_default_database_path(app)?;
+    log::info!("使用默认数据库路径: {:?}", default_path);
+    Ok(default_path)
 }
 
 /// 获取数据库连接 URL
@@ -220,15 +283,25 @@ pub fn get_database_size(app: &tauri::AppHandle) -> Result<u64, String> {
 }
 
 /// 更改数据库存储位置
-/// 1. 将当前数据库复制到新位置
-/// 2. 更新配置（下次启动时使用新位置）
+/// 1. 备份当前配置
+/// 2. 将当前数据库复制到新位置
+/// 3. 更新配置（下次启动时使用新位置）
 pub fn change_database_location(app: &tauri::AppHandle, new_dir: &str) -> Result<String, String> {
     let current_path = get_database_path(app)?;
     let new_path = PathBuf::from(new_dir).join("jdnotes.db");
-    
+
     log::info!("当前数据库路径: {:?}", current_path);
     log::info!("新数据库路径: {:?}", new_path);
-    
+
+    // 先备份当前配置（在做任何更改之前）
+    let config_path = get_config_path(app)?;
+    let config_backup_path = config_path.with_extension("json.backup");
+    if config_path.exists() {
+        fs::copy(&config_path, &config_backup_path)
+            .map_err(|e| format!("备份配置文件失败: {}", e))?;
+        log::info!("配置文件已备份到: {:?}", config_backup_path);
+    }
+
     // 确保新目录存在
     if let Some(parent) = new_path.parent() {
         if !parent.exists() {
@@ -236,7 +309,7 @@ pub fn change_database_location(app: &tauri::AppHandle, new_dir: &str) -> Result
                 .map_err(|e| format!("创建目标目录失败: {}", e))?;
         }
     }
-    
+
     // 如果当前数据库存在，复制到新位置
     if current_path.exists() {
         // 如果目标位置已存在同名文件，先备份
@@ -246,22 +319,22 @@ pub fn change_database_location(app: &tauri::AppHandle, new_dir: &str) -> Result
             fs::copy(&new_path, &backup_path)
                 .map_err(|e| format!("备份目标位置已存在的文件失败: {}", e))?;
         }
-        
+
         // 复制数据库文件到新位置
         log::info!("复制数据库文件...");
         fs::copy(&current_path, &new_path)
             .map_err(|e| format!("复制数据库文件失败: {}", e))?;
-        
+
         log::info!("数据库复制成功");
     }
-    
+
     // 更新配置
     let mut config = load_config(app)?;
     config.database_path = Some(new_path.to_string_lossy().to_string());
     save_config(app, &config)?;
-    
-    log::info!("配置已更新，下次启动将使用新位置");
-    
+
+    log::info!("配置已更新，新数据库路径: {}", new_path.to_string_lossy());
+
     Ok(new_path.to_string_lossy().to_string())
 }
 
