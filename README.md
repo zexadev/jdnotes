@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/app-icon.png" width="128" height="128" alt="JD Notes Logo">
+  <img src="./app-icon.png" width="128" height="128" alt="JD Notes Logo">
 </p>
 
 <h1 align="center">JD Notes</h1>
@@ -16,7 +16,7 @@
     <img src="https://img.shields.io/github/downloads/huancheng01/jdnotes/total?style=flat-square&logo=github" alt="Downloads">
   </a>
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
-  <img src="https://img.shields.io/badge/license-Proprietary-red?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
 </p>
 
 <p align="center">
@@ -247,14 +247,9 @@
 
 ## 📄 许可协议
 
-Copyright © 2024-2026 [huancheng01](https://github.com/huancheng01). All Rights Reserved.
+本项目基于 [MIT License](LICENSE) 开源。
 
-本软件为专有软件，未经作者书面授权，禁止以下行为：
-- 复制、修改、分发本软件的源代码
-- 对本软件进行反编译、反汇编或逆向工程
-- 将本软件用于商业目的
-
-个人用户可免费下载并使用本软件的发布版本。
+Copyright © 2026 [huancheng01](https://github.com/huancheng01)
 
 ---
 
