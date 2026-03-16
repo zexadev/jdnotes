@@ -378,3 +378,97 @@ pub fn get_config_file_path(app: &tauri::AppHandle) -> Result<String, String> {
     let config_path = get_config_path(app)?;
     Ok(config_path.to_string_lossy().to_string())
 }
+
+// ============= 旧版本数据迁移 =============
+
+/// 旧版本的 identifier 列表（用于数据迁移）
+const OLD_IDENTIFIERS: &[&str] = &["com.jdnotes.dev"];
+
+/// 从旧 identifier 目录迁移数据到当前目录
+/// 应在应用启动时、数据库初始化之前调用
+pub fn migrate_from_old_identifier(app: &tauri::AppHandle) -> Result<(), String> {
+    let current_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+
+    let current_db = current_dir.join("jdnotes.db");
+    let current_config = current_dir.join(CONFIG_FILE);
+
+    // 如果当前目录已有数据库文件，不需要迁移
+    if current_db.exists() {
+        log::info!("当前目录已有数据库，跳过旧版本迁移");
+        return Ok(());
+    }
+
+    // 查找旧 identifier 目录
+    // app_data_dir 的结构: .../AppData/Roaming/<identifier>/
+    // 通过替换当前 identifier 来构建旧路径
+    let parent = match current_dir.parent() {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+
+    for old_id in OLD_IDENTIFIERS {
+        let old_dir = parent.join(old_id);
+        let old_db = old_dir.join("jdnotes.db");
+        let old_config = old_dir.join(CONFIG_FILE);
+
+        log::info!("检查旧目录: {:?}", old_dir);
+
+        if !old_db.exists() {
+            log::info!("旧目录无数据库文件，跳过: {:?}", old_dir);
+            continue;
+        }
+
+        log::info!("发现旧版本数据! 旧目录: {:?}", old_dir);
+
+        // 确保当前目录存在
+        if !current_dir.exists() {
+            fs::create_dir_all(&current_dir)
+                .map_err(|e| format!("创建当前数据目录失败: {}", e))?;
+        }
+
+        // 迁移数据库文件
+        log::info!("迁移数据库: {:?} -> {:?}", old_db, current_db);
+        fs::copy(&old_db, &current_db)
+            .map_err(|e| format!("迁移数据库文件失败: {}", e))?;
+
+        // 迁移配置文件（如果存在且当前没有）
+        if old_config.exists() && !current_config.exists() {
+            log::info!("迁移配置文件: {:?} -> {:?}", old_config, current_config);
+
+            // 读取旧配置，检查是否有自定义 database_path 需要更新
+            if let Ok(content) = fs::read_to_string(&old_config) {
+                if let Ok(mut config) = serde_json::from_str::<AppConfig>(&content) {
+                    // 如果旧配置的 database_path 指向旧目录内，需要清除
+                    // 因为数据已经迁移到新目录的默认位置了
+                    if let Some(ref db_path) = config.database_path {
+                        let db_path_buf = PathBuf::from(db_path);
+                        if db_path_buf.starts_with(&old_dir) {
+                            log::info!("旧配置的 database_path 指向旧目录，清除: {}", db_path);
+                            config.database_path = None;
+                        }
+                    }
+                    // 保存调整后的配置到新目录
+                    let new_content = serde_json::to_string_pretty(&config)
+                        .map_err(|e| format!("序列化迁移配置失败: {}", e))?;
+                    fs::write(&current_config, new_content)
+                        .map_err(|e| format!("保存迁移配置失败: {}", e))?;
+                } else {
+                    // 配置解析失败，直接复制
+                    fs::copy(&old_config, &current_config)
+                        .map_err(|e| format!("复制配置文件失败: {}", e))?;
+                }
+            }
+        }
+
+        log::info!("旧版本数据迁移完成（从 {} 迁移）", old_id);
+
+        // 只迁移第一个找到的旧目录
+        return Ok(());
+    }
+
+    log::info!("未发现旧版本数据，无需迁移");
+    Ok(())
+}
