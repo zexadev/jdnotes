@@ -13,7 +13,10 @@ import { SlashCommand } from './SlashCommand'
 import { useEditorAI, useSlashCommand } from '../../hooks'
 import { useAutoTitle } from '../../hooks/useAutoTitle'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
+import Link from '@tiptap/extension-link'
+import { open } from '@tauri-apps/plugin-opener'
 import { EditorHeader } from './EditorHeader'
+import { AIBubbleMenu } from '../ai/AIBubbleMenu'
 
 interface EditorProps {
   title: string
@@ -58,9 +61,6 @@ export function Editor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
         codeBlock: false,
       }),
       CodeBlock.extend({
@@ -111,20 +111,41 @@ export function Editor({
         transformPastedText: true,
         transformCopiedText: true,
       }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: {
+          class: 'cursor-text text-indigo-600 dark:text-indigo-400 underline underline-offset-4 transition-colors hover:text-indigo-500',
+        },
+      }),
     ],
     content: content,
     editable: isEditing,
-    editorProps: {
-      attributes: {
-        class:
-          'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px]',
-      },
-    },
     onCreate: ({ editor }) => {
       const latestContent = contentRef.current
       if (latestContent) {
         editor.commands.setContent(latestContent, { emitUpdate: false })
       }
+    },
+    editorProps: {
+      attributes: {
+        class:
+          'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px]',
+      },
+      handleDOMEvents: {
+        click: (view, event) => {
+          const { target } = event
+          if (target instanceof HTMLAnchorElement && (event.ctrlKey || event.metaKey)) {
+            const href = target.getAttribute('href')
+            if (href) {
+              event.preventDefault()
+              open(href)
+              return true
+            }
+          }
+          return false
+        },
+      },
     },
   })
 
@@ -161,9 +182,7 @@ export function Editor({
 
     const handleUpdate = () => {
       if (!diffState.isActive) {
-        // 记录用户输入产生的内容，用于后续跳过不必要的同步
         const newContent = editor.storage.markdown.getMarkdown()
-        console.log('[Editor] handleUpdate - 用户输入:', newContent.substring(0, 50) + '...')
         lastEmittedContentRef.current = newContent
         onContentChange(newContent)
       }
@@ -184,31 +203,17 @@ export function Editor({
 
   // 当 content prop 变化时更新编辑器内容
   useEffect(() => {
-    console.log('[Editor] content sync useEffect - content 变化:', content.substring(0, 50) + '...')
-    console.log('[Editor] content sync useEffect - lastEmittedContentRef:', lastEmittedContentRef.current?.substring(0, 50) + '...')
+    if (skipContentSyncRef.current) return
     
-    // 跳过同步标志生效时不更新（AI 操作）
-    if (skipContentSyncRef.current) {
-      console.log('[Editor] content sync useEffect - 跳过（skipContentSyncRef）')
-      return
-    }
-    
-    // 如果 content 是由用户输入产生的，跳过同步
     if (content === lastEmittedContentRef.current) {
-      console.log('[Editor] content sync useEffect - 跳过（用户输入产生的）')
-      lastEmittedContentRef.current = null // 重置
+      lastEmittedContentRef.current = null
       return
     }
 
     if (editor && !editor.isDestroyed && content && !diffState.isActive) {
-      // 使用 Markdown 格式进行比较，避免格式差异导致不必要的更新
       const currentMarkdown = editor.storage.markdown.getMarkdown()
-      console.log('[Editor] content sync useEffect - currentMarkdown:', currentMarkdown.substring(0, 50) + '...')
       if (content !== currentMarkdown) {
-        console.log('[Editor] content sync useEffect - 执行 setContent!')
         editor.commands.setContent(content, { emitUpdate: false })
-      } else {
-        console.log('[Editor] content sync useEffect - 内容相同，跳过')
       }
     }
   }, [content, editor, diffState.isActive])
@@ -296,6 +301,7 @@ export function Editor({
           className={`mt-6 relative ${!isEditing ? 'cursor-default' : ''}`}
           onContextMenu={handleContextMenu}
         >
+          {isEditing && <AIBubbleMenu editor={editor} />}
           <EditorContent editor={editor} />
 
           {/* 斜杠命令菜单 */}

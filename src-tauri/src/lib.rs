@@ -67,6 +67,12 @@ pub fn run() {
                 )?;
             }
 
+            // 从旧版本 identifier (com.jdnotes.dev) 迁移数据
+            if let Err(e) = db::migrate_from_old_identifier(app.handle()) {
+                log::error!("旧版本数据迁移失败: {}", e);
+                // 迁移失败不阻止启动，继续使用新目录
+            }
+
             // 获取数据库完整路径（考虑用户自定义配置）
             let db_path = db::get_database_path(app.handle())
                 .map_err(|e| Box::<dyn std::error::Error>::from(e))?;

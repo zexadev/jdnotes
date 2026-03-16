@@ -1,6 +1,15 @@
-// @ts-expect-error BubbleMenu 在 TipTap v3 的类型定义中可能有问题
 import { BubbleMenu, type Editor } from '@tiptap/react'
-import { Sparkles, FileText, Languages, Square } from 'lucide-react'
+import { 
+  Sparkles, 
+  FileText, 
+  Languages, 
+  Square, 
+  Bold, 
+  Italic, 
+  Strikethrough, 
+  Code as CodeIcon,
+  Link as LinkIcon
+} from 'lucide-react'
 import { useAIStream, type AIAction } from '../../hooks/useAIStream'
 import { useCallback, useState } from 'react'
 
@@ -13,11 +22,9 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
 
   const { isStreaming, startStream, stopStream } = useAIStream({
     onChunk: (chunk) => {
-      // 实时插入内容
       editor.chain().focus().insertContent(chunk).run()
     },
     onFinish: () => {
-      // 流结束，移除高亮样式
     },
     onError: (error) => {
       setShowError(error)
@@ -25,84 +32,147 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
     },
   })
 
-  const handleAction = useCallback(
+  const handleAIAction = useCallback(
     async (action: AIAction) => {
       const { from, to } = editor.state.selection
       const selectedText = editor.state.doc.textBetween(from, to, ' ')
 
       if (!selectedText.trim()) return
 
-      // 删除选中的文本
       editor.chain().focus().deleteSelection().run()
-
-      // 开始流式生成
       await startStream(action, selectedText)
     },
     [editor, startStream]
   )
 
-  const menuItems = [
+  const setLink = useCallback(() => {
+    const previousUrl = editor.getAttributes('link').href
+    const url = window.prompt('输入链接地址', previousUrl)
+
+    // 取消
+    if (url === null) {
+      return
+    }
+
+    // 清空
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run()
+      return
+    }
+
+    // 设置链接
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+  }, [editor])
+
+  const aiItems = [
     { action: 'refine' as AIAction, icon: Sparkles, label: '改进写作' },
     { action: 'summarize' as AIAction, icon: FileText, label: '总结摘要' },
-    { action: 'translate' as AIAction, icon: Languages, label: '中英互译' },
+    { action: 'translate' as AIAction, icon: Languages, label: '翻译' },
   ]
 
   return (
     <BubbleMenu
       editor={editor}
       tippyOptions={{
-        duration: 100,
+        duration: 150,
         placement: 'top',
+        offset: [0, 10],
       }}
-      shouldShow={({ editor: e, state }: { editor: Editor; state: { selection: { from: number; to: number } } }) => {
-        // 只在有选中文本时显示
+      shouldShow={({ state }) => {
         const { from, to } = state.selection
-        return from !== to && !e.isActive('codeBlock')
+        return from !== to && !editor.isActive('codeBlock')
       }}
     >
-      <div className="flex items-center gap-1 px-1.5 py-1 bg-white dark:bg-dark-sidebar rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-0.5 px-1 py-1 bg-white/95 dark:bg-[#1C1C1F]/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden animate-in fade-in zoom-in duration-200">
         {isStreaming ? (
-          <>
-            {/* 流式生成中的状态 */}
-            <div className="flex items-center gap-2 px-2 py-1">
-              <div className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-              <span className="text-xs text-indigo-600 dark:text-indigo-400">AI 正在输入...</span>
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            <div className="flex gap-1">
+              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
             </div>
+            <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">AI 正在处理...</span>
             <button
               onClick={stopStream}
-              className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors"
-              title="停止"
+              className="ml-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
             >
-              <Square className="h-3.5 w-3.5 fill-current" />
+              <Square className="h-3 w-3 fill-current" />
             </button>
-          </>
+          </div>
         ) : (
           <>
-            {menuItems.map(({ action, icon: Icon, label }) => (
-              <button
-                key={action}
-                onClick={() => handleAction(action)}
-                className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded transition-colors"
-                title={label}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{label}</span>
-              </button>
-            ))}
+            {/* 常规格式化工具 */}
+            <div className="flex items-center px-1 border-r border-gray-100 dark:border-gray-800">
+              <FormatButton
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                active={editor.isActive('bold')}
+                icon={<Bold className="h-3.5 w-3.5" />}
+                label="加粗"
+              />
+              <FormatButton
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                active={editor.isActive('italic')}
+                icon={<Italic className="h-3.5 w-3.5" />}
+                label="斜体"
+              />
+              <FormatButton
+                onClick={() => editor.chain().focus().toggleStrike().run()}
+                active={editor.isActive('strike')}
+                icon={<Strikethrough className="h-3.5 w-3.5" />}
+                label="删除线"
+              />
+              <FormatButton
+                onClick={() => editor.chain().focus().toggleCode().run()}
+                active={editor.isActive('code')}
+                icon={<CodeIcon className="h-3.5 w-3.5" />}
+                label="内联代码"
+              />
+              <FormatButton
+                onClick={setLink}
+                active={editor.isActive('link')}
+                icon={<LinkIcon className="h-3.5 w-3.5" />}
+                label="插入链接"
+              />
+            </div>
+
+            {/* AI 功能工具 */}
+            <div className="flex items-center px-1">
+              {aiItems.map(({ action, icon: Icon, label }) => (
+                <button
+                  key={action}
+                  onClick={() => handleAIAction(action)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 rounded-lg transition-all"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
           </>
         )}
 
-        {/* 错误提示 */}
         {showError && (
-          <div className="absolute top-full left-0 mt-2 px-3 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-lg border border-red-200 dark:border-red-800 whitespace-nowrap">
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/90 text-red-600 dark:text-red-100 text-[11px] rounded-lg shadow-lg border border-red-100 dark:border-red-800 whitespace-nowrap animate-in slide-in-from-bottom-1">
             {showError}
           </div>
         )}
       </div>
     </BubbleMenu>
+  )
+}
+
+function FormatButton({ onClick, active, icon, label }: { onClick: () => void; active: boolean; icon: React.ReactNode; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`p-1.5 rounded-lg transition-all ${
+        active 
+          ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 dark:text-indigo-300' 
+          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
+      }`}
+      title={label}
+    >
+      {icon}
+    </button>
   )
 }
