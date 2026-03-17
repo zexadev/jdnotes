@@ -1,4 +1,5 @@
-import { BubbleMenu, type Editor } from '@tiptap/react'
+import { BubbleMenu } from '@tiptap/react/menus'
+import { type Editor } from '@tiptap/react'
 import { 
   Sparkles, 
   FileText, 
@@ -73,12 +74,11 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
   return (
     <BubbleMenu
       editor={editor}
-      tippyOptions={{
-        duration: 150,
+      options={{
         placement: 'top',
-        offset: [0, 10],
+        offset: 10,
       }}
-      shouldShow={({ state }) => {
+      shouldShow={({ state }: { state: any }) => {
         const { from, to } = state.selection
         return from !== to && !editor.isActive('codeBlock')
       }}

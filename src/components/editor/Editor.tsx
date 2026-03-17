@@ -14,7 +14,7 @@ import { useEditorAI, useSlashCommand } from '../../hooks'
 import { useAutoTitle } from '../../hooks/useAutoTitle'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
 import Link from '@tiptap/extension-link'
-import { open } from '@tauri-apps/plugin-opener'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { EditorHeader } from './EditorHeader'
 import { AIBubbleMenu } from '../ai/AIBubbleMenu'
 
@@ -133,13 +133,13 @@ export function Editor({
           'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px]',
       },
       handleDOMEvents: {
-        click: (view, event) => {
+        click: (_view, event) => {
           const { target } = event
           if (target instanceof HTMLAnchorElement && (event.ctrlKey || event.metaKey)) {
             const href = target.getAttribute('href')
             if (href) {
               event.preventDefault()
-              open(href)
+              openUrl(href)
               return true
             }
           }
