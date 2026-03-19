@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
-import { Sparkles, FileText, Lightbulb, Code } from 'lucide-react'
+import { Sparkles, FileText, Lightbulb, Code, MessageSquare } from 'lucide-react'
 
 export interface SlashCommandItem {
   id: string
@@ -128,6 +128,13 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '代码实现',
       description: '根据描述生成代码',
       action: () => onAIAction('template', 'code'),
+    },
+    {
+      id: 'custom-prompt',
+      icon: <MessageSquare className="h-4 w-4" />,
+      title: '自由提问',
+      description: '输入自定义指令',
+      action: () => onAIAction('show-inline-prompt'),
     },
   ]
 }

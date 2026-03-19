@@ -4,10 +4,9 @@ import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import { Markdown } from 'tiptap-markdown'
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { CodeBlockComponent } from './CodeBlockComponent'
 import { ResizableImage } from './ResizableImage'
-import { AIContextMenu } from '../ai/AIContextMenu'
 import { AIReviewToolbar } from '../ai/AIReviewToolbar'
 import { SlashCommand } from './SlashCommand'
 import { useEditorAI, useSlashCommand } from '../../hooks'
@@ -17,6 +16,7 @@ import Link from '@tiptap/extension-link'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { EditorHeader } from './EditorHeader'
 import { AIBubbleMenu } from '../ai/AIBubbleMenu'
+import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 
 interface EditorProps {
   title: string
@@ -153,14 +153,10 @@ export function Editor({
     diffState,
     showError,
     ghostPosition,
-    contextMenuPos,
-    hasSelection,
     skipContentSyncRef,
     handleAIAction,
     handleAccept,
     handleDiscard,
-    handleContextMenu,
-    closeContextMenu,
     startAIFromSlashCommand,
   } = useEditorAI({
     editor,
@@ -169,12 +165,57 @@ export function Editor({
     title,
   })
 
+  // 包装斜杠命令回调，拦截 show-inline-prompt
+  const handleSlashAction = useCallback((action: string, templateType?: string) => {
+    if (action === 'show-inline-prompt') {
+      if (!editor || !editorContainerRef.current) return
+      const { from, to } = editor.state.selection
+      const coords = editor.view.coordsAtPos(from)
+      const containerRect = editorContainerRef.current.getBoundingClientRect()
+      setInlineHasSelection(from !== to)
+      setInlinePromptPos({
+        top: coords.bottom - containerRect.top + 4,
+        left: Math.max(0, coords.left - containerRect.left),
+      })
+      return
+    }
+    startAIFromSlashCommand(action, templateType)
+  }, [editor, editorContainerRef, startAIFromSlashCommand])
+
   const { slashMenuPos, slashCommands, closeSlashMenu } = useSlashCommand({
     editor,
     editorContainerRef,
-    onAIAction: startAIFromSlashCommand,
+    onAIAction: handleSlashAction,
     diffStateActive: diffState.isActive,
   })
+
+  // Ctrl+K 内联提问
+  const [inlinePromptPos, setInlinePromptPos] = useState<{ top: number; left: number } | null>(null)
+  const [inlineHasSelection, setInlineHasSelection] = useState(false)
+
+  useEffect(() => {
+    if (!editor || !editorContainerRef.current || !isEditing) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+        e.preventDefault()
+        if (diffState.isActive) return
+
+        const { from, to } = editor.state.selection
+        const coords = editor.view.coordsAtPos(from)
+        const containerRect = editorContainerRef.current!.getBoundingClientRect()
+
+        setInlineHasSelection(from !== to)
+        setInlinePromptPos({
+          top: coords.bottom - containerRect.top + 4,
+          left: Math.max(0, coords.left - containerRect.left),
+        })
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [editor, editorContainerRef, isEditing, diffState.isActive])
 
   // Handle editor updates
   useEffect(() => {
@@ -299,9 +340,8 @@ export function Editor({
         <div
           ref={editorContainerRef}
           className={`mt-6 relative ${!isEditing ? 'cursor-default' : ''}`}
-          onContextMenu={handleContextMenu}
         >
-          {isEditing && <AIBubbleMenu editor={editor} />}
+          {isEditing && <AIBubbleMenu editor={editor} onAIAction={handleAIAction} />}
           <EditorContent editor={editor} />
 
           {/* 斜杠命令菜单 */}
@@ -312,6 +352,19 @@ export function Editor({
               position={slashMenuPos}
               onSelect={(item) => item.action(editor)}
               onClose={closeSlashMenu}
+            />
+          )}
+
+          {/* Ctrl+K 内联提问 */}
+          {inlinePromptPos && isEditing && !diffState.isActive && (
+            <AIInlinePrompt
+              position={inlinePromptPos}
+              hasSelection={inlineHasSelection}
+              onSubmit={(prompt) => {
+                handleAIAction('custom', prompt)
+                setInlinePromptPos(null)
+              }}
+              onClose={() => setInlinePromptPos(null)}
             />
           )}
 
@@ -371,15 +424,6 @@ export function Editor({
         )}
       </div>
 
-      {/* AI 右键菜单 */}
-      {isEditing && contextMenuPos && !diffState.isActive && (
-        <AIContextMenu
-          position={contextMenuPos}
-          hasSelection={hasSelection}
-          onAction={handleAIAction}
-          onClose={closeContextMenu}
-        />
-      )}
     </div>
   )
 }
