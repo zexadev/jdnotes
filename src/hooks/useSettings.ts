@@ -260,7 +260,7 @@ export function useAIConfig() {
 // ============= 兼容旧接口的 Hook =============
 
 export function useSettings() {
-  const { config, isInitialized, updateSource, saveConfig } = useAIConfig()
+  const { config, isInitialized, updateSource } = useAIConfig()
 
   const settings = configToSettings(config)
 
