@@ -4,6 +4,30 @@ import { invoke } from '@tauri-apps/api/core'
 // AI 提供商类型
 export type AIProvider = 'openai' | 'anthropic' | 'google' | 'ollama'
 
+// AI 来源
+export interface AISource {
+  id: string
+  name: string
+  provider: AIProvider
+  baseUrl: string
+  apiKey: string
+  model: string
+}
+
+// AI 配置（多来源）
+export interface AIConfig {
+  sources: AISource[]
+  activeSourceId: string
+}
+
+// 兼容旧接口：扁平化的当前激活来源设置
+export interface Settings {
+  aiProvider: AIProvider
+  aiBaseUrl: string
+  aiApiKey: string
+  aiModel: string
+}
+
 // 提供商预设配置
 export interface ProviderPreset {
   name: string
@@ -14,7 +38,7 @@ export interface ProviderPreset {
   description: string
 }
 
-// 提供商预设配置列表（baseUrl 包含完整路径前缀）
+// 提供商预设配置列表
 export const PROVIDER_PRESETS: Record<AIProvider, ProviderPreset> = {
   openai: {
     name: 'OpenAI 兼容',
@@ -50,7 +74,7 @@ export const PROVIDER_PRESETS: Record<AIProvider, ProviderPreset> = {
   },
 }
 
-// 常用 OpenAI 兼容服务预设（baseUrl 包含完整路径前缀，代码只追加 /chat/completions）
+// 常用 OpenAI 兼容服务预设
 export const OPENAI_COMPATIBLE_PRESETS = [
   { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' },
   { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
@@ -60,13 +84,6 @@ export const OPENAI_COMPATIBLE_PRESETS = [
   { name: '硅基流动', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
 ]
 
-export interface Settings {
-  aiProvider: AIProvider
-  aiBaseUrl: string
-  aiApiKey: string
-  aiModel: string
-}
-
 const defaultSettings: Settings = {
   aiProvider: 'openai',
   aiBaseUrl: 'https://api.deepseek.com/v1',
@@ -74,120 +91,215 @@ const defaultSettings: Settings = {
   aiModel: 'deepseek-chat',
 }
 
-// 缓存设置，避免重复加载
-let cachedSettings: Settings | null = null
+// 缓存
+let cachedConfig: AIConfig | null = null
 let isLoading = false
-let loadPromise: Promise<Settings> | null = null
+let loadPromise: Promise<AIConfig> | null = null
 
-// 从后端加载设置
-async function loadSettingsFromBackend(): Promise<Settings> {
-  // 如果已有缓存，直接返回
-  if (cachedSettings) {
-    return cachedSettings
-  }
-  
-  // 如果正在加载，返回已有的 Promise
-  if (isLoading && loadPromise) {
-    return loadPromise
-  }
-  
+// 来源变更监听器
+type ConfigChangeListener = (config: AIConfig) => void
+const listeners: Set<ConfigChangeListener> = new Set()
+
+function notifyListeners(config: AIConfig) {
+  listeners.forEach(fn => fn(config))
+}
+
+// 从后端加载配置
+async function loadConfigFromBackend(): Promise<AIConfig> {
+  if (cachedConfig) return cachedConfig
+  if (isLoading && loadPromise) return loadPromise
+
   isLoading = true
   loadPromise = (async () => {
     try {
       const result = await invoke<{
-        aiProvider: string
-        aiBaseUrl: string
-        aiApiKey: string
-        aiModel: string
-      }>('get_ai_settings')
-      
-      // 验证 provider 是否为有效值
+        sources: Array<{
+          id: string
+          name: string
+          provider: string
+          baseUrl: string
+          apiKey: string
+          model: string
+        }>
+        activeSourceId: string
+      }>('get_ai_config')
+
       const validProviders: AIProvider[] = ['openai', 'anthropic', 'google', 'ollama']
-      const provider = validProviders.includes(result.aiProvider as AIProvider)
-        ? (result.aiProvider as AIProvider)
-        : defaultSettings.aiProvider
-      
-      cachedSettings = {
-        aiProvider: provider,
-        aiBaseUrl: result.aiBaseUrl || defaultSettings.aiBaseUrl,
-        aiApiKey: result.aiApiKey || defaultSettings.aiApiKey,
-        aiModel: result.aiModel || defaultSettings.aiModel,
+
+      cachedConfig = {
+        sources: result.sources.map(s => ({
+          ...s,
+          provider: validProviders.includes(s.provider as AIProvider)
+            ? (s.provider as AIProvider)
+            : 'openai',
+        })),
+        activeSourceId: result.activeSourceId,
       }
-      return cachedSettings
+      return cachedConfig
     } catch (e) {
-      console.error('Failed to load settings from backend:', e)
-      cachedSettings = defaultSettings
-      return defaultSettings
+      console.error('Failed to load AI config:', e)
+      cachedConfig = {
+        sources: [{
+          id: 'default',
+          name: 'DeepSeek',
+          provider: 'openai',
+          baseUrl: defaultSettings.aiBaseUrl,
+          apiKey: '',
+          model: defaultSettings.aiModel,
+        }],
+        activeSourceId: 'default',
+      }
+      return cachedConfig
     } finally {
       isLoading = false
     }
   })()
-  
+
   return loadPromise
 }
 
-// 保存设置到后端
-async function saveSettingsToBackend(settings: Settings): Promise<void> {
+// 保存配置到后端
+async function saveConfigToBackend(config: AIConfig): Promise<void> {
   try {
-    await invoke('save_ai_settings', {
-      provider: settings.aiProvider,
-      baseUrl: settings.aiBaseUrl,
-      apiKey: settings.aiApiKey,
-      model: settings.aiModel,
+    await invoke('save_ai_config', {
+      sources: config.sources,
+      activeSourceId: config.activeSourceId,
     })
-    // 更新缓存
-    cachedSettings = settings
+    cachedConfig = config
+    notifyListeners(config)
   } catch (e) {
-    console.error('Failed to save settings to backend:', e)
+    console.error('Failed to save AI config:', e)
     throw e
   }
 }
 
-export function useSettings() {
-  const [settings, setSettingsState] = useState<Settings>(cachedSettings || defaultSettings)
-  const [isInitialized, setIsInitialized] = useState(!!cachedSettings)
+// 从 AIConfig 中提取当前激活来源的扁平化 Settings
+function configToSettings(config: AIConfig): Settings {
+  const active = config.sources.find(s => s.id === config.activeSourceId)
+  if (active) {
+    return {
+      aiProvider: active.provider,
+      aiBaseUrl: active.baseUrl,
+      aiApiKey: active.apiKey,
+      aiModel: active.model,
+    }
+  }
+  return defaultSettings
+}
 
-  // 初始化时从后端加载设置
+// ============= 多来源管理 Hook =============
+
+export function useAIConfig() {
+  const [config, setConfigState] = useState<AIConfig>(
+    cachedConfig || { sources: [], activeSourceId: '' }
+  )
+  const [isInitialized, setIsInitialized] = useState(!!cachedConfig)
+
   useEffect(() => {
     if (!isInitialized) {
-      loadSettingsFromBackend().then((loadedSettings) => {
-        setSettingsState(loadedSettings)
+      loadConfigFromBackend().then((loaded) => {
+        setConfigState(loaded)
         setIsInitialized(true)
       })
     }
   }, [isInitialized])
 
-  // 更新单个设置项
+  // 监听外部变更（如 Chat 侧边栏切换来源）
+  useEffect(() => {
+    const handler = (newConfig: AIConfig) => {
+      setConfigState(newConfig)
+    }
+    listeners.add(handler)
+    return () => { listeners.delete(handler) }
+  }, [])
+
+  const saveConfig = useCallback(async (newConfig: AIConfig) => {
+    setConfigState(newConfig)
+    await saveConfigToBackend(newConfig)
+  }, [])
+
+  const addSource = useCallback(async (source: AISource) => {
+    const newConfig = {
+      ...config,
+      sources: [...config.sources, source],
+    }
+    await saveConfig(newConfig)
+  }, [config, saveConfig])
+
+  const removeSource = useCallback(async (id: string) => {
+    if (config.sources.length <= 1) return
+    const newSources = config.sources.filter(s => s.id !== id)
+    const newActiveId = config.activeSourceId === id
+      ? newSources[0].id
+      : config.activeSourceId
+    await saveConfig({ sources: newSources, activeSourceId: newActiveId })
+  }, [config, saveConfig])
+
+  const updateSource = useCallback(async (id: string, updates: Partial<AISource>) => {
+    const newSources = config.sources.map(s =>
+      s.id === id ? { ...s, ...updates } : s
+    )
+    await saveConfig({ ...config, sources: newSources })
+  }, [config, saveConfig])
+
+  const setActiveSource = useCallback(async (id: string) => {
+    await saveConfig({ ...config, activeSourceId: id })
+  }, [config, saveConfig])
+
+  return {
+    config,
+    isInitialized,
+    addSource,
+    removeSource,
+    updateSource,
+    setActiveSource,
+    saveConfig,
+  }
+}
+
+// ============= 兼容旧接口的 Hook =============
+
+export function useSettings() {
+  const { config, isInitialized, updateSource, saveConfig } = useAIConfig()
+
+  const settings = configToSettings(config)
+
+  // 兼容旧的 updateSetting 接口
   const updateSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettingsState((prev) => {
-      const newSettings = { ...prev, [key]: value }
-      // 异步保存到后端
-      saveSettingsToBackend(newSettings).catch((e) => {
-        console.error('Failed to save setting:', e)
-      })
-      return newSettings
-    })
-  }, [])
+    const active = config.sources.find(s => s.id === config.activeSourceId)
+    if (!active) return
 
-  // 更新所有设置
+    const fieldMap: Record<keyof Settings, keyof AISource> = {
+      aiProvider: 'provider',
+      aiBaseUrl: 'baseUrl',
+      aiApiKey: 'apiKey',
+      aiModel: 'model',
+    }
+    updateSource(active.id, { [fieldMap[key]]: value })
+  }, [config, updateSource])
+
   const updateSettings = useCallback((newSettings: Partial<Settings>) => {
-    setSettingsState((prev) => {
-      const merged = { ...prev, ...newSettings }
-      // 异步保存到后端
-      saveSettingsToBackend(merged).catch((e) => {
-        console.error('Failed to save settings:', e)
-      })
-      return merged
-    })
-  }, [])
+    const active = config.sources.find(s => s.id === config.activeSourceId)
+    if (!active) return
 
-  // 重置为默认设置
+    const updates: Partial<AISource> = {}
+    if (newSettings.aiProvider !== undefined) updates.provider = newSettings.aiProvider
+    if (newSettings.aiBaseUrl !== undefined) updates.baseUrl = newSettings.aiBaseUrl
+    if (newSettings.aiApiKey !== undefined) updates.apiKey = newSettings.aiApiKey
+    if (newSettings.aiModel !== undefined) updates.model = newSettings.aiModel
+    updateSource(active.id, updates)
+  }, [config, updateSource])
+
   const resetSettings = useCallback(() => {
-    setSettingsState(defaultSettings)
-    saveSettingsToBackend(defaultSettings).catch((e) => {
-      console.error('Failed to reset settings:', e)
+    const active = config.sources.find(s => s.id === config.activeSourceId)
+    if (!active) return
+    updateSource(active.id, {
+      provider: defaultSettings.aiProvider,
+      baseUrl: defaultSettings.aiBaseUrl,
+      apiKey: defaultSettings.aiApiKey,
+      model: defaultSettings.aiModel,
     })
-  }, [])
+  }, [config, updateSource])
 
   return {
     settings,
@@ -198,12 +310,14 @@ export function useSettings() {
   }
 }
 
-// 直接获取设置（用于非 React 环境）
+// 直接获取设置（用于非 React 环境，如 useAIStream）
 export async function getSettings(): Promise<Settings> {
-  return loadSettingsFromBackend()
+  const config = await loadConfigFromBackend()
+  return configToSettings(config)
 }
 
-// 同步获取缓存的设置（可能为空）
+// 同步获取缓存的设置
 export function getCachedSettings(): Settings {
-  return cachedSettings || defaultSettings
+  if (cachedConfig) return configToSettings(cachedConfig)
+  return defaultSettings
 }
