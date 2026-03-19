@@ -177,7 +177,7 @@ pub fn load_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
                 if !config.ai_sources.iter().any(|s| s.id == config.active_source_id) {
                     config.active_source_id = config.ai_sources[0].id.clone();
                 }
-                log::info!("配置加载成功，database_path: {:?}", config.database_path);
+                log::debug!("配置加载成功，database_path: {:?}", config.database_path);
                 Ok(config)
             },
             Err(e) => {
@@ -261,7 +261,7 @@ pub fn get_database_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         if let Some(parent) = path.parent() {
             if parent.exists() {
                 // 目录存在，使用自定义路径
-                log::info!("使用自定义数据库路径: {:?}", path);
+                log::debug!("使用自定义数据库路径: {:?}", path);
                 return Ok(path);
             } else {
                 // 目录不存在，尝试创建
