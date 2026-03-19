@@ -197,7 +197,7 @@ export function Editor({
     if (!editor || !editorContainerRef.current || !isEditing) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
         e.preventDefault()
         if (diffState.isActive) return
 

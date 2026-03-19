@@ -87,10 +87,10 @@ function App() {
     setIsChatOpen((prev) => !prev)
   }, [])
 
-  // Cmd/Ctrl + J 快捷键切换侧栏
+  // Cmd/Ctrl + L 快捷键切换侧栏
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'l') {
         e.preventDefault()
         toggleChat()
       }
