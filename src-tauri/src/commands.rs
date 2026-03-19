@@ -1,4 +1,4 @@
-use crate::db::{self, AISettings};
+use crate::db;
 use crate::models::ExportData;
 
 // ============= 架构说明 =============
@@ -127,48 +127,61 @@ pub async fn get_database_url(app: tauri::AppHandle) -> Result<String, String> {
     db::get_database_url(&app)
 }
 
-// ============= AI 设置管理 =============
+// ============= AI 配置管理 =============
 
-/// 获取 AI 设置
+/// 获取 AI 配置（所有来源 + 激活 ID）
 #[tauri::command]
-pub async fn get_ai_settings(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    let settings = db::get_ai_settings(&app)?;
-    let provider_str = match settings.provider {
-        db::AIProvider::OpenAICompatible => "openai",
-        db::AIProvider::Anthropic => "anthropic",
-        db::AIProvider::Google => "google",
-        db::AIProvider::Ollama => "ollama",
-    };
+pub async fn get_ai_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let (sources, active_source_id) = db::get_ai_config(&app)?;
+    let sources_json: Vec<serde_json::Value> = sources.iter().map(|s| {
+        let provider_str = match s.provider {
+            db::AIProvider::OpenAICompatible => "openai",
+            db::AIProvider::Anthropic => "anthropic",
+            db::AIProvider::Google => "google",
+            db::AIProvider::Ollama => "ollama",
+        };
+        serde_json::json!({
+            "id": s.id,
+            "name": s.name,
+            "provider": provider_str,
+            "baseUrl": s.base_url,
+            "apiKey": s.api_key,
+            "model": s.model
+        })
+    }).collect();
+
     Ok(serde_json::json!({
-        "aiProvider": provider_str,
-        "aiBaseUrl": settings.base_url,
-        "aiApiKey": settings.api_key,
-        "aiModel": settings.model
+        "sources": sources_json,
+        "activeSourceId": active_source_id
     }))
 }
 
-/// 保存 AI 设置
+/// 保存 AI 配置（所有来源 + 激活 ID）
 #[tauri::command]
-pub async fn save_ai_settings(
+pub async fn save_ai_config(
     app: tauri::AppHandle,
-    provider: String,
-    base_url: String,
-    api_key: String,
-    model: String,
+    sources: Vec<serde_json::Value>,
+    active_source_id: String,
 ) -> Result<(), String> {
-    let ai_provider = match provider.as_str() {
-        "anthropic" => db::AIProvider::Anthropic,
-        "google" => db::AIProvider::Google,
-        "ollama" => db::AIProvider::Ollama,
-        _ => db::AIProvider::OpenAICompatible,
-    };
-    let settings = AISettings {
-        provider: ai_provider,
-        base_url,
-        api_key,
-        model,
-    };
-    db::save_ai_settings(&app, settings)?;
+    let ai_sources: Vec<db::AISource> = sources.iter().map(|s| {
+        let provider_str = s.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
+        let provider = match provider_str {
+            "anthropic" => db::AIProvider::Anthropic,
+            "google" => db::AIProvider::Google,
+            "ollama" => db::AIProvider::Ollama,
+            _ => db::AIProvider::OpenAICompatible,
+        };
+        db::AISource {
+            id: s.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            name: s.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            provider,
+            base_url: s.get("baseUrl").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            api_key: s.get("apiKey").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            model: s.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        }
+    }).collect();
+
+    db::save_ai_config(&app, ai_sources, active_source_id)?;
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
+use uuid::Uuid;
 
 const CONFIG_FILE: &str = "config.json";
 
@@ -18,23 +19,22 @@ pub enum AIProvider {
     Ollama,
 }
 
-/// AI 设置结构
+/// 单个 AI 来源配置
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct AISettings {
-    /// AI 提供商
-    #[serde(default)]
+pub struct AISource {
+    pub id: String,
+    pub name: String,
     pub provider: AIProvider,
-    /// AI API 基础 URL
     pub base_url: String,
-    /// AI API Key
     pub api_key: String,
-    /// AI 模型名称
     pub model: String,
 }
 
-impl Default for AISettings {
+impl Default for AISource {
     fn default() -> Self {
         Self {
+            id: Uuid::new_v4().to_string(),
+            name: "DeepSeek".to_string(),
             provider: AIProvider::OpenAICompatible,
             base_url: "https://api.deepseek.com/v1".to_string(),
             api_key: String::new(),
@@ -48,9 +48,16 @@ impl Default for AISettings {
 pub struct AppConfig {
     /// 用户自定义的数据库路径（如果为 None 则使用默认路径）
     pub database_path: Option<String>,
-    /// AI 设置
+    /// AI 来源列表
+    #[serde(default = "default_ai_sources")]
+    pub ai_sources: Vec<AISource>,
+    /// 当前激活的来源 ID
     #[serde(default)]
-    pub ai_settings: AISettings,
+    pub active_source_id: String,
+}
+
+fn default_ai_sources() -> Vec<AISource> {
+    vec![AISource::default()]
 }
 
 /// 获取配置文件路径
@@ -68,6 +75,53 @@ fn get_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir.join(CONFIG_FILE))
 }
 
+/// 从旧 ai_settings 格式迁移到新 ai_sources 格式
+fn migrate_ai_settings_to_sources(old_config: &serde_json::Value) -> (Vec<AISource>, String) {
+    let mut source = AISource::default();
+
+    if let Some(ai_settings) = old_config.get("ai_settings") {
+        if let Some(base_url) = ai_settings.get("base_url").and_then(|v| v.as_str()) {
+            source.base_url = if base_url.ends_with("/v1") || base_url.contains("/v4") {
+                base_url.to_string()
+            } else {
+                format!("{}/v1", base_url.trim_end_matches('/'))
+            };
+        }
+        if let Some(api_key) = ai_settings.get("api_key").and_then(|v| v.as_str()) {
+            source.api_key = api_key.to_string();
+        }
+        if let Some(model) = ai_settings.get("model").and_then(|v| v.as_str()) {
+            source.model = model.to_string();
+        }
+        if let Some(provider) = ai_settings.get("provider").and_then(|v| v.as_str()) {
+            source.provider = match provider {
+                "Anthropic" => AIProvider::Anthropic,
+                "Google" => AIProvider::Google,
+                "Ollama" => AIProvider::Ollama,
+                _ => AIProvider::OpenAICompatible,
+            };
+        }
+        // 根据 provider/url 推断名称
+        source.name = match &source.provider {
+            AIProvider::Anthropic => "Claude".to_string(),
+            AIProvider::Google => "Gemini".to_string(),
+            AIProvider::Ollama => "Ollama".to_string(),
+            AIProvider::OpenAICompatible => {
+                if source.base_url.contains("deepseek") {
+                    "DeepSeek".to_string()
+                } else if source.base_url.contains("openai") {
+                    "OpenAI".to_string()
+                } else {
+                    "AI 来源".to_string()
+                }
+            }
+        };
+    }
+
+    let active_id = source.id.clone();
+    (vec![source], active_id)
+}
+
 /// 读取配置
 pub fn load_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
     let config_path = get_config_path(app)?;
@@ -76,108 +130,83 @@ pub fn load_config(app: &tauri::AppHandle) -> Result<AppConfig, String> {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| format!("读取配置文件失败: {}", e))?;
 
-        // 尝试解析配置文件
+        // 先尝试解析为 JSON Value 来检测格式
+        if let Ok(raw_value) = serde_json::from_str::<serde_json::Value>(&content) {
+            // 检测是否为旧格式（有 ai_settings 但没有 ai_sources）
+            let needs_migration = raw_value.get("ai_settings").is_some()
+                && raw_value.get("ai_sources").is_none();
+
+            if needs_migration {
+                log::info!("检测到旧配置格式，执行迁移...");
+                let mut new_config = AppConfig::default();
+
+                // 迁移 database_path
+                if let Some(db_path_value) = raw_value.get("database_path") {
+                    if let Some(db_path) = db_path_value.as_str() {
+                        if !db_path.is_empty() {
+                            new_config.database_path = Some(db_path.to_string());
+                        }
+                    }
+                }
+
+                // 迁移 ai_settings -> ai_sources
+                let (sources, active_id) = migrate_ai_settings_to_sources(&raw_value);
+                new_config.ai_sources = sources;
+                new_config.active_source_id = active_id;
+
+                // 保存迁移后的配置
+                if let Err(save_err) = save_config_internal(&config_path, &new_config) {
+                    log::warn!("保存迁移后的配置失败: {}", save_err);
+                } else {
+                    log::info!("配置迁移成功");
+                }
+
+                return Ok(new_config);
+            }
+        }
+
+        // 尝试直接解析新格式
         match serde_json::from_str::<AppConfig>(&content) {
-            Ok(config) => {
+            Ok(mut config) => {
+                // 确保至少有一个来源
+                if config.ai_sources.is_empty() {
+                    config.ai_sources = default_ai_sources();
+                    config.active_source_id = config.ai_sources[0].id.clone();
+                }
+                // 确保 active_source_id 有效
+                if !config.ai_sources.iter().any(|s| s.id == config.active_source_id) {
+                    config.active_source_id = config.ai_sources[0].id.clone();
+                }
                 log::info!("配置加载成功，database_path: {:?}", config.database_path);
                 Ok(config)
             },
             Err(e) => {
-                log::warn!("配置文件解析失败，尝试迁移旧配置: {}", e);
+                log::warn!("配置文件解析失败: {}", e);
 
-                // 尝试解析旧配置格式（可能只有 database_path 和旧的 ai_settings）
-                if let Ok(old_config) = serde_json::from_str::<serde_json::Value>(&content) {
-                    let mut new_config = AppConfig::default();
+                let backup_path = config_path.with_extension("json.backup");
+                let mut recovered_db_path: Option<String> = None;
 
-                    // 迁移 database_path - 同时处理字符串和 null 值
-                    if let Some(db_path_value) = old_config.get("database_path") {
-                        if let Some(db_path) = db_path_value.as_str() {
-                            // 值是有效的字符串
-                            if !db_path.is_empty() {
-                                log::info!("迁移 database_path: {}", db_path);
-                                new_config.database_path = Some(db_path.to_string());
-                            }
-                        }
-                        // 如果是 null，保持 database_path 为 None（使用默认路径）
-                    }
-
-                    // 迁移旧的 ai_settings
-                    if let Some(ai_settings) = old_config.get("ai_settings") {
-                        if let Some(base_url) = ai_settings.get("base_url").and_then(|v| v.as_str()) {
-                            // 如果旧的 base_url 不包含版本号，添加 /v1
-                            new_config.ai_settings.base_url = if base_url.ends_with("/v1") || base_url.contains("/v4") {
-                                base_url.to_string()
-                            } else {
-                                format!("{}/v1", base_url.trim_end_matches('/'))
-                            };
-                        }
-                        if let Some(api_key) = ai_settings.get("api_key").and_then(|v| v.as_str()) {
-                            new_config.ai_settings.api_key = api_key.to_string();
-                        }
-                        if let Some(model) = ai_settings.get("model").and_then(|v| v.as_str()) {
-                            new_config.ai_settings.model = model.to_string();
-                        }
-                        // 迁移 provider 字段
-                        if let Some(provider) = ai_settings.get("provider").and_then(|v| v.as_str()) {
-                            new_config.ai_settings.provider = match provider {
-                                "Anthropic" => AIProvider::Anthropic,
-                                "Google" => AIProvider::Google,
-                                "Ollama" => AIProvider::Ollama,
-                                _ => AIProvider::OpenAICompatible,
-                            };
-                        }
-                    }
-
-                    // 保存迁移后的配置
-                    if let Err(save_err) = save_config_internal(&config_path, &new_config) {
-                        log::warn!("保存迁移后的配置失败: {}", save_err);
-                    } else {
-                        log::info!("配置迁移成功，database_path: {:?}", new_config.database_path);
-                    }
-
-                    Ok(new_config)
-                } else {
-                    // 无法解析，尝试从备份恢复
-                    log::error!("配置文件完全无法解析");
-                    let backup_path = config_path.with_extension("json.backup");
-                    let mut recovered_db_path: Option<String> = None;
-
-                    // 尝试从备份文件恢复 database_path
-                    if backup_path.exists() {
-                        log::info!("尝试从备份文件恢复配置: {:?}", backup_path);
-                        if let Ok(backup_content) = fs::read_to_string(&backup_path) {
-                            if let Ok(backup_value) = serde_json::from_str::<serde_json::Value>(&backup_content) {
-                                if let Some(db_path) = backup_value.get("database_path").and_then(|v| v.as_str()) {
-                                    if !db_path.is_empty() {
-                                        log::info!("从备份恢复 database_path: {}", db_path);
-                                        recovered_db_path = Some(db_path.to_string());
-                                    }
+                if backup_path.exists() {
+                    if let Ok(backup_content) = fs::read_to_string(&backup_path) {
+                        if let Ok(backup_value) = serde_json::from_str::<serde_json::Value>(&backup_content) {
+                            if let Some(db_path) = backup_value.get("database_path").and_then(|v| v.as_str()) {
+                                if !db_path.is_empty() {
+                                    recovered_db_path = Some(db_path.to_string());
                                 }
                             }
                         }
                     }
-
-                    // 备份当前损坏的配置文件（如果还没有备份）
-                    if !backup_path.exists() {
-                        if let Err(backup_err) = fs::copy(&config_path, &backup_path) {
-                            log::warn!("备份旧配置文件失败: {}", backup_err);
-                        } else {
-                            log::info!("旧配置文件已备份到: {:?}", backup_path);
-                        }
-                    }
-
-                    // 创建新配置，保留恢复的 database_path
-                    let mut new_config = AppConfig::default();
-                    new_config.database_path = recovered_db_path;
-
-                    if let Err(save_err) = save_config_internal(&config_path, &new_config) {
-                        log::warn!("保存配置失败: {}", save_err);
-                    } else {
-                        log::info!("配置已重建，database_path: {:?}", new_config.database_path);
-                    }
-
-                    Ok(new_config)
                 }
+
+                if !backup_path.exists() {
+                    let _ = fs::copy(&config_path, &backup_path);
+                }
+
+                let mut new_config = AppConfig::default();
+                new_config.database_path = recovered_db_path;
+
+                let _ = save_config_internal(&config_path, &new_config);
+                Ok(new_config)
             }
         }
     } else {
@@ -357,18 +386,19 @@ pub fn get_init_sql() -> &'static str {
     include_str!("../migrations/001_initial.sql")
 }
 
-// ============= AI 设置管理 =============
+// ============= AI 配置管理 =============
 
-/// 获取 AI 设置
-pub fn get_ai_settings(app: &tauri::AppHandle) -> Result<AISettings, String> {
+/// 获取 AI 配置（所有来源 + 激活 ID）
+pub fn get_ai_config(app: &tauri::AppHandle) -> Result<(Vec<AISource>, String), String> {
     let config = load_config(app)?;
-    Ok(config.ai_settings)
+    Ok((config.ai_sources, config.active_source_id))
 }
 
-/// 保存 AI 设置
-pub fn save_ai_settings(app: &tauri::AppHandle, settings: AISettings) -> Result<(), String> {
+/// 保存 AI 配置（所有来源 + 激活 ID）
+pub fn save_ai_config(app: &tauri::AppHandle, sources: Vec<AISource>, active_source_id: String) -> Result<(), String> {
     let mut config = load_config(app)?;
-    config.ai_settings = settings;
+    config.ai_sources = sources;
+    config.active_source_id = active_source_id;
     save_config(app, &config)?;
     Ok(())
 }

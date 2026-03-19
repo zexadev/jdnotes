@@ -2,7 +2,7 @@ export { useAIStream, type AIAction, type TemplateType, type AIContext } from '.
 export { useAutoSave, recoverPendingSaves } from './useAutoSave'
 export { useAutoTitle } from './useAutoTitle'
 export { useExport } from './useExport'
-export { useSettings, getSettings, getCachedSettings, type Settings } from './useSettings'
+export { useSettings, useAIConfig, getSettings, getCachedSettings, type Settings, type AISource, type AIConfig } from './useSettings'
 export { useChat } from './useChat'
 export { useNotes } from './useNotes'
 export { useEditorAI } from './useEditorAI'

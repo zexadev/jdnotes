@@ -1,7 +1,8 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { X, Send, Sparkles, Loader2 } from 'lucide-react'
+import { X, Send, Sparkles, Loader2, ChevronDown, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useChat } from '../../hooks/useChat'
+import { useAIConfig } from '../../hooks/useSettings'
 import { type ChatMessage } from '../../lib/db'
 import { ChatMessageItem } from './ChatMessageItem'
 
@@ -36,6 +37,12 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     handleRetry,
     handleClear,
   } = useChat({ noteId, noteTitle, noteContent })
+
+  const { config, setActiveSource } = useAIConfig()
+  const [showSourcePicker, setShowSourcePicker] = useState(false)
+  const sourcePickerRef = useRef<HTMLDivElement>(null)
+
+  const activeSource = config.sources.find(s => s.id === config.activeSourceId)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -93,6 +100,19 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     }
   }, [input])
 
+  // 点击外部关闭来源选择器
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sourcePickerRef.current && !sourcePickerRef.current.contains(event.target as Node)) {
+        setShowSourcePicker(false)
+      }
+    }
+    if (showSourcePicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSourcePicker])
+
   // 复制消息
   const handleCopy = useCallback((content: string) => {
     navigator.clipboard.writeText(content)
@@ -131,13 +151,46 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     <div className="w-[350px] ai-sidebar-glass border-l border-black/[0.03] dark:border-white/[0.06] flex flex-col h-full ai-chat-sidebar">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.03] dark:border-white/[0.06]">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[#5E6AD2]" strokeWidth={1.5} />
-          <span className="text-[14px] font-medium text-slate-900 dark:text-slate-100 tracking-tight">
-            AI 助手
-          </span>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Sparkles className="h-4 w-4 text-[#5E6AD2] flex-shrink-0" strokeWidth={1.5} />
+          {/* 来源选择器 */}
+          <div ref={sourcePickerRef} className="relative min-w-0">
+            <button
+              onClick={() => setShowSourcePicker(!showSourcePicker)}
+              className="flex items-center gap-1 text-[14px] font-medium text-slate-900 dark:text-slate-100 tracking-tight hover:text-[#5E6AD2] transition-colors max-w-[180px]"
+            >
+              <span className="truncate">{activeSource?.name || 'AI 助手'}</span>
+              <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${showSourcePicker ? 'rotate-180' : ''}`} />
+            </button>
+            {showSourcePicker && config.sources.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 w-56 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                {config.sources.map((source) => (
+                  <button
+                    key={source.id}
+                    onClick={() => {
+                      setActiveSource(source.id)
+                      setShowSourcePicker(false)
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors ${
+                      source.id === config.activeSourceId
+                        ? 'bg-[#5E6AD2]/10 text-[#5E6AD2]'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate font-medium">{source.name}</div>
+                      <div className="text-xs text-gray-400 truncate">{source.model}</div>
+                    </div>
+                    {source.id === config.activeSourceId && (
+                      <Check className="h-4 w-4 flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {((messages && messages.length > 0) || pendingUserMessage) && (
             <button
               onClick={handleClear}

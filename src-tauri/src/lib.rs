@@ -108,9 +108,9 @@ pub fn run() {
             commands::export_database_json,
             commands::import_database_json,
             commands::import_from_indexeddb,
-            // AI 设置
-            commands::get_ai_settings,
-            commands::save_ai_settings,
+            // AI 配置
+            commands::get_ai_config,
+            commands::save_ai_config,
             commands::get_config_path,
         ])
         .run(tauri::generate_context!())
