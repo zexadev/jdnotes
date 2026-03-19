@@ -16,6 +16,22 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.3.0',
+    date: '2026-03-20',
+    notes: `## ✨ 新增功能
+### 🤖 AI 多来源配置
+- 支持同时保存多个 AI 来源（如 DeepSeek + Claude + Gemini）
+- 在聊天侧边栏直接切换模型/提供商，无需跳转设置页
+- 设置页重新设计为来源列表 + 编辑面板
+### ✏️ 编辑器交互优化
+- 气泡菜单整合 AI 功能，移除右键菜单
+- 新增 Ctrl+J 内联提问
+### 🏗️ 基建
+- 初始化 Nextra 文档站
+- 添加 GitHub Actions 自动打包发布
+- 清理 NSIS 自定义安装器相关配置`
+  },
+  {
     version: '1.2.0',
     date: '2026-01-10',
     notes: `## ✨ 新增功能

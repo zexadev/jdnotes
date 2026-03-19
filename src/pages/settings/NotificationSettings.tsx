@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Bell, CheckCircle, XCircle } from 'lucide-react'
+import { Bell, CheckCircle, XCircle, ExternalLink } from 'lucide-react'
 import {
   isPermissionGranted,
   requestPermission,
   sendNotification
 } from '@tauri-apps/plugin-notification'
+import { invoke } from '@tauri-apps/api/core'
 
 export function NotificationSettings() {
   const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>('default')
@@ -33,7 +34,6 @@ export function NotificationSettings() {
       const result = await requestPermission()
       setNotificationPermission(result === 'granted' ? 'granted' : 'denied')
 
-      // 如果授权成功，发送一个测试通知
       if (result === 'granted') {
         await sendNotification({
           title: 'JD Notes',
@@ -49,12 +49,29 @@ export function NotificationSettings() {
   // 发送测试通知
   const handleTestNotification = async () => {
     try {
+      // 重新请求一次权限确保生效
+      await requestPermission()
       await sendNotification({
         title: 'JD Notes',
-        body: '每一个被记录的瞬间，都值得被温柔对待❤',
+        body: '每一个被记录的瞬间，都值得被温柔对待',
       })
     } catch (e) {
       console.error('Failed to send test notification:', e)
+    }
+  }
+
+  // 打开系统通知设置
+  const handleOpenSystemSettings = async () => {
+    try {
+      // Windows: 打开通知设置页面
+      await invoke('plugin:opener|open_url', { url: 'ms-settings:notifications' })
+    } catch {
+      // fallback: 尝试用 shell 打开
+      try {
+        await invoke('plugin:opener|open_url', { url: 'ms-settings:notifications' })
+      } catch (e) {
+        console.error('Failed to open system settings:', e)
+      }
     }
   }
 
@@ -124,6 +141,25 @@ export function NotificationSettings() {
               className="w-full px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
             >
               发送测试通知
+            </button>
+          )}
+
+          {notificationPermission === 'granted' && (
+            <button
+              onClick={handleOpenSystemSettings}
+              className="w-full px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-2"
+            >
+              <ExternalLink className="h-4 w-4" />
+              打开系统通知设置
+            </button>
+          )}
+
+          {notificationPermission === 'denied' && (
+            <button
+              onClick={handleRequestPermission}
+              className="w-full px-4 py-2.5 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors"
+            >
+              重新请求权限
             </button>
           )}
         </div>

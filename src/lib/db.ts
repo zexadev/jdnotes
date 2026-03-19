@@ -130,14 +130,15 @@ export async function initializeDefaultNotes(): Promise<void> {
        VALUES (?, ?, ?, 0, 0, ?, ?, 0)`,
       [
         '欢迎使用 JD Notes',
-        `欢迎使用 JD Notes！这是一个 Linear 风格的笔记应用。
+        `欢迎使用 JD Notes！这是一个简洁高效的本地笔记应用。
 
 ## 功能特性
 
 - **富文本编辑**：支持 Markdown 语法
 - **代码块**：语法高亮，支持运行 Shell 命令
 - **自动保存**：本地持久化存储
-- **AI 智能助手**：右键菜单 + 侧栏对话
+- **AI 智能助手**：气泡菜单 AI 功能 + 侧栏对话
+- **多来源 AI**：支持 OpenAI、Claude、Gemini、Ollama，快速切换
 - **斜杠命令**：快速调用 AI 模板
 - **日历视图**：按时间维度管理笔记
 - **笔记提醒**：设置提醒，到期通知
@@ -147,7 +148,7 @@ export async function initializeDefaultNotes(): Promise<void> {
 
 1. 点击左上角 **+ 新建笔记** 创建笔记
 2. 按 \`Ctrl+K\` 搜索已有笔记
-3. 按 \`Ctrl+J\` 打开 AI 助手
+3. 按 \`Ctrl+L\` 打开 AI 助手
 4. 点击侧栏 **📅 日历** 查看时间轴
 
 开始创建你的第一个笔记吧！`,
@@ -172,13 +173,14 @@ export async function initializeDefaultNotes(): Promise<void> {
 ## 通用快捷键
 
 - \`Ctrl+K\` - 搜索笔记
-- \`Ctrl+J\` - 打开/关闭 AI 助手侧栏
+- \`Ctrl+L\` - 打开/关闭 AI 助手侧栏
+- \`Ctrl+J\` - 内联提问（选中文本后）
 
 ## AI 功能
 
-**右键菜单**：在编辑器中右键即可呼出 AI 助手菜单
-- 选中文本：改进写作、总结摘要、中英互译
-- 任意位置：AI 续写、自由提问
+**气泡菜单**：选中文本后自动弹出，包含 AI 改进、翻译、总结等功能
+
+**内联提问**：选中文本后按 \`Ctrl+J\`，直接向 AI 提问
 
 **斜杠命令**：输入 \`/\` 触发快捷模板
 - AI 续写 - 根据上文继续写作
@@ -186,7 +188,7 @@ export async function initializeDefaultNotes(): Promise<void> {
 - 脑暴大纲 - 生成 5 点思维大纲
 - 代码实现 - 根据描述生成代码
 
-**AI 侧栏**：按 \`Ctrl+J\` 打开，可与 AI 自由对话，AI 会自动获取当前笔记上下文
+**AI 侧栏**：按 \`Ctrl+L\` 打开，可与 AI 自由对话，支持多来源快速切换
 
 ## 日历视图
 
@@ -200,7 +202,7 @@ export async function initializeDefaultNotes(): Promise<void> {
 在笔记编辑界面，点击工具栏的 **🔔 铃铛按钮** 设置提醒：
 - 快捷选项：30分钟后、1小时后、3小时后、明天此时
 - 自定义时间：选择任意时间
-- 到期通知：浏览器弹窗 + 系统通知`,
+- 到期通知：系统弹窗通知 + 应用内通知`,
         '["入门", "快捷键"]',
         now,
         now
