@@ -33,10 +33,6 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
   // Ghost 面板位置（基于光标）
   const [ghostPosition, setGhostPosition] = useState<{ top: number; left: number } | null>(null)
   
-  // AI 右键菜单状态
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null)
-  const [hasSelection, setHasSelection] = useState(false)
-
   // 防止 content 同步覆盖刚接受/放弃的内容
   const skipContentSyncRef = useRef(false)
 
@@ -216,26 +212,6 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     }, 100)
   }, [editor, diffState.originalText, isStreaming, stopStream, resetDiffState, onContentChange])
 
-  // 右键菜单处理
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      if (!editor || diffState.isActive) return
-
-      e.preventDefault()
-
-      const { from, to } = editor.state.selection
-      const hasText = from !== to
-
-      setHasSelection(hasText)
-      setContextMenuPos({ x: e.clientX, y: e.clientY })
-    },
-    [editor, diffState.isActive]
-  )
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenuPos(null)
-  }, [])
-
   // 处理斜杠命令触发的 AI
   const startAIFromSlashCommand = useCallback((action: string, templateType?: string) => {
     if (!editor || !editorContainerRef.current) return
@@ -263,6 +239,17 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
         action: 'continue',
       })
       startStream('continue', contextText, undefined, buildAIContext())
+    } else if (action === 'custom' && templateType) {
+      // 自由提问
+      setDiffState({
+        isActive: true,
+        originalText: '',
+        generatedText: '',
+        isStreaming: true,
+        action: 'custom',
+        customPrompt: templateType,
+      })
+      startStream('custom', contextText, templateType, buildAIContext())
     } else if (action === 'template' && templateType) {
       // 模板生成
       setDiffState({
@@ -281,14 +268,10 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     diffState,
     showError,
     ghostPosition,
-    contextMenuPos,
-    hasSelection,
     skipContentSyncRef,
     handleAIAction,
     handleAccept,
     handleDiscard,
-    handleContextMenu,
-    closeContextMenu,
     startAIFromSlashCommand,
   }
 }

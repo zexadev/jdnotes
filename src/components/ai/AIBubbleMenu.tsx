@@ -1,67 +1,63 @@
 import { BubbleMenu } from '@tiptap/react/menus'
 import { type Editor } from '@tiptap/react'
-import { 
-  Sparkles, 
-  FileText, 
-  Languages, 
-  Square, 
-  Bold, 
-  Italic, 
-  Strikethrough, 
+import {
+  Sparkles,
+  FileText,
+  Languages,
+  MessageSquare,
+  Bold,
+  Italic,
+  Strikethrough,
   Code as CodeIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Send
 } from 'lucide-react'
-import { useAIStream, type AIAction } from '../../hooks/useAIStream'
+import type { AIAction } from '../../hooks/useAIStream'
 import { useCallback, useState } from 'react'
 
 interface AIBubbleMenuProps {
   editor: Editor
+  onAIAction: (action: AIAction, customPrompt?: string) => void
 }
 
-export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
-  const [showError, setShowError] = useState<string | null>(null)
-
-  const { isStreaming, startStream, stopStream } = useAIStream({
-    onChunk: (chunk) => {
-      editor.chain().focus().insertContent(chunk).run()
-    },
-    onFinish: () => {
-    },
-    onError: (error) => {
-      setShowError(error)
-      setTimeout(() => setShowError(null), 3000)
-    },
-  })
+export function AIBubbleMenu({ editor, onAIAction }: AIBubbleMenuProps) {
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [customPrompt, setCustomPrompt] = useState('')
 
   const handleAIAction = useCallback(
-    async (action: AIAction) => {
-      const { from, to } = editor.state.selection
-      const selectedText = editor.state.doc.textBetween(from, to, ' ')
-
-      if (!selectedText.trim()) return
-
-      editor.chain().focus().deleteSelection().run()
-      await startStream(action, selectedText)
+    (action: AIAction) => {
+      onAIAction(action)
     },
-    [editor, startStream]
+    [onAIAction]
   )
+
+  const handleCustomPrompt = useCallback(() => {
+    if (!customPrompt.trim()) return
+    onAIAction('custom', customPrompt)
+    setCustomPrompt('')
+    setShowCustomInput(false)
+  }, [customPrompt, onAIAction])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleCustomPrompt()
+    }
+    if (e.key === 'Escape') {
+      setShowCustomInput(false)
+      setCustomPrompt('')
+    }
+  }
 
   const setLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href
     const url = window.prompt('输入链接地址', previousUrl)
 
-    // 取消
-    if (url === null) {
-      return
-    }
-
-    // 清空
+    if (url === null) return
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
       return
     }
-
-    // 设置链接
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
   }, [editor])
 
@@ -83,25 +79,35 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
         return from !== to && !editor.isActive('codeBlock')
       }}
     >
-      <div className="flex items-center gap-0.5 px-1 py-1 bg-white/95 dark:bg-[#1C1C1F]/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden animate-in fade-in zoom-in duration-200">
-        {isStreaming ? (
-          <div className="flex items-center gap-2 px-3 py-1.5">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" />
-            </div>
-            <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">AI 正在处理...</span>
+      <div className="flex flex-col gap-0 bg-white/95 dark:bg-[#1C1C1F]/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden animate-in fade-in zoom-in duration-200">
+        {showCustomInput ? (
+          <div className="flex items-center gap-1.5 px-2 py-1.5">
+            <input
+              type="text"
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="针对选中内容提问..."
+              autoFocus
+              className="w-48 px-2 py-1 text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md outline-none focus:ring-1 focus:ring-indigo-500"
+            />
             <button
-              onClick={stopStream}
-              className="ml-2 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+              onClick={handleCustomPrompt}
+              disabled={!customPrompt.trim()}
+              className="p-1.5 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Square className="h-3 w-3 fill-current" />
+              <Send className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => { setShowCustomInput(false); setCustomPrompt('') }}
+              className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1"
+            >
+              取消
             </button>
           </div>
         ) : (
-          <>
-            {/* 常规格式化工具 */}
+          <div className="flex items-center gap-0.5 px-1 py-1">
+            {/* 格式化工具 */}
             <div className="flex items-center px-1 border-r border-gray-100 dark:border-gray-800">
               <FormatButton
                 onClick={() => editor.chain().focus().toggleBold().run()}
@@ -135,7 +141,7 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
               />
             </div>
 
-            {/* AI 功能工具 */}
+            {/* AI 工具 */}
             <div className="flex items-center px-1">
               {aiItems.map(({ action, icon: Icon, label }) => (
                 <button
@@ -147,13 +153,14 @@ export function AIBubbleMenu({ editor }: AIBubbleMenuProps) {
                   <span>{label}</span>
                 </button>
               ))}
+              <button
+                onClick={() => setShowCustomInput(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-300 rounded-lg transition-all"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span>提问</span>
+              </button>
             </div>
-          </>
-        )}
-
-        {showError && (
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/90 text-red-600 dark:text-red-100 text-[11px] rounded-lg shadow-lg border border-red-100 dark:border-red-800 whitespace-nowrap animate-in slide-in-from-bottom-1">
-            {showError}
           </div>
         )}
       </div>
@@ -166,8 +173,8 @@ function FormatButton({ onClick, active, icon, label }: { onClick: () => void; a
     <button
       onClick={onClick}
       className={`p-1.5 rounded-lg transition-all ${
-        active 
-          ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 dark:text-indigo-300' 
+        active
+          ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 dark:text-indigo-300'
           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
       }`}
       title={label}
