@@ -40,9 +40,9 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/huancheng01/jdnotes/releases/latest/download/latest.json"
+        "https://github.com/zexadev/jdnotes/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUxNEJDNTVCRkFERUQ5NDcKUldSSDJkNzZXOFZMVVdrekR2azI3VXV0eXJZTzR3b1NpQ0FielZONVpSUzdLQ2duUmtoaDFJaEcK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVDRUM0RjVDQzFFM0ZERDUKUldUVi9lUEJYRS9zN01wNTE0RTZoOStSYmVvclpMQ0dNN0sya01SVFdIdXBua24yMUJTeCtZMFEK"
     }
   }
 }

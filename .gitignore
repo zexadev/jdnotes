@@ -25,3 +25,6 @@ dist-ssr
 .claude/settings.local.json
 .claude/skills/ui-ux-pro-max/
 release/
+
+# Signing keys
+src-tauri/keys/

@@ -10,6 +10,47 @@
 
 ---
 
+## 项目概况
+
+- **名称**：JD Notes — 简洁高效的本地笔记应用
+- **技术栈**：Tauri v2 (tauri 2.9.5, tauri-build 2.5.3) + Vite + React + TypeScript
+- **包管理器**：pnpm
+- **版本**：1.3.0
+- **标识符**：com.jdnotes.app
+- **窗口**：1200x800，无边框 (decorations: false)
+- **前端开发端口**：5173
+- **GitHub**：zexadev/jdnotes
+- **品牌**：Zexa (zexa.cc)
+
+---
+
+## 基建
+
+- **CI/CD**：GitHub Actions（`.github/workflows/release.yml`），推送 `v*` tag 自动构建 Windows 安装包 + 发布 Release
+- **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
+- **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
+- **数据库**：SQLite（通过 tauri-plugin-sql）
+- **Tauri 插件**：log, notification, sql(sqlite), dialog, fs, opener, updater, process
+
+---
+
+## 关键文件路径
+
+| 文件 | 说明 |
+|------|------|
+| `src-tauri/tauri.conf.json` | Tauri 配置、版本号 |
+| `src-tauri/Cargo.toml` | Rust 依赖、版本号 |
+| `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
+| `src-tauri/src/commands.rs` | Tauri 后端命令 |
+| `src-tauri/src/lib.rs` | 插件注册、命令注册 |
+| `src/hooks/useSettings.ts` | AI 多来源配置 Hook（useAIConfig / useSettings） |
+| `src/components/modals/ChangelogModal.tsx` | 应用内更新日志（CHANGELOG_DATA 数组） |
+| `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
+| `docs/src/content/changelog.mdx` | 文档站更新日志 |
+| `docs/next.config.mjs` | 文档站构建配置 |
+
+---
+
 ## 发布流程
 
 发布新版本时，按以下步骤逐一执行，每步执行前告知用户：
@@ -23,8 +64,8 @@
 2. **更新版本号**
    - `src-tauri/tauri.conf.json` 中的 `version`
    - `src-tauri/Cargo.toml` 中的 `version`
-   - patch 修复：1.2.x → 1.2.(x+1)
-   - 新功能：1.2.x → 1.3.0
+   - patch 修复：x.y.z → x.y.(z+1)
+   - 新功能：x.y.z → x.(y+1).0
 
 3. **更新 changelog**
    - 更新 `docs/src/content/changelog.mdx`，添加新版本的更新说明
@@ -66,24 +107,13 @@
 
 ---
 
-## 基建
+## 快捷键
 
-- **CI/CD**: GitHub Actions，推送 tag 自动构建 Tauri 安装包 + 发布 Release
-- **文档站**: Nextra (Next.js)，位于 `docs/`
-- **文档部署**: Cloudflare Pages，域名 jdnotes.zexa.cc
-- **品牌**: Zexa (zexa.cc)
-
----
-
-## 项目概况
-- Tauri v2 桌面应用 (tauri 2.9.5, tauri-build 2.5.3)
-- 前端: Vite + React (端口 5173)
-- 版本: 1.2.0
-- 标识符: com.jdnotes.app
-- 窗口: 1200x800, 无边框 (decorations: false)
-- 插件: log, notification, sql(sqlite), dialog, fs, opener, updater, process
-- GitHub: huancheng01/jdnotes
-
-## 关键文件路径
-- Tauri 配置: `src-tauri/tauri.conf.json`
-- Cargo: `src-tauri/Cargo.toml`
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl+K` | 搜索笔记 |
+| `Ctrl+L` | 打开/关闭 AI 侧栏 |
+| `Ctrl+J` | 内联提问（选中文本后） |
+| `Ctrl+B` | 粗体 |
+| `Ctrl+I` | 斜体 |
+| `Ctrl+Shift+C` | 代码块 |
