@@ -160,6 +160,12 @@ body {
   cursor: text;
 }
 
+/* Ctrl 按住时链接可点击 */
+.tiptap.ctrl-held a {
+  cursor: pointer;
+  text-decoration-thickness: 2px;
+}
+
 .dark .tiptap a {
   color: #818cf8;
 }

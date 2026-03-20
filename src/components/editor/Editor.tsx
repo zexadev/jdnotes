@@ -230,6 +230,30 @@ export function Editor({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [editor, editorContainerRef, isEditing, diffState.isActive])
 
+  // Ctrl 按住时链接显示手型光标
+  useEffect(() => {
+    if (!editor) return
+    const el = editor.view.dom
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') el.classList.add('ctrl-held')
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') el.classList.remove('ctrl-held')
+    }
+    const onBlur = () => el.classList.remove('ctrl-held')
+
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+      el.classList.remove('ctrl-held')
+    }
+  }, [editor])
+
   // Handle editor updates
   useEffect(() => {
     if (!editor) return
