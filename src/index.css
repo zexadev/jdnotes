@@ -94,6 +94,11 @@ body {
   line-height: 1.75;
 }
 
+.tiptap p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
 .dark .tiptap {
   color: #e2e8f0;
 }
@@ -748,14 +753,18 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  margin: 0.25rem 0;
+  margin: 0.5em 0;
+}
+
+.tiptap ul[data-type="taskList"] li > div p {
+  margin: 0 !important;
 }
 
 .tiptap ul[data-type="taskList"] li > label {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  margin-top: 0.25rem;
+  margin-top: 0.35rem;
   user-select: none;
 }
 

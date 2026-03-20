@@ -385,7 +385,7 @@ export function Editor({
           {diffState.isActive && ghostPosition && (
             <div
               ref={diffRef}
-              className="absolute z-10 max-w-md"
+              className="absolute z-10 max-w-2xl"
               style={{
                 top: ghostPosition.top,
                 left: Math.max(0, ghostPosition.left - 8),
@@ -393,14 +393,14 @@ export function Editor({
             >
               {/* 原文（灰色半透明删除线） */}
               {diffState.originalText && (
-                <div className="ai-ghost-original text-sm mb-1">
+                <div className="ai-ghost-original text-base mb-1">
                   {diffState.originalText}
                 </div>
               )}
 
               {/* AI 生成内容（靛蓝色） */}
               <div className="flex items-start gap-1">
-                <div className="ai-ghost-text text-sm flex-1 whitespace-pre-wrap">
+                <div className="ai-ghost-text text-base flex-1 whitespace-pre-wrap">
                   {diffState.generatedText}
                   {diffState.isStreaming && (
                     <span className="ai-streaming-cursor" />
