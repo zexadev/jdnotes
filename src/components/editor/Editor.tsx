@@ -3,6 +3,8 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { CodeBlockComponent } from './CodeBlockComponent'
@@ -30,6 +32,7 @@ interface EditorProps {
   onTagsChange?: (tags: string[]) => void
   contentToInsert?: string | null // 要插入的内容
   onContentInserted?: () => void // 插入完成后的回调
+  onEditorReady?: (editor: ReturnType<typeof useEditor>) => void // 编辑器就绪回调
 }
 
 export function Editor({
@@ -44,6 +47,7 @@ export function Editor({
   onTagsChange,
   contentToInsert,
   onContentInserted,
+  onEditorReady,
 }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const diffRef = useRef<HTMLDivElement>(null)
@@ -118,6 +122,10 @@ export function Editor({
           class: 'cursor-text text-indigo-600 dark:text-indigo-400 underline underline-offset-4 transition-colors hover:text-indigo-500',
         },
       }),
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
     ],
     content: content,
     editable: isEditing,
@@ -148,6 +156,11 @@ export function Editor({
       },
     },
   })
+
+  // 通知父组件编辑器就绪
+  useEffect(() => {
+    onEditorReady?.(editor)
+  }, [editor, onEditorReady])
 
   const {
     diffState,
