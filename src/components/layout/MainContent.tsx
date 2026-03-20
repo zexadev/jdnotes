@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Star, Eye, PenLine, Sparkles, Bell, X } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
+import { EditorToolbar } from '../editor/EditorToolbar'
 import { formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import { formatTimeRemaining } from '../calendar/ReminderNotification'
 import type { Note } from '../../lib/db'
+import type { Editor as TiptapEditor } from '@tiptap/react'
 
 interface MainContentProps {
   activeNoteId: number | null
@@ -50,6 +52,11 @@ export function MainContent({
   const [showReminderPicker, setShowReminderPicker] = useState(false)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
   const reminderPopupRef = useRef<HTMLDivElement>(null)
+  const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null)
+
+  const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
+    setEditorInstance(editor)
+  }, [])
 
   // 点击外部关闭提醒选择器
   useEffect(() => {
@@ -196,6 +203,13 @@ export function MainContent({
               />
             </div>
 
+            {/* 编辑器工具栏 - 固定不滚动 */}
+            {isEditing && editorInstance && (
+              <div className="px-12 border-b border-black/[0.03] dark:border-white/[0.06]">
+                <EditorToolbar editor={editorInstance} />
+              </div>
+            )}
+
             {/* Tiptap 编辑器 */}
             <Editor
               key={`editor-${activeNoteId}`}
@@ -210,6 +224,7 @@ export function MainContent({
               onTagsChange={onTagsChange}
               contentToInsert={contentToInsert}
               onContentInserted={onContentInserted}
+              onEditorReady={handleEditorReady}
             />
           </motion.div>
         ) : (

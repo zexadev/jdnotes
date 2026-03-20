@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
-import { Sparkles, FileText, Lightbulb, Code, MessageSquare } from 'lucide-react'
+import { Sparkles, FileText, Lightbulb, Code, MessageSquare, ListChecks } from 'lucide-react'
 
 export interface SlashCommandItem {
   id: string
   icon: React.ReactNode
   title: string
   description: string
+  group: 'editor' | 'ai'
   action: (editor: Editor) => void
 }
 
@@ -65,32 +66,42 @@ export function SlashCommand({ items, position, onSelect, onClose }: SlashComman
         left: position.left,
       }}
     >
-      <div className="px-2 py-1.5 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
-        AI 命令
-      </div>
-      {items.map((item, index) => (
-        <button
-          key={item.id}
-          onClick={() => onSelect(item)}
-          className={`w-full flex items-start gap-3 px-3 py-2 text-left transition-colors ${
-            index === selectedIndex
-              ? 'bg-indigo-50 dark:bg-indigo-900/30'
-              : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-          }`}
-        >
-          <span className={`mt-0.5 ${index === selectedIndex ? 'text-indigo-500' : 'text-gray-400 dark:text-gray-500'}`}>
-            {item.icon}
-          </span>
-          <div className="flex-1 min-w-0">
-            <div className={`text-sm font-medium ${index === selectedIndex ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
-              {item.title}
+      {(() => {
+        let lastGroup = ''
+        return items.map((item, index) => {
+          const showGroupHeader = item.group !== lastGroup
+          lastGroup = item.group
+          return (
+            <div key={item.id}>
+              {showGroupHeader && (
+                <div className="px-2 py-1.5 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
+                  {item.group === 'editor' ? '编辑器命令' : 'AI 命令'}
+                </div>
+              )}
+              <button
+                onClick={() => onSelect(item)}
+                className={`w-full flex items-start gap-3 px-3 py-2 text-left transition-colors ${
+                  index === selectedIndex
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                }`}
+              >
+                <span className={`mt-0.5 ${index === selectedIndex ? 'text-indigo-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {item.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium ${index === selectedIndex ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    {item.title}
+                  </div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                    {item.description}
+                  </div>
+                </div>
+              </button>
             </div>
-            <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
-              {item.description}
-            </div>
-          </div>
-        </button>
-      ))}
+          )
+        })
+      })()}
       <div className="px-3 py-1.5 text-[10px] text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-800">
         ↑↓ 选择 · Enter 确认 · Esc 取消
       </div>
@@ -101,11 +112,22 @@ export function SlashCommand({ items, position, onSelect, onClose }: SlashComman
 // 默认的斜杠命令项
 export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: string) => void): SlashCommandItem[] {
   return [
+    // 编辑器命令
+    {
+      id: 'task-list',
+      icon: <ListChecks className="h-4 w-4" />,
+      title: '待办列表',
+      description: '插入带复选框的待办清单',
+      group: 'editor',
+      action: (editor) => editor.chain().focus().toggleTaskList().run(),
+    },
+    // AI 命令
     {
       id: 'ai-continue',
       icon: <Sparkles className="h-4 w-4" />,
       title: 'AI 续写',
       description: '根据上文继续写作',
+      group: 'ai',
       action: () => onAIAction('continue'),
     },
     {
@@ -113,6 +135,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       icon: <FileText className="h-4 w-4" />,
       title: '会议纪要',
       description: '生成结构化会议模板',
+      group: 'ai',
       action: () => onAIAction('template', 'meeting'),
     },
     {
@@ -120,6 +143,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       icon: <Lightbulb className="h-4 w-4" />,
       title: '脑暴大纲',
       description: '生成5点思维大纲',
+      group: 'ai',
       action: () => onAIAction('template', 'brainstorm'),
     },
     {
@@ -127,6 +151,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       icon: <Code className="h-4 w-4" />,
       title: '代码实现',
       description: '根据描述生成代码',
+      group: 'ai',
       action: () => onAIAction('template', 'code'),
     },
     {
@@ -134,6 +159,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       icon: <MessageSquare className="h-4 w-4" />,
       title: '自由提问',
       description: '输入自定义指令',
+      group: 'ai',
       action: () => onAIAction('show-inline-prompt'),
     },
   ]
