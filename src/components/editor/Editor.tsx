@@ -113,7 +113,7 @@ export function Editor({
         html: false,
         tightLists: true,
         transformPastedText: true,
-        transformCopiedText: true,
+        transformCopiedText: false,
       }),
       Link.configure({
         openOnClick: false,
