@@ -37,7 +37,7 @@ export function useAutoTitle(): UseAutoTitleReturn {
 使用与内容相同的语言。按以下 JSON 格式返回，不要其他内容：
 {"tags": ["标签1", "标签2"]}`
 
-      const response = await fetch(`${settings.aiBaseUrl}/v1/chat/completions`, {
+      const response = await fetch(`${settings.aiBaseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
