@@ -250,6 +250,20 @@ Copyright © 2026 [Zexa](https://zexa.cc)
 
 ---
 
+## 🙏 致谢
+
+感谢以下开源项目为 JD Notes 提供技术支持：
+
+<p>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/-Tauri-24C8D8?style=for-the-badge&logo=tauri&logoColor=white" /></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/-React-61DAFB?style=for-the-badge&logo=react&logoColor=black" /></a>
+  <a href="https://tiptap.dev/"><img src="https://img.shields.io/badge/-TipTap-000000?style=for-the-badge" /></a>
+  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/-TailwindCSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" /></a>
+  <a href="https://lucide.dev/"><img src="https://img.shields.io/badge/-Lucide-F56565?style=for-the-badge" /></a>
+</p>
+
+---
+
 <p align="center">
   Made with ❤️ by <a href="https://zexa.cc">Zexa</a>
 </p>
