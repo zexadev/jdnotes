@@ -662,7 +662,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
               一个简洁高效的本地笔记应用
             </p>
             <p className="text-xs text-slate-300 dark:text-slate-600 mt-3 italic">
-              to jiaxiang
+              to zexa
             </p>
           </div>
         </div>
