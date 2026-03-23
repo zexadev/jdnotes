@@ -16,6 +16,8 @@ import { useAutoTitle } from '../../hooks/useAutoTitle'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
 import Link from '@tiptap/extension-link'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { readFile } from '@tauri-apps/plugin-fs'
 import { EditorHeader } from './EditorHeader'
 import { AIBubbleMenu } from '../ai/AIBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
@@ -154,21 +156,6 @@ export function Editor({
           }
           return false
         },
-        drop: (_view, event) => {
-          const files = event.dataTransfer?.files
-          if (!files?.length) return false
-
-          const imageFile = Array.from(files).find(f => f.type.startsWith('image/'))
-          if (!imageFile) return false
-
-          event.preventDefault()
-          const reader = new FileReader()
-          reader.onload = () => {
-            editor?.chain().focus().setImage({ src: reader.result as string }).run()
-          }
-          reader.readAsDataURL(imageFile)
-          return true
-        },
       },
     },
   })
@@ -268,6 +255,46 @@ export function Editor({
       el.classList.remove('ctrl-held')
     }
   }, [editor])
+
+  // Tauri 拖拽图片文件到编辑器
+  useEffect(() => {
+    if (!editor || !isEditing) return
+
+    const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
+    let unlisten: (() => void) | undefined
+
+    getCurrentWebview().onDragDropEvent(async (event) => {
+      if (event.payload.type === 'drop') {
+        const paths = event.payload.paths
+        for (const filePath of paths) {
+          const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
+          if (!imageExts.includes(ext)) continue
+
+          try {
+            const data = await readFile(filePath)
+            const mimeType = ext === '.png' ? 'image/png'
+              : ext === '.svg' ? 'image/svg+xml'
+              : ext === '.gif' ? 'image/gif'
+              : ext === '.webp' ? 'image/webp'
+              : ext === '.bmp' ? 'image/bmp'
+              : 'image/jpeg'
+            const base64 = btoa(
+              Array.from(data).map(b => String.fromCharCode(b)).join('')
+            )
+            editor.chain().focus().setImage({ src: `data:${mimeType};base64,${base64}` }).run()
+          } catch (err) {
+            console.error('拖拽图片插入失败:', err)
+          }
+        }
+      }
+    }).then((fn) => {
+      unlisten = fn
+    })
+
+    return () => {
+      unlisten?.()
+    }
+  }, [editor, isEditing])
 
   // Handle editor updates
   useEffect(() => {
