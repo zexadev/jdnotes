@@ -112,7 +112,7 @@ export function Sidebar({
       </nav>
 
       {/* 标签区域 */}
-      <div className="mt-6 px-3 flex-1">
+      <div className="mt-6 px-3 flex-1 min-h-0 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             标签
