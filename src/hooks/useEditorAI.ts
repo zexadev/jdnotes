@@ -27,12 +27,12 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     isStreaming: false,
     action: null,
   })
-  
+
   const [showError, setShowError] = useState<string | null>(null)
-  
-  // Ghost 面板位置（基于光标）
-  const [ghostPosition, setGhostPosition] = useState<{ top: number; left: number } | null>(null)
-  
+
+  // 记录 AI 内容插入的起始位置
+  const aiInsertPosRef = useRef<number>(0)
+
   // 防止 content 同步覆盖刚接受/放弃的内容
   const skipContentSyncRef = useRef(false)
 
@@ -45,12 +45,31 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
       isStreaming: false,
       action: null,
     })
-    setGhostPosition(null)
   }, [])
 
   // AI Stream hook
   const { isStreaming, startStream, stopStream } = useAIStream({
     onChunk: (chunk) => {
+      if (!editor) return
+
+      // 直接在编辑器中追加内容，带 aiHighlight mark
+      editor.chain()
+        .focus()
+        .command(({ tr, state }) => {
+          // 插入到最后一个段落内部（end - 1），而不是文档末尾（end）
+          const insertPos = state.doc.content.size - 1
+          const markType = state.schema.marks.aiHighlight
+          if (markType) {
+            const mark = markType.create()
+            tr.insertText(chunk, insertPos)
+            tr.addMark(insertPos, insertPos + chunk.length, mark)
+          } else {
+            tr.insertText(chunk, insertPos)
+          }
+          return true
+        })
+        .run()
+
       setDiffState(prev => ({
         ...prev,
         generatedText: prev.generatedText + chunk,
@@ -66,13 +85,60 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     onError: (error) => {
       setShowError(error)
       setTimeout(() => setShowError(null), 3000)
-      // 恢复原始文本
-      if (editor && diffState.originalText) {
-        editor.chain().focus().insertContent(diffState.originalText).run()
+      // 删除已插入的 AI 内容，恢复原始文本
+      if (editor) {
+        removeAIHighlightContent(editor)
+        if (diffState.originalText) {
+          editor.chain().focus().insertContent(diffState.originalText).run()
+        }
       }
       resetDiffState()
     },
   })
+
+  // 删除编辑器中所有带 aiHighlight mark 的内容
+  const removeAIHighlightContent = useCallback((ed: Editor) => {
+    const { state } = ed
+    const markType = state.schema.marks.aiHighlight
+    if (!markType) return
+
+    const ranges: { from: number; to: number }[] = []
+    state.doc.descendants((node, pos) => {
+      if (node.isText) {
+        node.marks.forEach(mark => {
+          if (mark.type === markType) {
+            ranges.push({ from: pos, to: pos + node.nodeSize })
+          }
+        })
+      }
+    })
+
+    // 从后往前删除，避免位置偏移
+    if (ranges.length > 0) {
+      ed.chain()
+        .command(({ tr }) => {
+          for (let i = ranges.length - 1; i >= 0; i--) {
+            tr.delete(ranges[i].from, ranges[i].to)
+          }
+          return true
+        })
+        .run()
+    }
+  }, [])
+
+  // 移除 aiHighlight mark 但保留内容
+  const clearAIHighlightMark = useCallback((ed: Editor) => {
+    const { state } = ed
+    const markType = state.schema.marks.aiHighlight
+    if (!markType) return
+
+    ed.chain()
+      .command(({ tr }) => {
+        tr.removeMark(0, state.doc.content.size, markType)
+        return true
+      })
+      .run()
+  }, [])
 
   // 获取上下文
   const getContextText = useCallback(() => {
@@ -93,13 +159,12 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
 
     const { from, to } = editor.state.selection
     const selectedText = editor.state.doc.textBetween(from, to, ' ')
-    const containerRect = editorContainerRef.current.getBoundingClientRect()
 
     let textToProcess = ''
     let originalText = ''
 
     if (action === 'continue') {
-      // 续写模式：使用上下文，定位到当前行下一行
+      // 续写模式：使用上下文
       textToProcess = getContextText()
       if (!textToProcess.trim()) {
         setShowError('请先输入一些内容')
@@ -108,35 +173,27 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
       }
       originalText = ''
 
-      // 获取当前行末尾位置，定位到下一行
-      const coords = editor.view.coordsAtPos(from)
-      setGhostPosition({
-        top: coords.bottom - containerRect.top + 4, // 下一行
-        left: 0, // 从行首开始
-      })
+      // 光标移到文档末尾，AI 内容将从这里开始追加
+      editor.commands.focus('end')
+      // 插入换行
+      editor.commands.insertContent('\n')
+      aiInsertPosRef.current = editor.state.selection.from
     } else if (selectedText.trim()) {
-      // 有选中文本：替换模式，定位到选中位置
+      // 有选中文本：替换模式
       textToProcess = selectedText
       originalText = selectedText
 
-      const coords = editor.view.coordsAtPos(from)
-      setGhostPosition({
-        top: coords.top - containerRect.top,
-        left: coords.left - containerRect.left,
-      })
-
-      // 删除选中的文本
+      // 记录位置后删除选中文本
+      aiInsertPosRef.current = from
       editor.chain().focus().deleteSelection().run()
     } else if (action === 'custom' && customPrompt) {
-      // 自定义提问，无选中：定位到当前行下一行
+      // 自定义提问，无选中
       textToProcess = getContextText()
       originalText = ''
 
-      const coords = editor.view.coordsAtPos(from)
-      setGhostPosition({
-        top: coords.bottom - containerRect.top + 4,
-        left: 0,
-      })
+      editor.commands.focus('end')
+      editor.commands.insertContent('\n')
+      aiInsertPosRef.current = editor.state.selection.from
     } else {
       return
     }
@@ -160,13 +217,13 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     // 设置跳过同步标志
     skipContentSyncRef.current = true
 
-    // 先设置编辑器为可编辑
+    // 移除 aiHighlight mark，保留内容
+    clearAIHighlightMark(editor)
+
+    // 确保编辑器可编辑
     editor.setEditable(true)
 
-    // 插入内容
-    editor.chain().focus().insertContent(diffState.generatedText).run()
-
-    // 立即更新 content 状态，防止被旧内容覆盖（以 Markdown 格式保存）
+    // 立即更新 content 状态（以 Markdown 格式保存）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const newContent = (editor.storage as any).markdown.getMarkdown()
     onContentChange(newContent)
@@ -178,7 +235,7 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     setTimeout(() => {
       skipContentSyncRef.current = false
     }, 100)
-  }, [editor, diffState.generatedText, resetDiffState, onContentChange])
+  }, [editor, diffState.generatedText, resetDiffState, onContentChange, clearAIHighlightMark])
 
   // 放弃 AI 更改
   const handleDiscard = useCallback(() => {
@@ -190,7 +247,10 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     skipContentSyncRef.current = true
 
     if (editor) {
-      // 先设置编辑器为可编辑
+      // 删除所有带 aiHighlight mark 的内容
+      removeAIHighlightContent(editor)
+
+      // 确保编辑器可编辑
       editor.setEditable(true)
 
       // 恢复原始文本
@@ -210,24 +270,18 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
     setTimeout(() => {
       skipContentSyncRef.current = false
     }, 100)
-  }, [editor, diffState.originalText, isStreaming, stopStream, resetDiffState, onContentChange])
+  }, [editor, diffState.originalText, isStreaming, stopStream, resetDiffState, onContentChange, removeAIHighlightContent])
 
   // 处理斜杠命令触发的 AI
   const startAIFromSlashCommand = useCallback((action: string, templateType?: string) => {
     if (!editor || !editorContainerRef.current) return
 
-    // 获取光标位置
-    const { from } = editor.state.selection
-    const coords = editor.view.coordsAtPos(from)
-    const containerRect = editorContainerRef.current.getBoundingClientRect()
-
-    // 设置 Ghost 位置
-    setGhostPosition({
-      top: coords.bottom - containerRect.top + 4,
-      left: 0,
-    })
-
     const contextText = getContextText()
+
+    // 光标移到末尾，AI 内容从这里追加
+    editor.commands.focus('end')
+    editor.commands.insertContent('\n')
+    aiInsertPosRef.current = editor.state.selection.from
 
     if (action === 'continue') {
       // AI 续写
@@ -267,7 +321,6 @@ export function useEditorAI({ editor, editorContainerRef, onContentChange, title
   return {
     diffState,
     showError,
-    ghostPosition,
     skipContentSyncRef,
     handleAIAction,
     handleAccept,

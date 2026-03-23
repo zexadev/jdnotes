@@ -273,6 +273,19 @@ body {
 
 /* ===== AI Ghost Writing 样式 (Linear-grade) ===== */
 
+/* AI 内联高亮 - 未确认的 AI 生成内容 */
+.ai-highlight {
+  color: #5E6AD2;
+  background-color: rgba(94, 106, 210, 0.08);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.dark .ai-highlight {
+  color: #818cf8;
+  background-color: rgba(129, 140, 248, 0.1);
+}
+
 /* 原文样式 - 灰色半透明 */
 .ai-ghost-original {
   color: #9ca3af;
@@ -353,19 +366,155 @@ body {
   }
 }
 
-/* Linear 风格审查工具栏 */
+/* AI 审查工具栏 - 圆润浮动条风格 */
 .ai-review-toolbar {
-  animation: ai-toolbar-appear 0.15s ease-out;
+  animation: ai-toolbar-appear 0.3s cubic-bezier(0, -0.02, 0.4, 1.25);
+}
+
+.ai-review-toolbar__container {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #f0f1f4;
+  border-radius: 100px;
+  box-shadow:
+    0 -1px 1px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  transition: 0.3s cubic-bezier(0, -0.02, 0.4, 1.25);
+}
+
+.dark .ai-review-toolbar__container {
+  background: #1D1F2C;
+  box-shadow:
+    0 -1px 1px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.05);
+}
+
+.ai-review-toolbar__sparkle {
+  width: 14px;
+  height: 14px;
+  color: #5E6AD2;
+  animation: ai-sparkle-pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.ai-review-toolbar__sparkle--done {
+  animation: none;
+  opacity: 0.6;
+}
+
+.dark .ai-review-toolbar__sparkle {
+  color: #818cf8;
+}
+
+.ai-review-toolbar__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0 4px;
+  white-space: nowrap;
+}
+
+.dark .ai-review-toolbar__label {
+  color: #94a3b8;
+}
+
+.ai-review-toolbar__divider {
+  width: 1px;
+  height: 16px;
+  background: #d1d5db;
+  margin: 0 2px;
+  border-radius: 1px;
+}
+
+.dark .ai-review-toolbar__divider {
+  background: #374151;
+}
+
+.ai-review-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.ai-review-toolbar__icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.ai-review-toolbar__btn--accept {
+  background: #5E6AD2;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(94, 106, 210, 0.3);
+}
+
+.ai-review-toolbar__btn--accept:hover {
+  background: #4F5BC4;
+  box-shadow: 0 2px 6px rgba(94, 106, 210, 0.4);
+  transform: translateY(-1px);
+}
+
+.dark .ai-review-toolbar__btn--accept {
+  background: #818cf8;
+  color: #1e1e2e;
+  box-shadow: 0 1px 3px rgba(129, 140, 248, 0.3);
+}
+
+.dark .ai-review-toolbar__btn--accept:hover {
+  background: #a5b4fc;
+  box-shadow: 0 2px 6px rgba(129, 140, 248, 0.4);
+}
+
+.ai-review-toolbar__btn--discard {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.ai-review-toolbar__btn--discard:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.dark .ai-review-toolbar__btn--discard:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.ai-review-toolbar__btn--stop {
+  background: transparent;
+  color: #94a3b8;
+}
+
+.ai-review-toolbar__btn--stop:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.dark .ai-review-toolbar__btn--stop:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
 }
 
 @keyframes ai-toolbar-appear {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(8px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
