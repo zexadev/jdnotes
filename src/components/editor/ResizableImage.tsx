@@ -1,5 +1,6 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { Trash2 } from 'lucide-react'
 
 interface ImagePreviewProps {
   src: string
@@ -106,7 +107,7 @@ function ImagePreview({ src, onClose }: ImagePreviewProps) {
   )
 }
 
-export function ResizableImage({ node, updateAttributes, selected, editor }: NodeViewProps) {
+export function ResizableImage({ node, updateAttributes, selected, editor, deleteNode }: NodeViewProps) {
   const [isResizing, setIsResizing] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -115,6 +116,12 @@ export function ResizableImage({ node, updateAttributes, selected, editor }: Nod
 
   const { src, alt, title, width } = node.attrs
   const isEditable = editor.isEditable
+
+  // 获取编辑器容器最大可用宽度
+  const getMaxWidth = useCallback(() => {
+    const container = editor.view.dom.parentElement
+    return container ? container.clientWidth : 800
+  }, [editor])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -127,7 +134,8 @@ export function ResizableImage({ node, updateAttributes, selected, editor }: Nod
 
       const handleMouseMove = (e: MouseEvent) => {
         const diff = e.clientX - startXRef.current
-        const newWidth = Math.max(100, startWidthRef.current + diff)
+        const maxWidth = getMaxWidth()
+        const newWidth = Math.min(maxWidth, Math.max(100, startWidthRef.current + diff))
         updateAttributes({ width: newWidth })
       }
 
@@ -140,7 +148,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor }: Nod
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
     },
-    [updateAttributes, isEditable]
+    [updateAttributes, isEditable, getMaxWidth]
   )
 
   const handleImageClick = (e: React.MouseEvent) => {
@@ -150,11 +158,17 @@ export function ResizableImage({ node, updateAttributes, selected, editor }: Nod
     }
   }
 
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    deleteNode()
+  }, [deleteNode])
+
   return (
-    <NodeViewWrapper className="relative my-6">
+    <NodeViewWrapper className="relative my-4 flex justify-center">
       <div
-        className={`relative inline-block group ${selected && isEditable ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 rounded-xl' : ''}`}
-        style={{ width: width ? `${width}px` : 'auto' }}
+        className={`relative inline-block group ${selected && isEditable ? 'ring-2 ring-[#5E6AD2] ring-offset-2 dark:ring-offset-gray-900 rounded-lg' : ''}`}
+        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%' }}
       >
         <img
           ref={imageRef}
@@ -162,15 +176,26 @@ export function ResizableImage({ node, updateAttributes, selected, editor }: Nod
           alt={alt || ''}
           title={title || ''}
           onClick={handleImageClick}
-          className="block max-w-full h-auto rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 cursor-zoom-in"
-          style={{ width: width ? `${width}px` : 'auto' }}
+          className="block max-w-full h-auto rounded-lg shadow-sm dark:border dark:border-white/[0.06] cursor-zoom-in"
+          style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%' }}
           draggable={false}
         />
+
+        {/* 悬浮删除按钮 - 仅编辑模式 */}
+        {isEditable && (
+          <button
+            onClick={handleDelete}
+            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+            title="删除图片"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
 
         {/* 缩放提示 - 仅编辑模式显示 */}
         {isEditable && (
           <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            点击预览 · 拖拽角落缩放
+            点击预览 · 拖拽缩放
           </div>
         )}
 

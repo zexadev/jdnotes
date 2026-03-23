@@ -170,19 +170,18 @@ body {
   color: #818cf8;
 }
 
-/* 图片样式 - Water 风格 */
+/* 图片样式 */
 .tiptap img {
   max-width: 100%;
   height: auto;
-  border-radius: 1rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  margin: 1.5rem 0;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  margin: 1rem 0;
 }
 
 .dark .tiptap img {
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* CodeMirror 样式调整 */
