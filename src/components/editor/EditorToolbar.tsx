@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { Editor } from '@tiptap/react'
 import {
   Bold,
@@ -10,6 +11,7 @@ import {
   Quote,
   Minus,
   CodeSquare,
+  ImagePlus,
 } from 'lucide-react'
 
 interface EditorToolbarProps {
@@ -24,6 +26,27 @@ interface ToolbarButton {
 }
 
 export function EditorToolbar({ editor }: EditorToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImageInsert = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result as string
+      editor.chain().focus().setImage({ src: base64 }).run()
+    }
+    reader.readAsDataURL(file)
+
+    // 重置 input 以便重复选同一文件
+    e.target.value = ''
+  }
+
   const buttons: ToolbarButton[][] = [
     // 文本格式
     [
@@ -93,6 +116,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         action: () => editor.chain().focus().toggleCodeBlock().run(),
         isActive: () => editor.isActive('codeBlock'),
       },
+      {
+        icon: <ImagePlus className="h-4 w-4" />,
+        title: '插入图片',
+        action: handleImageInsert,
+        isActive: () => false,
+      },
     ],
   ]
 
@@ -119,6 +148,13 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           ))}
         </div>
       ))}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
     </div>
   )
 }
