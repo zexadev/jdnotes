@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod mcp_server;
 mod models;
 
 use tauri::{
@@ -94,6 +95,12 @@ pub fn run() {
                     .add_migrations(&db_url, migrations)
                     .build(),
             )?;
+
+            // 启动 MCP Server
+            let db_path_for_mcp = db_path.clone();
+            tauri::async_runtime::spawn(async move {
+                mcp_server::start_mcp_server(db_path_for_mcp).await;
+            });
             
             Ok(())
         })
