@@ -280,7 +280,7 @@ export function ChangelogModal({ open, onClose }: ChangelogModalProps) {
         {/* 底部 */}
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0 flex items-center justify-between">
           <a
-            href="https://github.com/huancheng01/jdnotes/releases"
+            href="https://github.com/zexadev/jdnotes/releases"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#5E6AD2] transition-colors"

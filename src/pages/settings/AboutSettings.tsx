@@ -118,7 +118,7 @@ export function AboutSettings() {
           </h3>
         </div>
         <p className="text-xs text-pink-700 dark:text-pink-300 italic">
-          to jiaxiang - 感谢你的支持与陪伴
+          to zexa - 感谢你的支持与陪伴
         </p>
       </div>
 

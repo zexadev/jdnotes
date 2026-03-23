@@ -11,7 +11,7 @@ export const metadata = {
 const navbar = (
   <Navbar
     logo={<b>JD Notes</b>}
-    projectLink="https://github.com/huancheng01/jdnotes"
+    projectLink="https://github.com/zexadev/jdnotes"
   />
 )
 
@@ -25,7 +25,7 @@ export default async function RootLayout({ children }) {
         <Layout
           navbar={navbar}
           pageMap={await getPageMap()}
-          docsRepositoryBase="https://github.com/huancheng01/jdnotes/tree/main/docs"
+          docsRepositoryBase="https://github.com/zexadev/jdnotes/tree/main/docs"
           footer={footer}
         >
           {children}

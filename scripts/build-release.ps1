@@ -268,7 +268,7 @@ if ($updateSigFile -and (Test-Path $updateSigFile.FullName)) {
 $updateFileName = if ($updateFile) { $updateFile.Name } else { "" }
 
 # Read GitHub repo from tauri.conf.json endpoints
-$githubRepo = "huancheng01/jdnotes"  # Default
+$githubRepo = "zexadev/jdnotes"  # Default
 $endpoints = $tauriConf.plugins.updater.endpoints
 if ($endpoints -and $endpoints.Count -gt 0) {
     $endpoint = $endpoints[0]
