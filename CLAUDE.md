@@ -98,7 +98,20 @@
    git push origin vx.y.z
    ```
 
-7. **等待文档站部署**
+7. **本地打包**
+   ```bash
+   cd src-tauri
+   pnpm tauri build
+   ```
+   产物位于 `src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe`
+
+8. **创建 GitHub Release 并上传安装包**
+   ```bash
+   gh release create vx.y.z ./src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe --title "vx.y.z" --notes-file docs/src/content/changelog.mdx
+   ```
+   或使用 changelog 中对应版本的内容作为 release notes。
+
+9. **等待文档站部署**
    文档站通过 Cloudflare Pages 自动部署。
 
 ---
