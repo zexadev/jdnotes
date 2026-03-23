@@ -254,51 +254,177 @@ impl ServerHandler for JdNotesMcpServer {
     }
 }
 
-/// 注册 MCP Server 到 Claude Code 配置（~/.claude.json）
-pub fn register_in_claude_config() {
+/// 注册 MCP Server 到各 AI 编程工具的配置文件
+pub fn register_in_ai_tools() {
     let home = match dirs::home_dir() {
         Some(h) => h,
         None => {
-            log::warn!("无法获取用户主目录，跳过 Claude Code MCP 注册");
+            log::warn!("无法获取用户主目录，跳过 MCP 自动注册");
             return;
         }
     };
 
-    let config_path = home.join(".claude.json");
+    let url = "http://127.0.0.1:19230/mcp";
 
-    let mut config: serde_json::Value = if config_path.exists() {
-        match std::fs::read_to_string(&config_path) {
-            Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({})),
-            Err(_) => serde_json::json!({}),
-        }
-    } else {
-        serde_json::json!({})
-    };
+    // Claude Code: ~/.claude.json
+    register_mcp_entry(
+        &home.join(".claude.json"),
+        "Claude Code",
+        "mcpServers",
+        serde_json::json!({ "type": "http", "url": url }),
+    );
 
-    // 检查是否已注册
-    let servers = config
-        .as_object_mut()
-        .unwrap()
-        .entry("mcpServers")
-        .or_insert_with(|| serde_json::json!({}));
+    // Claude Desktop: %APPDATA%/Claude/claude_desktop_config.json
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        let path = std::path::PathBuf::from(appdata);
+        register_mcp_entry(
+            &path.join("Claude").join("claude_desktop_config.json"),
+            "Claude Desktop",
+            "mcpServers",
+            serde_json::json!({ "url": url }),
+        );
+    }
 
-    if servers.get("jdnotes").is_some() {
-        log::debug!("JDNotes MCP 已注册在 Claude Code 中");
+    // Cursor: ~/.cursor/mcp.json
+    register_mcp_entry(
+        &home.join(".cursor").join("mcp.json"),
+        "Cursor",
+        "mcpServers",
+        serde_json::json!({ "url": url }),
+    );
+
+    // Windsurf: ~/.codeium/windsurf/mcp_config.json
+    register_mcp_entry(
+        &home.join(".codeium").join("windsurf").join("mcp_config.json"),
+        "Windsurf",
+        "mcpServers",
+        serde_json::json!({ "serverUrl": url }),
+    );
+
+    // Gemini CLI: ~/.gemini/settings.json
+    register_mcp_entry(
+        &home.join(".gemini").join("settings.json"),
+        "Gemini CLI",
+        "mcpServers",
+        serde_json::json!({ "url": url }),
+    );
+
+    // Kiro: ~/.kiro/settings/mcp.json
+    register_mcp_entry(
+        &home.join(".kiro").join("settings").join("mcp.json"),
+        "Kiro",
+        "mcpServers",
+        serde_json::json!({ "url": url }),
+    );
+
+    // Copilot CLI: ~/.copilot/mcp-config.json
+    register_mcp_entry(
+        &home.join(".copilot").join("mcp-config.json"),
+        "Copilot CLI",
+        "mcpServers",
+        serde_json::json!({ "url": url }),
+    );
+
+    // OpenCode: ~/.config/opencode/opencode.json
+    register_mcp_entry_nested(
+        &home.join(".config").join("opencode").join("opencode.json"),
+        "OpenCode",
+        "mcp",
+        serde_json::json!({ "type": "remote", "url": url }),
+    );
+
+    // Cline: %APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+    if let Some(appdata) = std::env::var_os("APPDATA") {
+        let path = std::path::PathBuf::from(appdata)
+            .join("Code")
+            .join("User")
+            .join("globalStorage")
+            .join("saoudrizwan.claude-dev")
+            .join("settings")
+            .join("cline_mcp_settings.json");
+        register_mcp_entry(
+            &path,
+            "Cline",
+            "mcpServers",
+            serde_json::json!({ "url": url }),
+        );
+    }
+}
+
+/// 通用注册函数：在 JSON 配置文件的指定 key 下添加 jdnotes 条目
+/// 仅当配置文件已存在时才注册（说明用户安装了该工具）
+fn register_mcp_entry(
+    config_path: &std::path::Path,
+    tool_name: &str,
+    servers_key: &str,
+    server_config: serde_json::Value,
+) {
+    if !config_path.exists() {
         return;
     }
 
-    // 注册
-    servers.as_object_mut().unwrap().insert(
-        "jdnotes".to_string(),
-        serde_json::json!({
-            "type": "http",
-            "url": "http://127.0.0.1:19230/mcp"
-        }),
-    );
+    let mut config: serde_json::Value = match std::fs::read_to_string(config_path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({})),
+        Err(_) => return,
+    };
 
-    match std::fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap()) {
-        Ok(_) => log::info!("已自动注册 JDNotes MCP 到 Claude Code"),
-        Err(e) => log::warn!("写入 Claude Code 配置失败: {}", e),
+    let servers = config
+        .as_object_mut()
+        .unwrap()
+        .entry(servers_key)
+        .or_insert_with(|| serde_json::json!({}));
+
+    if servers.get("jdnotes").is_some() {
+        log::debug!("JDNotes MCP 已注册在 {} 中", tool_name);
+        return;
+    }
+
+    servers
+        .as_object_mut()
+        .unwrap()
+        .insert("jdnotes".to_string(), server_config);
+
+    match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
+        Ok(_) => log::info!("已自动注册 JDNotes MCP 到 {}", tool_name),
+        Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
+    }
+}
+
+/// OpenCode 使用嵌套的 mcp key，格式不同
+fn register_mcp_entry_nested(
+    config_path: &std::path::Path,
+    tool_name: &str,
+    servers_key: &str,
+    server_config: serde_json::Value,
+) {
+    if !config_path.exists() {
+        return;
+    }
+
+    let mut config: serde_json::Value = match std::fs::read_to_string(config_path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({})),
+        Err(_) => return,
+    };
+
+    let servers = config
+        .as_object_mut()
+        .unwrap()
+        .entry(servers_key)
+        .or_insert_with(|| serde_json::json!({}));
+
+    if servers.get("jdnotes").is_some() {
+        log::debug!("JDNotes MCP 已注册在 {} 中", tool_name);
+        return;
+    }
+
+    servers
+        .as_object_mut()
+        .unwrap()
+        .insert("jdnotes".to_string(), server_config);
+
+    match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
+        Ok(_) => log::info!("已自动注册 JDNotes MCP 到 {}", tool_name),
+        Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
     }
 }
 
