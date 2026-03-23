@@ -5,15 +5,15 @@
 <h1 align="center">JD Notes</h1>
 
 <p align="center">
-  <strong>thinking is water</strong>
+  <strong>简洁高效的本地笔记应用</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/huancheng01/jdnotes/releases/latest">
-    <img src="https://img.shields.io/github/v/release/huancheng01/jdnotes?style=flat-square&logo=github" alt="Latest Release">
+  <a href="https://github.com/zexadev/jdnotes/releases/latest">
+    <img src="https://img.shields.io/github/v/release/zexadev/jdnotes?style=flat-square&logo=github" alt="Latest Release">
   </a>
-  <a href="https://github.com/huancheng01/jdnotes/releases">
-    <img src="https://img.shields.io/github/downloads/huancheng01/jdnotes/total?style=flat-square&logo=github" alt="Downloads">
+  <a href="https://github.com/zexadev/jdnotes/releases">
+    <img src="https://img.shields.io/github/downloads/zexadev/jdnotes/total?style=flat-square&logo=github" alt="Downloads">
   </a>
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
@@ -29,11 +29,11 @@
 </p>
 
 <p align="center">
+  <a href="https://jdnotes.zexa.cc">文档</a> •
   <a href="#-功能特性">功能特性</a> •
   <a href="#-下载安装">下载安装</a> •
   <a href="#-快速开始">快速开始</a> •
   <a href="#-技术架构">技术架构</a> •
-  <a href="#-路线图">路线图</a> •
   <a href="#-反馈支持">反馈支持</a>
 </p>
 
@@ -41,17 +41,15 @@
 
 ## 📖 简介
 
-**JD Notes** 是一款基于 Tauri 2 构建的跨平台桌面笔记应用，集成了 AI 智能助手，让您的写作更高效、更智能。无论是日常记录、知识管理还是创意写作，JD Notes 都能满足您的需求。
-
-### 为什么选择 JD Notes？
+**JD Notes** 是一款基于 Tauri 2 构建的桌面笔记应用，集成 AI 智能助手和 MCP Server，让您的写作更高效。数据本地存储，隐私安全。
 
 | | 特性 | 说明 |
 |---|---|---|
 | 🚀 | **轻量高效** | 基于 Rust + Web 技术，启动快速，内存占用低 |
 | 🔒 | **数据安全** | 本地 SQLite 存储，数据完全掌控在您手中 |
-| 🤖 | **AI 赋能** | 内置智能助手，助力创作与整理 |
-| 🎨 | **界面优雅** | 现代化设计，支持深色/浅色主题 |
-| 📱 | **跨平台** | 支持 Windows，macOS 和 Linux 即将推出 |
+| 🤖 | **AI 赋能** | 多平台 AI 助手，支持 DeepSeek / Claude / Gemini / Ollama |
+| 🔗 | **MCP 集成** | 内置 MCP Server，Claude Code 等 AI 工具可直接保存笔记 |
+| 🎨 | **界面优雅** | 现代化设计，支持深色/浅色主题动画切换 |
 
 ---
 
@@ -59,47 +57,54 @@
 
 ### 📝 富文本编辑
 
-- **Markdown 支持** - 原生支持 Markdown 语法，所见即所得
-- **代码高亮** - 支持 20+ 种编程语言语法高亮
-- **图片管理** - 拖拽或粘贴图片，支持大小调整
-- **斜杠命令** - 输入 `/` 快速插入各种内容块
-- **自动保存** - 实时保存，永不丢失
+- **Markdown 支持** — 原生支持 Markdown 语法，所见即所得
+- **固定工具栏** — 文本格式、列表、引用、代码块、插入图片等常用操作
+- **代码高亮** — 支持 20+ 种编程语言语法高亮
+- **图片管理** — 工具栏插入、粘贴、拖拽插入，可缩放和预览大图
+- **待办列表** — 支持 `- [ ]` / `- [x]` Markdown 语法，工具栏和斜杠命令快速创建
+- **斜杠命令** — 输入 `/` 快速插入各种内容块和 AI 命令
+- **链接交互** — Ctrl+Click 打开链接（类似 VS Code）
+- **自动保存** — 实时保存，永不丢失
 
 ### 🤖 AI 智能助手
 
-- **侧边栏对话** - 随时与 AI 交流，获取灵感
-- **右键菜单** - 选中文本即可调用 AI 功能
-  - ✍️ 续写内容
-  - 🔄 改写润色
-  - 📝 总结要点
-  - 🌐 多语言翻译
-  - ❓ 智能问答
-- **自动标题** - AI 自动生成笔记标题和标签
+- **多平台支持** — DeepSeek、OpenAI、Anthropic Claude、Google Gemini、Ollama
+- **多来源管理** — 同时配置多个 AI 来源，侧边栏快速切换
+- **侧边栏对话** — 随时与 AI 交流，获取灵感（`Ctrl+L`）
+- **内联提问** — 选中文本后 `Ctrl+J` 直接提问
+- **AI 功能菜单** — 续写、改写、总结、翻译、问答
+- **自动标题** — AI 自动生成笔记标题和标签
+
+### 🔗 MCP Server 集成
+
+- **内置 HTTP MCP Server** — JDNotes 启动时自动提供服务（`127.0.0.1:19230`）
+- **自动注册** — 启动时自动注册到 Claude Code，无需手动配置
+- **三个工具** — `create_note`（创建）、`append_note`（追加）、`update_note`（修改）
+- **AI 编程工具集成** — 在 Claude Code 中直接说"把这段代码保存到笔记"
 
 ### 📅 日历视图
 
-- **月视图** - 一览当月笔记分布
-- **周视图** - 规划一周工作学习
-- **日视图** - 聚焦当日任务
+- **月视图** — 一览当月笔记分布
+- **周视图** — 规划一周工作学习
+- **日视图** — 聚焦当日任务
 
 ### 🗂️ 笔记管理
 
-- **智能搜索** - 全局搜索，快速定位 (`Ctrl+K`)
-- **收藏功能** - 重要笔记一键收藏
-- **废纸篓** - 误删笔记可恢复
-- **标签系统** - 灵活分类管理
-- **提醒功能** - 为笔记设置定时提醒，支持快捷时间选择
+- **智能搜索** — 全局搜索，快速定位（`Ctrl+K`）
+- **收藏功能** — 重要笔记一键收藏
+- **废纸篓** — 误删笔记可恢复
+- **标签系统** — 灵活分类管理
+- **提醒功能** — 为笔记设置定时提醒
 
 ### 📤 导出分享
 
-- **PDF 导出** - 通过浏览器打印功能导出 PDF
-- **Markdown** - 导出为 Markdown 文件
+- **PDF 导出** — 通过浏览器打印功能导出 PDF
+- **Markdown** — 导出为 Markdown 文件
 
 ### 🎨 个性化
 
-- **主题切换** - 深色/浅色主题自由切换
-- **界面定制** - 简洁直观的设置面板
-- **自动更新** - 应用内检查更新
+- **主题切换** — 深色/浅色主题，日夜动画开关
+- **自动更新** — 应用内检查更新
 
 ---
 
@@ -107,7 +112,7 @@
 
 ### Windows
 
-从 [Releases](https://github.com/huancheng01/jdnotes/releases/latest) 下载最新版本：
+从 [Releases](https://github.com/zexadev/jdnotes/releases/latest) 下载最新版本：
 
 | 文件 | 说明 |
 |------|------|
@@ -122,23 +127,37 @@
 
 ### 安装步骤
 
-1. 从 [Releases](https://github.com/huancheng01/jdnotes/releases/latest) 下载最新安装包
+1. 从 [Releases](https://github.com/zexadev/jdnotes/releases/latest) 下载最新安装包
 2. 运行安装程序，按提示完成安装
 3. 启动 JD Notes，开始您的笔记之旅
 
 ### 配置 AI 功能
 
 1. 打开设置（点击左下角齿轮图标）
-2. 在「AI 设置」中填入 API Key
-3. 支持 OpenAI 及兼容 API 接口
+2. 在「AI 设置」中添加 AI 来源
+3. 支持 DeepSeek、OpenAI、Anthropic、Google、Ollama 等多个平台
+
+### 使用 MCP Server
+
+JDNotes 启动时自动在 `127.0.0.1:19230` 提供 MCP Server，并自动注册到 Claude Code。在 Claude Code 中可以直接说"把这段内容保存到笔记"。
+
+手动注册：
+```bash
+claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
+```
 
 ### 快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
 | `Ctrl+K` | 全局搜索 |
-| `Ctrl+J` | AI 助手侧栏 |
-| `/` | 斜杠命令菜单（编辑模式下） |
+| `Ctrl+L` | 打开/关闭 AI 侧栏 |
+| `Ctrl+J` | 内联提问（选中文本后） |
+| `Ctrl+B` | 粗体 |
+| `Ctrl+I` | 斜体 |
+| `Ctrl+Shift+C` | 代码块 |
+| `Ctrl+Click` | 打开链接 |
+| `/` | 斜杠命令菜单 |
 
 ---
 
@@ -172,7 +191,7 @@
     <td>前端构建工具</td>
   </tr>
   <tr>
-    <td rowspan="3"><strong>后端</strong></td>
+    <td rowspan="4"><strong>后端</strong></td>
     <td><img src="https://img.shields.io/badge/-Tauri%202-24C8D8?style=flat-square&logo=tauri&logoColor=white" /></td>
     <td>跨平台桌面应用框架</td>
   </tr>
@@ -185,62 +204,40 @@
     <td>轻量级关系数据库</td>
   </tr>
   <tr>
+    <td><img src="https://img.shields.io/badge/-MCP-000000?style=flat-square" /></td>
+    <td>Model Context Protocol Server</td>
+  </tr>
+  <tr>
     <td><strong>AI</strong></td>
-    <td><img src="https://img.shields.io/badge/-OpenAI%20API-412991?style=flat-square&logo=openai&logoColor=white" /></td>
-    <td>GPT 系列大语言模型</td>
+    <td><img src="https://img.shields.io/badge/-多平台-412991?style=flat-square&logo=openai&logoColor=white" /></td>
+    <td>DeepSeek / OpenAI / Claude / Gemini / Ollama</td>
   </tr>
 </table>
 
 ---
 
-## 📋 路线图
-
-### 已完成 ✅
-
-- [x] 基础笔记管理功能
-- [x] TipTap 富文本编辑器
-- [x] AI 智能助手（对话、续写、改写、总结、翻译）
-- [x] 日历视图（月/周/日）
-- [x] 深色/浅色主题
-- [x] 应用内自动更新
-- [x] 全局搜索
-- [x] 笔记导出（PDF、Markdown）
-- [x] 笔记提醒功能
-- [x] AI 智能标签推荐
-
-### 计划中 🚧
-
-
-- [ ] 移动端应用
-- [ ] 更多 AI 功能支持
-- [ ] 笔记模板系统
-
----
-
 ## 💬 反馈支持
 
-### 问题反馈
+如果您在使用中遇到问题或有功能建议：
 
-如果您在使用中遇到问题或有功能建议，欢迎通过以下方式反馈：
-
-- 📧 提交 [GitHub Issue](https://github.com/huancheng01/jdnotes/issues/new)
-- 💬 在 Release 页面留言
+- 📧 提交 [GitHub Issue](https://github.com/zexadev/jdnotes/issues/new)
+- 📖 查看 [文档站](https://jdnotes.zexa.cc)
 
 ### 常见问题
 
 <details>
 <summary><strong>Q: 数据存储在哪里？</strong></summary>
-<p>所有数据存储在本地 SQLite 数据库中，位于 <code>%APPDATA%/jdnotes/</code> 目录下。也可以在设置中修改存储位置</p>
+<p>所有数据存储在本地 SQLite 数据库中，位于 <code>%APPDATA%/com.jdnotes.app/</code> 目录下。可以在设置中修改存储位置。</p>
 </details>
 
 <details>
-<summary><strong>Q: 如何配置 AI 功能？</strong></summary>
-<p>打开设置 → AI 设置，填入您的 OpenAI API Key 或兼容 API 的地址和密钥即可。</p>
+<summary><strong>Q: 支持哪些 AI 平台？</strong></summary>
+<p>支持 DeepSeek、OpenAI（及兼容 API）、Anthropic Claude、Google Gemini、Ollama 本地模型。可同时配置多个来源并快速切换。</p>
 </details>
 
 <details>
-<summary><strong>Q: 支持哪些 AI 模型？</strong></summary>
-<p>支持 OpenAI GPT 系列模型，以及所有兼容 OpenAI API 格式的服务（如 Azure OpenAI、本地部署的模型等）。</p>
+<summary><strong>Q: MCP Server 怎么用？</strong></summary>
+<p>启动 JDNotes 后会自动在本地提供 MCP Server 并注册到 Claude Code。在 Claude Code 中直接说"保存到笔记"即可使用。</p>
 </details>
 
 ---
@@ -249,30 +246,16 @@
 
 本项目基于 [MIT License](LICENSE) 开源。
 
-Copyright © 2026 [huancheng01](https://github.com/huancheng01)
-
----
-
-## 🙏 致谢
-
-感谢以下开源项目为 JD Notes 提供技术支持：
-
-<p>
-  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/-Tauri-24C8D8?style=for-the-badge&logo=tauri&logoColor=white" /></a>
-  <a href="https://react.dev/"><img src="https://img.shields.io/badge/-React-61DAFB?style=for-the-badge&logo=react&logoColor=black" /></a>
-  <a href="https://tiptap.dev/"><img src="https://img.shields.io/badge/-TipTap-000000?style=for-the-badge" /></a>
-  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/-TailwindCSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" /></a>
-  <a href="https://lucide.dev/"><img src="https://img.shields.io/badge/-Lucide-F56565?style=for-the-badge" /></a>
-</p>
+Copyright © 2026 [Zexa](https://zexa.cc)
 
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/huancheng01">huancheng01</a>
+  Made with ❤️ by <a href="https://zexa.cc">Zexa</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/huancheng01/jdnotes">
+  <a href="https://github.com/zexadev/jdnotes">
     ⭐ 如果这个项目对您有帮助，请给一个 Star ⭐
   </a>
 </p>
