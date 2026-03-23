@@ -32,6 +32,7 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+dirs = "6"
 # MCP Server
 rmcp = { version = "1", features = ["server", "macros", "transport-streamable-http-server"] }
 axum = "0.8"

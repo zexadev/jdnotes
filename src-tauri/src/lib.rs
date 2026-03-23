@@ -97,6 +97,7 @@ pub fn run() {
             )?;
 
             // 启动 MCP Server
+            mcp_server::register_in_claude_config();
             let db_path_for_mcp = db_path.clone();
             tauri::async_runtime::spawn(async move {
                 mcp_server::start_mcp_server(db_path_for_mcp).await;

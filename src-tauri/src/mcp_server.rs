@@ -5,7 +5,7 @@ use rmcp::{
     ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{CallToolResult, Content, ServerCapabilities, ServerInfo},
-    schemars, tool, tool_router,
+    schemars, tool, tool_handler, tool_router,
 };
 use rmcp::ErrorData as McpError;
 use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
@@ -18,6 +18,7 @@ use sqlx::{Row, SqlitePool};
 #[derive(Clone)]
 pub struct JdNotesMcpServer {
     pool: Arc<SqlitePool>,
+    #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
 
@@ -48,6 +49,23 @@ pub struct AppendNoteParams {
     title: String,
     #[schemars(description = "要追加的内容，支持 Markdown 格式")]
     content: String,
+}
+
+/// update_note 工具参数
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct UpdateNoteParams {
+    /// 要查找的笔记标题（模糊匹配）
+    #[schemars(description = "要查找的笔记标题（模糊匹配）")]
+    title: String,
+    /// 新标题（可选，不传则不修改）
+    #[schemars(description = "新标题，不传则保持原标题")]
+    new_title: Option<String>,
+    /// 新内容（可选，不传则不修改）
+    #[schemars(description = "新内容，将完全替换原内容，支持 Markdown 格式")]
+    new_content: Option<String>,
+    /// 新标签（可选，不传则不修改）
+    #[schemars(description = "新标签列表，将完全替换原标签")]
+    new_tags: Option<Vec<String>>,
 }
 
 #[tool_router]
@@ -137,8 +155,93 @@ impl JdNotesMcpServer {
             ))])),
         }
     }
+
+    #[tool(description = "Find a note by title (fuzzy match) and update its title, content or tags / 按标题模糊匹配笔记并修改内容")]
+    async fn update_note(
+        &self,
+        Parameters(params): Parameters<UpdateNoteParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let search_pattern = format!("%{}%", params.title);
+
+        let note = sqlx::query(
+            "SELECT id, title FROM notes WHERE title LIKE ?1 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 1"
+        )
+        .bind(&search_pattern)
+        .fetch_optional(self.pool.as_ref())
+        .await;
+
+        match note {
+            Ok(Some(row)) => {
+                let id: i64 = row.get("id");
+                let old_title: String = row.get("title");
+                let now = chrono::Local::now()
+                    .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                    .to_string();
+
+                let mut updates = vec!["updated_at = ?1".to_string()];
+                let mut param_index = 2;
+                let mut bind_values: Vec<String> = vec![now];
+
+                if let Some(ref new_title) = params.new_title {
+                    updates.push(format!("title = ?{}", param_index));
+                    bind_values.push(new_title.clone());
+                    param_index += 1;
+                }
+                if let Some(ref new_content) = params.new_content {
+                    updates.push(format!("content = ?{}", param_index));
+                    bind_values.push(new_content.clone());
+                    param_index += 1;
+                }
+                if let Some(ref new_tags) = params.new_tags {
+                    updates.push(format!("tags = ?{}", param_index));
+                    bind_values.push(
+                        serde_json::to_string(new_tags).unwrap_or_else(|_| "[]".to_string()),
+                    );
+                    param_index += 1;
+                }
+
+                if param_index == 2 {
+                    return Ok(CallToolResult::error(vec![Content::text(
+                        "未指定任何要修改的字段（new_title / new_content / new_tags）",
+                    )]));
+                }
+
+                let sql = format!(
+                    "UPDATE notes SET {} WHERE id = ?{}",
+                    updates.join(", "),
+                    param_index
+                );
+
+                let mut query = sqlx::query(&sql);
+                for val in &bind_values {
+                    query = query.bind(val);
+                }
+                query = query.bind(id);
+
+                match query.execute(self.pool.as_ref()).await {
+                    Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
+                        "笔记「{}」(ID: {}) 已更新",
+                        old_title, id
+                    ))])),
+                    Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                        "更新笔记失败: {}",
+                        e
+                    ))])),
+                }
+            }
+            Ok(None) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "未找到标题匹配「{}」的笔记",
+                params.title
+            ))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "查询笔记失败: {}",
+                e
+            ))])),
+        }
+    }
 }
 
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for JdNotesMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
@@ -148,6 +251,54 @@ impl ServerHandler for JdNotesMcpServer {
                  - create_note: 创建新笔记（标题、内容、标签）\n\
                  - append_note: 按标题模糊匹配，追加内容到已有笔记",
             )
+    }
+}
+
+/// 注册 MCP Server 到 Claude Code 配置（~/.claude.json）
+pub fn register_in_claude_config() {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            log::warn!("无法获取用户主目录，跳过 Claude Code MCP 注册");
+            return;
+        }
+    };
+
+    let config_path = home.join(".claude.json");
+
+    let mut config: serde_json::Value = if config_path.exists() {
+        match std::fs::read_to_string(&config_path) {
+            Ok(content) => serde_json::from_str(&content).unwrap_or_else(|_| serde_json::json!({})),
+            Err(_) => serde_json::json!({}),
+        }
+    } else {
+        serde_json::json!({})
+    };
+
+    // 检查是否已注册
+    let servers = config
+        .as_object_mut()
+        .unwrap()
+        .entry("mcpServers")
+        .or_insert_with(|| serde_json::json!({}));
+
+    if servers.get("jdnotes").is_some() {
+        log::debug!("JDNotes MCP 已注册在 Claude Code 中");
+        return;
+    }
+
+    // 注册
+    servers.as_object_mut().unwrap().insert(
+        "jdnotes".to_string(),
+        serde_json::json!({
+            "type": "http",
+            "url": "http://127.0.0.1:19230/mcp"
+        }),
+    );
+
+    match std::fs::write(&config_path, serde_json::to_string_pretty(&config).unwrap()) {
+        Ok(_) => log::info!("已自动注册 JDNotes MCP 到 Claude Code"),
+        Err(e) => log::warn!("写入 Claude Code 配置失败: {}", e),
     }
 }
 
