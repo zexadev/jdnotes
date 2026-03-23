@@ -19,6 +19,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { EditorHeader } from './EditorHeader'
 import { AIBubbleMenu } from '../ai/AIBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
+import { AIHighlight } from '../ai/AIHighlightMark'
 
 interface EditorProps {
   title: string
@@ -50,7 +51,6 @@ export function Editor({
   onEditorReady,
 }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
-  const diffRef = useRef<HTMLDivElement>(null)
 
   // 使用 ref 存储最新的 content，避免闭包问题
   const contentRef = useRef(content)
@@ -126,6 +126,7 @@ export function Editor({
       TaskItem.configure({
         nested: true,
       }),
+      AIHighlight,
     ],
     content: content,
     editable: isEditing,
@@ -153,6 +154,21 @@ export function Editor({
           }
           return false
         },
+        drop: (_view, event) => {
+          const files = event.dataTransfer?.files
+          if (!files?.length) return false
+
+          const imageFile = Array.from(files).find(f => f.type.startsWith('image/'))
+          if (!imageFile) return false
+
+          event.preventDefault()
+          const reader = new FileReader()
+          reader.onload = () => {
+            editor?.chain().focus().setImage({ src: reader.result as string }).run()
+          }
+          reader.readAsDataURL(imageFile)
+          return true
+        },
       },
     },
   })
@@ -165,7 +181,6 @@ export function Editor({
   const {
     diffState,
     showError,
-    ghostPosition,
     skipContentSyncRef,
     handleAIAction,
     handleAccept,
@@ -405,50 +420,14 @@ export function Editor({
             />
           )}
 
-          {/* Ghost Writing 浮动面板 - 定位到光标位置 */}
-          {diffState.isActive && ghostPosition && (
-            <div
-              ref={diffRef}
-              className="absolute z-10 max-w-2xl"
-              style={{
-                top: ghostPosition.top,
-                left: Math.max(0, ghostPosition.left - 8),
-              }}
-            >
-              {/* 原文（灰色半透明删除线） */}
-              {diffState.originalText && (
-                <div className="ai-ghost-original text-base mb-1">
-                  {diffState.originalText}
-                </div>
-              )}
-
-              {/* AI 生成内容（靛蓝色） */}
-              <div className="flex items-start gap-1">
-                <div className="ai-ghost-text text-base flex-1 whitespace-pre-wrap">
-                  {diffState.generatedText}
-                  {diffState.isStreaming && (
-                    <span className="ai-streaming-cursor" />
-                  )}
-                </div>
-
-                {/* 内联工具栏 */}
-                {(diffState.generatedText || !diffState.isStreaming) && (
-                  <AIReviewToolbar
-                    isStreaming={diffState.isStreaming}
-                    onAccept={handleAccept}
-                    onDiscard={handleDiscard}
-                  />
-                )}
-              </div>
-
-              {/* 生成中但还没内容时显示加载状态 */}
-              {diffState.isStreaming && !diffState.generatedText && (
-                <AIReviewToolbar
-                  isStreaming={true}
-                  onAccept={handleAccept}
-                  onDiscard={handleDiscard}
-                />
-              )}
+          {/* AI 生成中/审查工具栏 - 固定在底部 */}
+          {diffState.isActive && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+              <AIReviewToolbar
+                isStreaming={diffState.isStreaming}
+                onAccept={handleAccept}
+                onDiscard={handleDiscard}
+              />
             </div>
           )}
         </div>
