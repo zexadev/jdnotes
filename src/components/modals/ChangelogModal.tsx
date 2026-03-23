@@ -16,6 +16,16 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.4.1',
+    date: '2026-03-23',
+    notes: `## 🐛 修复
+- 修复侧栏标签过多时设置按钮被挤出视图的问题
+- 添加单实例限制，防止重复打开应用
+## 💅 优化
+- 统一品牌标识
+- 更新 README 文档`
+  },
+  {
     version: '1.4.0',
     date: '2026-03-23',
     notes: `## ✨ 新增功能

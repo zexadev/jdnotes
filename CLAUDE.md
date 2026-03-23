@@ -15,7 +15,7 @@
 - **名称**：JD Notes — 简洁高效的本地笔记应用
 - **技术栈**：Tauri v2 (tauri 2.9.5, tauri-build 2.5.3) + Vite + React + TypeScript
 - **包管理器**：pnpm
-- **版本**：1.4.0
+- **版本**：1.4.1
 - **标识符**：com.jdnotes.app
 - **窗口**：1200x800，无边框 (decorations: false)
 - **前端开发端口**：5173
