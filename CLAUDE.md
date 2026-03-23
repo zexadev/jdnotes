@@ -80,6 +80,7 @@
    - 更新 `docs/src/content/changelog.mdx`，添加新版本的更新说明
    - 更新 `src/components/modals/ChangelogModal.tsx` 中的 `CHANGELOG_DATA` 数组，在顶部添加新版本条目
    - 两处内容保持一致，内容将同步到 GitHub Release body
+   - 更新 `README.md`，确保功能特性、快捷键等信息与最新版本一致
 
 4. **提交版本号变更**
    ```bash
