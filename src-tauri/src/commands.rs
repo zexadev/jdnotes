@@ -139,6 +139,7 @@ pub async fn get_ai_config(app: tauri::AppHandle) -> Result<serde_json::Value, S
             db::AIProvider::Anthropic => "anthropic",
             db::AIProvider::Google => "google",
             db::AIProvider::Ollama => "ollama",
+            db::AIProvider::Responses => "responses",
         };
         serde_json::json!({
             "id": s.id,
@@ -169,6 +170,7 @@ pub async fn save_ai_config(
             "anthropic" => db::AIProvider::Anthropic,
             "google" => db::AIProvider::Google,
             "ollama" => db::AIProvider::Ollama,
+            "responses" => db::AIProvider::Responses,
             _ => db::AIProvider::OpenAICompatible,
         };
         db::AISource {
