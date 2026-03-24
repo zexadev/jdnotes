@@ -12,6 +12,7 @@ import {
   Minus,
   CodeSquare,
   ImagePlus,
+  Table,
 } from 'lucide-react'
 
 interface EditorToolbarProps {
@@ -121,6 +122,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title: '插入图片',
         action: handleImageInsert,
         isActive: () => false,
+      },
+      {
+        icon: <Table className="h-4 w-4" />,
+        title: '插入表格',
+        action: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+        isActive: () => editor.isActive('table'),
       },
     ],
   ]
