@@ -3,6 +3,7 @@
  * 为 AI 模型提供操作笔记的工具能力
  */
 import { noteOperations } from './db'
+import { invoke } from '@tauri-apps/api/core'
 
 // ============= 工具定义 =============
 
@@ -125,6 +126,28 @@ export const AI_TOOLS: ToolDefinition[] = [
       properties: {
         note_id: { type: 'number', description: '笔记 ID（不传则获取当前笔记的图片）' },
       },
+    },
+  },
+  {
+    name: 'web_search',
+    description: '搜索互联网，获取最新信息、资料和参考内容',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: '搜索关键词' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'web_fetch',
+    description: '读取指定网页的内容（返回 Markdown 格式的正文）',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: '网页 URL' },
+      },
+      required: ['url'],
     },
   },
 ]
@@ -284,6 +307,28 @@ export async function executeToolCall(
           imageCount: images.length,
           images: images.slice(0, 5), // 最多返回 5 张，避免上下文过大
         })
+      }
+
+      case 'web_search': {
+        const query = params.query as string
+        if (!query) return '请提供搜索关键词'
+        try {
+          const result = await invoke<string>('web_search', { query })
+          return result
+        } catch (e) {
+          return `搜索失败: ${e instanceof Error ? e.message : e}`
+        }
+      }
+
+      case 'web_fetch': {
+        const url = params.url as string
+        if (!url) return '请提供网页 URL'
+        try {
+          const result = await invoke<string>('web_fetch', { url })
+          return result
+        } catch (e) {
+          return `读取网页失败: ${e instanceof Error ? e.message : e}`
+        }
       }
 
       default:

@@ -190,3 +190,55 @@ pub async fn save_ai_config(
 pub async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
     db::get_config_file_path(&app)
 }
+
+// ============= 联网功能 =============
+
+/// 搜索网页（通过 Jina AI Search API）
+#[tauri::command]
+pub async fn web_search(query: String) -> Result<String, String> {
+    let url = format!("https://s.jina.ai/{}", urlencoding::encode(&query));
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .header("Accept", "text/plain")
+        .send()
+        .await
+        .map_err(|e| format!("搜索请求失败: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("搜索失败: HTTP {}", response.status()));
+    }
+
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("读取搜索结果失败: {}", e))?;
+
+    // 限制返回长度
+    Ok(text.chars().take(5000).collect())
+}
+
+/// 读取网页内容（通过 Jina AI Reader API）
+#[tauri::command]
+pub async fn web_fetch(url: String) -> Result<String, String> {
+    let jina_url = format!("https://r.jina.ai/{}", url);
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&jina_url)
+        .header("Accept", "text/plain")
+        .send()
+        .await
+        .map_err(|e| format!("网页请求失败: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("网页读取失败: HTTP {}", response.status()));
+    }
+
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("读取网页内容失败: {}", e))?;
+
+    // 限制返回长度
+    Ok(text.chars().take(8000).collect())
+}

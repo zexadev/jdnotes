@@ -142,6 +142,9 @@ pub fn run() {
             commands::get_ai_config,
             commands::save_ai_config,
             commands::get_config_path,
+            // 联网功能
+            commands::web_search,
+            commands::web_fetch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
