@@ -219,7 +219,7 @@ pub async fn web_search(query: String) -> Result<String, String> {
 
     // 解析 DuckDuckGo HTML 搜索结果
     let document = scraper::Html::parse_document(&html);
-    let result_selector = scraper::Selector::parse(".result").unwrap();
+    let result_selector = scraper::Selector::parse(".result.results_links").unwrap();
     let title_selector = scraper::Selector::parse(".result__a").unwrap();
     let snippet_selector = scraper::Selector::parse(".result__snippet").unwrap();
     let url_selector = scraper::Selector::parse(".result__url").unwrap();
@@ -331,4 +331,26 @@ pub async fn web_fetch(url: String) -> Result<String, String> {
 
     // 限制长度
     Ok(cleaned.chars().take(8000).collect())
+}
+
+/// 获取用户大致位置（通过 IP 定位）
+#[tauri::command]
+pub async fn get_location() -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
+    let response = client
+        .get("http://ip-api.com/json/?fields=city,regionName,country&lang=zh-CN")
+        .send()
+        .await
+        .map_err(|e| format!("定位请求失败: {}", e))?;
+
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("读取定位结果失败: {}", e))?;
+
+    Ok(text)
 }

@@ -141,13 +141,21 @@ export const AI_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'web_fetch',
-    description: '读取指定网页的内容（返回 Markdown 格式的正文）',
+    description: '读取指定网页的内容（返回正文文本）',
     parameters: {
       type: 'object',
       properties: {
         url: { type: 'string', description: '网页 URL' },
       },
       required: ['url'],
+    },
+  },
+  {
+    name: 'get_location',
+    description: '获取用户的大致地理位置（城市、省份、国家），基于 IP 定位',
+    parameters: {
+      type: 'object',
+      properties: {},
     },
   },
 ]
@@ -328,6 +336,15 @@ export async function executeToolCall(
           return result
         } catch (e) {
           return `读取网页失败: ${e instanceof Error ? e.message : e}`
+        }
+      }
+
+      case 'get_location': {
+        try {
+          const result = await invoke<string>('get_location')
+          return result
+        } catch (e) {
+          return `获取位置失败: ${e instanceof Error ? e.message : e}`
         }
       }
 
