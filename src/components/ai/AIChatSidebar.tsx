@@ -41,7 +41,6 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     createConversation,
     switchConversation,
     deleteConversation,
-    handleSend,
     sendMessage,
     handleEdit,
     handleDelete,
@@ -184,8 +183,6 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     })
   }
 
-  // 判断 segments 中是否有文字内容
-  const hasStreamingText = streamingSegments.some(s => s.type === 'text' && s.content)
   const hasStreamingSegments = streamingSegments.length > 0
 
   const isWaitingForResponse = isStreamingActive && !hasStreamingSegments
@@ -317,7 +314,7 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
                     )}
                     {/* assistant 消息：检查是否有 parts 结构 */}
                     {msg.role === 'assistant' ? (
-                      <MessagePartsRenderer content={msg.content} isStreaming={false} onCopy={handleCopy} onDelete={handleDelete} onRetry={handleRetry} onInsertToNote={onInsertToNote} message={msg as ChatMessage} isAnyStreaming={isStreaming || isStreamingActive} />
+                      <MessagePartsRenderer content={msg.content} isStreaming={false} onCopy={handleCopy} onDelete={handleDelete} onRetry={handleRetry} onInsertToNote={onInsertToNote} message={msg as ChatMessage} />
                     ) : (
                       <ChatMessageItem
                         message={msg as ChatMessage}
@@ -510,7 +507,7 @@ function StreamingSegmentsRenderer({ segments, isStreamingActive }: { segments: 
 }
 
 function MessagePartsRenderer({
-  content, isStreaming, onCopy, onDelete, onRetry, onInsertToNote, message, isAnyStreaming,
+  content, isStreaming, onCopy, onDelete, onRetry, onInsertToNote, message,
 }: {
   content: string
   isStreaming: boolean
@@ -519,7 +516,6 @@ function MessagePartsRenderer({
   onRetry: (message: ChatMessage) => void
   onInsertToNote?: (content: string) => void
   message: ChatMessage
-  isAnyStreaming: boolean
 }) {
   // 尝试解析 parts 结构
   let parts: StreamSegment[] | null = null

@@ -121,7 +121,7 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
   }, [refreshMessages])
 
   // AI Stream
-  const { isStreaming, startStreamWithTools, startStream, stopStream } = useAIStream({
+  const { isStreaming, startStreamWithTools, stopStream } = useAIStream({
     onChunk: (chunk) => {
       streamTextRef.current += chunk
       // 如果上一个 segment 是 tool_call，新建一个 text segment
