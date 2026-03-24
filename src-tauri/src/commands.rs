@@ -193,14 +193,17 @@ pub async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
 
 // ============= 联网功能 =============
 
-/// 搜索网页（通过 Jina AI Search API）
+/// 搜索网页（通过 DuckDuckGo HTML 搜索）
 #[tauri::command]
 pub async fn web_search(query: String) -> Result<String, String> {
-    let url = format!("https://s.jina.ai/{}", urlencoding::encode(&query));
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
     let response = client
-        .get(&url)
-        .header("Accept", "text/plain")
+        .post("https://html.duckduckgo.com/html/")
+        .form(&[("q", &query)])
         .send()
         .await
         .map_err(|e| format!("搜索请求失败: {}", e))?;
@@ -209,23 +212,63 @@ pub async fn web_search(query: String) -> Result<String, String> {
         return Err(format!("搜索失败: HTTP {}", response.status()));
     }
 
-    let text = response
+    let html = response
         .text()
         .await
         .map_err(|e| format!("读取搜索结果失败: {}", e))?;
 
-    // 限制返回长度
-    Ok(text.chars().take(5000).collect())
+    // 解析 DuckDuckGo HTML 搜索结果
+    let document = scraper::Html::parse_document(&html);
+    let result_selector = scraper::Selector::parse(".result").unwrap();
+    let title_selector = scraper::Selector::parse(".result__a").unwrap();
+    let snippet_selector = scraper::Selector::parse(".result__snippet").unwrap();
+    let url_selector = scraper::Selector::parse(".result__url").unwrap();
+
+    let mut results = Vec::new();
+    for (i, result) in document.select(&result_selector).enumerate() {
+        if i >= 8 { break; } // 最多 8 条结果
+
+        let title = result
+            .select(&title_selector)
+            .next()
+            .map(|e| e.text().collect::<String>())
+            .unwrap_or_default();
+
+        let snippet = result
+            .select(&snippet_selector)
+            .next()
+            .map(|e| e.text().collect::<String>())
+            .unwrap_or_default();
+
+        let url = result
+            .select(&url_selector)
+            .next()
+            .map(|e| e.text().collect::<String>().trim().to_string())
+            .unwrap_or_default();
+
+        if !title.is_empty() {
+            results.push(format!("{}. {}\n   {}\n   {}", i + 1, title.trim(), url.trim(), snippet.trim()));
+        }
+    }
+
+    if results.is_empty() {
+        Ok(format!("没有找到关于「{}」的搜索结果", query))
+    } else {
+        Ok(results.join("\n\n"))
+    }
 }
 
-/// 读取网页内容（通过 Jina AI Reader API）
+/// 读取网页内容（直接抓取并提取正文）
 #[tauri::command]
 pub async fn web_fetch(url: String) -> Result<String, String> {
-    let jina_url = format!("https://r.jina.ai/{}", url);
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
     let response = client
-        .get(&jina_url)
-        .header("Accept", "text/plain")
+        .get(&url)
         .send()
         .await
         .map_err(|e| format!("网页请求失败: {}", e))?;
@@ -234,11 +277,58 @@ pub async fn web_fetch(url: String) -> Result<String, String> {
         return Err(format!("网页读取失败: HTTP {}", response.status()));
     }
 
-    let text = response
+    let html = response
         .text()
         .await
         .map_err(|e| format!("读取网页内容失败: {}", e))?;
 
-    // 限制返回长度
-    Ok(text.chars().take(8000).collect())
+    // 提取正文文本
+    let document = scraper::Html::parse_document(&html);
+
+    // 移除 script 和 style 内容，提取文本
+    let body_selector = scraper::Selector::parse("body").unwrap();
+    let script_selector = scraper::Selector::parse("script, style, nav, footer, header").unwrap();
+
+    let body = document.select(&body_selector).next();
+    let mut text = String::new();
+
+    if let Some(body_el) = body {
+        // 收集要排除的节点
+        let skip_ids: std::collections::HashSet<ego_tree::NodeId> = body_el
+            .select(&script_selector)
+            .map(|e| e.id())
+            .collect();
+
+        for node_ref in body_el.descendants() {
+            // 跳过被排除节点的子节点
+            let mut should_skip = false;
+            let mut current = node_ref.parent();
+            while let Some(parent) = current {
+                if skip_ids.contains(&parent.id()) {
+                    should_skip = true;
+                    break;
+                }
+                current = parent.parent();
+            }
+            if should_skip { continue; }
+
+            if let scraper::Node::Text(ref text_node) = node_ref.value() {
+                let t = text_node.text.trim();
+                if !t.is_empty() {
+                    text.push_str(t);
+                    text.push('\n');
+                }
+            }
+        }
+    }
+
+    // 清理多余空行
+    let cleaned: String = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect::<Vec<&str>>()
+        .join("\n");
+
+    // 限制长度
+    Ok(cleaned.chars().take(8000).collect())
 }
