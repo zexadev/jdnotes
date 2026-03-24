@@ -5,6 +5,10 @@ import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableCell from '@tiptap/extension-table-cell'
+import TableHeader from '@tiptap/extension-table-header'
 import { Markdown } from 'tiptap-markdown'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { CodeBlockComponent } from './CodeBlockComponent'
@@ -128,6 +132,12 @@ export function Editor({
       TaskItem.configure({
         nested: true,
       }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
       AIHighlight,
     ],
     content: content,
