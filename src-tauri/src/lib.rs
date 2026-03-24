@@ -89,12 +89,26 @@ pub fn run() {
             log::info!("数据库路径: {}", db_url);
 
             // 创建迁移
-            let migrations = vec![Migration {
-                version: 1,
-                description: "create initial tables",
-                sql: db::get_init_sql(),
-                kind: MigrationKind::Up,
-            }];
+            let migrations = vec![
+                Migration {
+                    version: 1,
+                    description: "create initial tables",
+                    sql: db::get_init_sql(),
+                    kind: MigrationKind::Up,
+                },
+                Migration {
+                    version: 2,
+                    description: "add conversations and chat enhancements",
+                    sql: include_str!("../migrations/002_conversations.sql"),
+                    kind: MigrationKind::Up,
+                },
+                Migration {
+                    version: 3,
+                    description: "remove role check constraint for tool calls",
+                    sql: include_str!("../migrations/003_remove_role_check.sql"),
+                    kind: MigrationKind::Up,
+                },
+            ];
 
             // 注册 SQL 插件
             app.handle().plugin(
