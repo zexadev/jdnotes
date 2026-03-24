@@ -145,6 +145,7 @@ pub fn run() {
             // 联网功能
             commands::web_search,
             commands::web_fetch,
+            commands::get_location,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
