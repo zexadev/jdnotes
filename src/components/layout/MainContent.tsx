@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Eye, PenLine, Sparkles, Bell, X } from 'lucide-react'
+import { Star, Sparkles, Bell, X } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
@@ -15,14 +15,12 @@ interface MainContentProps {
   activeNote: Note | null
   localTitle: string
   localContent: string
-  isEditing: boolean
   isChatOpen: boolean
   contentToInsert: string | null
   onTitleChange: (title: string) => void
   onContentChange: (content: string) => void
   onTagsChange: (tags: string[]) => void
   onToggleFavorite: (id: number) => void
-  onToggleEdit: () => void
   onToggleChat: () => void
   onCreateNote: () => void
   onContentInserted: () => void
@@ -35,14 +33,12 @@ export function MainContent({
   activeNote,
   localTitle,
   localContent,
-  isEditing,
   isChatOpen,
   contentToInsert,
   onTitleChange,
   onContentChange,
   onTagsChange,
   onToggleFavorite,
-  onToggleEdit,
   onToggleChat,
   onCreateNote,
   onContentInserted,
@@ -163,20 +159,6 @@ export function MainContent({
                     </div>
                   )}
                 </div>
-                {/* 模式切换按钮 */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={onToggleEdit}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors duration-200"
-                  title={isEditing ? '切换到阅读模式' : '切换到编辑模式'}
-                >
-                  {isEditing ? (
-                    <Eye className="h-4 w-4" strokeWidth={1.5} />
-                  ) : (
-                    <PenLine className="h-4 w-4" strokeWidth={1.5} />
-                  )}
-                </motion.button>
                 {/* AI 助手按钮 */}
                 <motion.button
                   whileHover={{ scale: 1.1 }}
@@ -199,12 +181,11 @@ export function MainContent({
               <TagsInput
                 tags={activeNote?.tags ?? []}
                 onChange={onTagsChange}
-                disabled={!isEditing}
               />
             </div>
 
             {/* 编辑器工具栏 - 固定不滚动 */}
-            {isEditing && editorInstance && (
+            {editorInstance && (
               <div className="px-12 border-b border-black/[0.03] dark:border-white/[0.06]">
                 <EditorToolbar editor={editorInstance} />
               </div>
@@ -216,7 +197,7 @@ export function MainContent({
               title={localTitle}
               content={localContent}
               tags={activeNote?.tags ?? []}
-              isEditing={isEditing}
+              isEditing={true}
               createdAt={activeNote?.createdAt ?? new Date()}
               updatedAt={activeNote?.updatedAt ?? new Date()}
               onTitleChange={onTitleChange}

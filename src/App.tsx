@@ -18,7 +18,6 @@ type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'se
 
 function App() {
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null)
-  const [isEditing, setIsEditing] = useState(false) // 默认阅读模式
   const [searchQuery, setSearchQuery] = useState('')
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
@@ -145,85 +144,50 @@ function App() {
     knownNoteIdsRef.current = currentIds
   }, [notes, activeNoteId])
 
-  // 自动保存 - 只在编辑模式下触发
+  // 自动保存
   const { saveNoteById, hasUnsavedChanges } = useAutoSave({
     noteId: activeNoteId,
     title: localTitle,
     content: localContent,
-    isEditing, // 只有编辑模式下才触发自动保存
+    isEditing: true,
     delay: 500,
-    onSave: refreshNotes, // 保存后刷新列表
+    onSave: refreshNotes,
   })
 
-  // 选择笔记 - 切换笔记时默认进入阅读模式
+  // 选择笔记
   const handleSelectNote = useCallback(async (note: Note) => {
-    console.log('[App] handleSelectNote - 点击笔记:', note.id, '当前笔记:', activeNoteId, '编辑模式:', isEditing)
-    console.log('[App] handleSelectNote - 当前 localContent:', localContent.substring(0, 50) + '...')
+    console.log('[App] handleSelectNote - 点击笔记:', note.id, '当前笔记:', activeNoteId)
 
-    // 如果点击的是当前笔记,不需要切换
-    if (note.id === activeNoteId) {
-      console.log('[App] handleSelectNote - 点击的是当前笔记,无需切换')
-      return
-    }
+    if (note.id === activeNoteId) return
 
-    // 只有在编辑模式下才需要保存(查看模式不会产生修改)
-    if (isEditing && activeNoteId !== null && hasUnsavedChanges()) {
-      console.log('[App] handleSelectNote - 编辑模式下有未保存的变化,保存当前笔记:', activeNoteId, '内容:', localContent.substring(0, 50) + '...')
-      // 使用 saveNoteById 显式保存当前笔记的最新内容
+    // 保存当前笔记未保存的变化
+    if (activeNoteId !== null && hasUnsavedChanges()) {
       await saveNoteById(activeNoteId, localTitle, localContent)
-      console.log('[App] handleSelectNote - 保存完成')
-    } else {
-      console.log('[App] handleSelectNote - 跳过保存(非编辑模式或无变化)')
     }
 
     // 从数据库获取最新的笔记数据
-    console.log('[App] handleSelectNote - 从数据库获取笔记:', note.id)
     const latestNote = await noteOperations.get(note.id)
-    if (!latestNote) {
-      console.log('[App] handleSelectNote - 笔记不存在')
-      return
-    }
+    if (!latestNote) return
 
-    console.log('[App] handleSelectNote - 获取到笔记:', latestNote.id, '内容:', latestNote.content.substring(0, 50) + '...')
-
-    // 批量更新状态,减少重渲染
     setActiveNoteId(latestNote.id)
     setLocalTitle(latestNote.title)
     setLocalContent(latestNote.content)
-    setIsEditing(false) // 切换笔记时默认进入阅读模式
-    // 如果当前在日历视图,切换回全部笔记
     if (currentView === 'calendar') {
       setCurrentView('inbox')
     }
-  }, [activeNoteId, localTitle, localContent, isEditing, saveNoteById, hasUnsavedChanges, currentView])
-
-  // 空笔记自动进入编辑模式（作为安全网，确保新笔记进入编辑模式）
-  useEffect(() => {
-    if (activeNote === null) return
-
-    // 检查是否是新建的空笔记
-    const isEmptyNote = activeNote.title === '无标题' && activeNote.content === ''
-    if (isEmptyNote) {
-      setIsEditing(true)
-    }
-  }, [activeNote?.id]) // 仅在笔记 ID 变化时触发
+  }, [activeNoteId, localTitle, localContent, saveNoteById, hasUnsavedChanges, currentView])
 
   // 创建新笔记
   const handleCreateNote = async () => {
     try {
-      // 只有在编辑模式下才需要保存当前笔记
-      if (isEditing && activeNoteId !== null && hasUnsavedChanges()) {
-        console.log('[App] handleCreateNote - 编辑模式下保存当前笔记:', activeNoteId)
+      if (activeNoteId !== null && hasUnsavedChanges()) {
         await saveNoteById(activeNoteId, localTitle, localContent)
       }
-      
+
       const id = await createNote()
-      console.log('Created Note ID:', id, typeof id)
-      // 确保 ID 是数字类型
       setActiveNoteId(Number(id))
       setLocalTitle('无标题')
       setLocalContent('')
-      setIsEditing(true)
     } catch (error) {
       console.error('Failed to create note:', error)
     }
@@ -275,8 +239,6 @@ function App() {
   // 插入内容到笔记
   const handleInsertToNote = useCallback((content: string) => {
     setContentToInsert(content)
-    // 切换到编辑模式以便插入内容
-    setIsEditing(true)
   }, [])
 
   // 插入完成后清除状态
@@ -397,14 +359,12 @@ function App() {
                   activeNote={activeNote}
                   localTitle={localTitle}
                   localContent={localContent}
-                  isEditing={isEditing}
                   isChatOpen={isChatOpen}
                   contentToInsert={contentToInsert}
                   onTitleChange={handleTitleChange}
                   onContentChange={handleContentChange}
                   onTagsChange={handleTagsChange}
                   onToggleFavorite={handleToggleFavorite}
-                  onToggleEdit={() => setIsEditing(!isEditing)}
                   onToggleChat={toggleChat}
                   onCreateNote={handleCreateNote}
                   onContentInserted={handleContentInserted}
