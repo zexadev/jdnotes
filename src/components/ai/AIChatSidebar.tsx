@@ -1,7 +1,10 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { X, Send, Sparkles, Loader2, ChevronDown, Check } from 'lucide-react'
+import { X, Send, Sparkles, Loader2, ChevronDown, Check, Plus, Trash2, Image, Copy, RotateCcw, FileInput } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useChat } from '../../hooks/useChat'
+import type { StreamSegment } from '../../hooks/useChat'
 import { useAIConfig } from '../../hooks/useSettings'
 import { type ChatMessage } from '../../lib/db'
 import { ChatMessageItem } from './ChatMessageItem'
@@ -10,6 +13,7 @@ import { ChatMessageItem } from './ChatMessageItem'
 interface StreamingMessage {
   role: 'user' | 'assistant'
   content: string
+  images?: string[]
 }
 
 interface AIChatSidebarProps {
@@ -27,11 +31,18 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     setInput,
     messages,
     pendingUserMessage,
-    streamingContent,
+    pendingImages,
+    streamingSegments,
     isStreamingActive,
     isStreaming,
     isRetryMode,
+    conversations,
+    activeConversationId,
+    createConversation,
+    switchConversation,
+    deleteConversation,
     handleSend,
+    sendMessage,
     handleEdit,
     handleDelete,
     handleRetry,
@@ -40,9 +51,14 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
 
   const { config, setActiveSource } = useAIConfig()
   const [showSourcePicker, setShowSourcePicker] = useState(false)
+  const [showConversationList, setShowConversationList] = useState(false)
+  const [attachedImages, setAttachedImages] = useState<string[]>([])
   const sourcePickerRef = useRef<HTMLDivElement>(null)
+  const conversationListRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeSource = config.sources.find(s => s.id === config.activeSourceId)
+  const activeConversation = conversations.find(c => c.id === activeConversationId)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -59,25 +75,59 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     }
   }, [])
 
-  // 当消息更新时滚动到底部
   useEffect(() => {
-    // 使用 requestAnimationFrame 确保 DOM 更新后再滚动
     requestAnimationFrame(() => {
       scrollToBottom()
     })
-  }, [messages, streamingContent, pendingUserMessage, scrollToBottom])
+  }, [messages, streamingSegments, pendingUserMessage, scrollToBottom])
 
   // 键盘事件处理
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
-      // 发送后重置输入框高度
+      handleSendWithImages()
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
         setIsMultiLine(false)
       }
     }
+  }
+
+  // 发送消息（带图片）
+  const handleSendWithImages = async () => {
+    if (!input.trim()) return
+    const content = input.trim()
+    setInput('')
+    const images = attachedImages.length > 0 ? [...attachedImages] : undefined
+    setAttachedImages([])
+    await sendMessage(content, images)
+  }
+
+  // 图片附加
+  const handleImageAttach = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = reader.result as string
+        setAttachedImages(prev => [...prev, base64])
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // 清空 input 以便重复选择同一文件
+    e.target.value = ''
+  }
+
+  const removeAttachedImage = (index: number) => {
+    setAttachedImages(prev => prev.filter((_, i) => i !== index))
   }
 
   // 自动调整文本框高度
@@ -87,12 +137,10 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
       textarea.style.height = 'auto'
       const newHeight = Math.min(textarea.scrollHeight, 150)
       textarea.style.height = `${newHeight}px`
-      // 判断是否为多行（超过单行高度约 24px）
       setIsMultiLine(newHeight > 36)
     }
   }
 
-  // 输入框清空后重置高度
   useEffect(() => {
     if (!input && textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -100,18 +148,21 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     }
   }, [input])
 
-  // 点击外部关闭来源选择器
+  // 点击外部关闭弹出层
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (sourcePickerRef.current && !sourcePickerRef.current.contains(event.target as Node)) {
         setShowSourcePicker(false)
       }
+      if (conversationListRef.current && !conversationListRef.current.contains(event.target as Node)) {
+        setShowConversationList(false)
+      }
     }
-    if (showSourcePicker) {
+    if (showSourcePicker || showConversationList) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showSourcePicker])
+  }, [showSourcePicker, showConversationList])
 
   // 复制消息
   const handleCopy = useCallback((content: string) => {
@@ -125,72 +176,80 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     ...(messages || []),
   ]
 
-  // 如果有正在发送的消息，添加临时消息（重试模式不显示用户消息，因为已在数据库中）
   if (pendingUserMessage && !isRetryMode) {
     displayMessages.push({
       role: 'user' as const,
       content: pendingUserMessage,
-    })
-  }
-  
-  // 只有当有实际内容时才添加流式 AI 消息
-  if (isStreamingActive && streamingContent) {
-    displayMessages.push({
-      role: 'assistant' as const,
-      content: streamingContent,
+      images: pendingImages,
     })
   }
 
-  // 判断是否正在等待 AI 回复：
-  // 1. 正在流式传输但还没有内容（等待第一个响应）
-  // 2. 用户消息已发送，正在请求但还没开始流式响应
-  const isWaitingForResponse = (isStreamingActive && !streamingContent) ||
-    ((pendingUserMessage || isStreaming) && !isStreamingActive)
+  // 判断 segments 中是否有文字内容
+  const hasStreamingText = streamingSegments.some(s => s.type === 'text' && s.content)
+  const hasStreamingSegments = streamingSegments.length > 0
+
+  const isWaitingForResponse = isStreamingActive && !hasStreamingSegments
 
   return (
     <div className="w-[350px] ai-sidebar-glass border-l border-black/[0.03] dark:border-white/[0.06] flex flex-col h-full ai-chat-sidebar">
-      {/* Header */}
+      {/* Header — 对话操作 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.03] dark:border-white/[0.06]">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Sparkles className="h-4 w-4 text-[#5E6AD2] flex-shrink-0" strokeWidth={1.5} />
-          {/* 来源选择器 */}
-          <div ref={sourcePickerRef} className="relative min-w-0">
+          {/* 对话切换器 */}
+          <div ref={conversationListRef} className="relative min-w-0">
             <button
-              onClick={() => setShowSourcePicker(!showSourcePicker)}
+              onClick={() => setShowConversationList(!showConversationList)}
               className="flex items-center gap-1 text-[14px] font-medium text-slate-900 dark:text-slate-100 tracking-tight hover:text-[#5E6AD2] transition-colors max-w-[180px]"
             >
-              <span className="truncate">{activeSource?.name || 'AI 助手'}</span>
-              <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${showSourcePicker ? 'rotate-180' : ''}`} />
+              <span className="truncate">{activeConversation?.title || '对话'}</span>
+              <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${showConversationList ? 'rotate-180' : ''}`} />
             </button>
-            {showSourcePicker && config.sources.length > 0 && (
+            {showConversationList && (
               <div className="absolute top-full left-0 mt-1 w-56 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-                {config.sources.map((source) => (
-                  <button
-                    key={source.id}
-                    onClick={() => {
-                      setActiveSource(source.id)
-                      setShowSourcePicker(false)
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors ${
-                      source.id === config.activeSourceId
+                {conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                      conv.id === activeConversationId
                         ? 'bg-[#5E6AD2]/10 text-[#5E6AD2]'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate font-medium">{source.name}</div>
-                      <div className="text-xs text-gray-400 truncate">{source.model}</div>
-                    </div>
-                    {source.id === config.activeSourceId && (
-                      <Check className="h-4 w-4 flex-shrink-0" />
+                    <button
+                      onClick={() => {
+                        switchConversation(conv.id)
+                        setShowConversationList(false)
+                      }}
+                      className="flex-1 text-left truncate"
+                    >
+                      {conv.title}
+                    </button>
+                    {conversations.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteConversation(conv.id)
+                        }}
+                        className="p-0.5 text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => createConversation()}
+            className="p-1.5 text-slate-400 hover:text-[#5E6AD2] hover:bg-[#5E6AD2]/10 rounded-lg transition-colors"
+            title="新建对话"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
           {((messages && messages.length > 0) || pendingUserMessage) && (
             <button
               onClick={handleClear}
@@ -208,13 +267,6 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
         </div>
       </div>
 
-      {/* Context Indicator */}
-      <div className="px-4 py-2 border-b border-black/[0.03] dark:border-white/[0.06]">
-        <p className="text-[10px] text-slate-400 dark:text-slate-500">
-          正在阅读笔记：{noteTitle || '无标题'}
-        </p>
-      </div>
-
       {/* Messages */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
         {displayMessages.length === 0 ? (
@@ -229,7 +281,7 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
               有什么可以帮你的？
             </p>
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-              我可以帮你分析笔记内容、回答问题
+              我可以读取、搜索和管理你的笔记
             </p>
           </motion.div>
         ) : (
@@ -237,7 +289,9 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
             <AnimatePresence mode="popLayout" initial={false}>
               {displayMessages.map((msg, index) => {
                 const isTemp = !('id' in msg) || msg.id === undefined
-                const isCurrentStreaming = isTemp && msg.role === 'assistant'
+
+                // 跳过旧的 tool_call 消息（兼容）
+                if (msg.role === 'tool_call') return null
 
                 return (
                   <motion.div
@@ -248,22 +302,51 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
                     transition={{ duration: 0.2 }}
                     layout
                   >
-                    <ChatMessageItem
-                      message={msg as ChatMessage}
-                      isStreaming={isCurrentStreaming}
-                      isTemporary={isTemp}
-                      isAnyStreaming={isStreaming || isStreamingActive}
-                      onCopy={handleCopy}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onRetry={handleRetry}
-                      onInsertToNote={onInsertToNote}
-                    />
+                    {/* 图片预览（用户消息） */}
+                    {'images' in msg && msg.images && msg.images.length > 0 && (
+                      <div className="flex gap-1.5 mb-1.5 flex-wrap justify-end">
+                        {msg.images.map((img, imgIdx) => (
+                          <img
+                            key={imgIdx}
+                            src={img}
+                            alt=""
+                            className="h-16 w-16 object-cover rounded-lg border border-black/[0.06] dark:border-white/[0.06]"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {/* assistant 消息：检查是否有 parts 结构 */}
+                    {msg.role === 'assistant' ? (
+                      <MessagePartsRenderer content={msg.content} isStreaming={false} onCopy={handleCopy} onDelete={handleDelete} onRetry={handleRetry} onInsertToNote={onInsertToNote} message={msg as ChatMessage} isAnyStreaming={isStreaming || isStreamingActive} />
+                    ) : (
+                      <ChatMessageItem
+                        message={msg as ChatMessage}
+                        isStreaming={false}
+                        isTemporary={isTemp}
+                        isAnyStreaming={isStreaming || isStreamingActive}
+                        onCopy={handleCopy}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onRetry={handleRetry}
+                        onInsertToNote={onInsertToNote}
+                      />
+                    )}
                   </motion.div>
                 )
               })}
             </AnimatePresence>
-            
+
+            {/* 流式输出 segments */}
+            {isStreamingActive && hasStreamingSegments && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="py-3"
+              >
+                <StreamingSegmentsRenderer segments={streamingSegments} isStreamingActive={isStreamingActive} />
+              </motion.div>
+            )}
+
             {/* 等待 AI 回复的加载动画 */}
             <AnimatePresence>
               {isWaitingForResponse && (
@@ -271,22 +354,14 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="py-3 ai-thinking-indicator"
+                  className="py-3"
                 >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                      AI
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <div className="ai-thinking-dots">
                       <span className="ai-dot"></span>
                       <span className="ai-dot"></span>
                       <span className="ai-dot"></span>
                     </div>
-                    <span className="text-[12px] text-slate-400 dark:text-slate-500 ml-1">
-                      思考中...
-                    </span>
                   </div>
                 </motion.div>
               )}
@@ -296,9 +371,82 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - 浮动输入框 */}
+      {/* 附加图片预览 */}
+      {attachedImages.length > 0 && (
+        <div className="px-4 py-2 border-t border-black/[0.03] dark:border-white/[0.06]">
+          <div className="flex gap-1.5 flex-wrap">
+            {attachedImages.map((img, idx) => (
+              <div key={idx} className="relative group">
+                <img src={img} alt="" className="h-14 w-14 object-cover rounded-lg border border-black/[0.06] dark:border-white/[0.06]" />
+                <button
+                  onClick={() => removeAttachedImage(idx)}
+                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input Area */}
       <div className="p-4">
+        {/* 模型选择器 */}
+        <div ref={sourcePickerRef} className="relative mb-2">
+          <button
+            onClick={() => setShowSourcePicker(!showSourcePicker)}
+            className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 hover:text-[#5E6AD2] transition-colors"
+          >
+            <span className="truncate">{activeSource?.name || 'AI'}</span>
+            <span className="text-slate-400 dark:text-slate-500">·</span>
+            <span className="text-slate-400 dark:text-slate-500 truncate">{activeSource?.model || ''}</span>
+            <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${showSourcePicker ? 'rotate-180' : ''}`} />
+          </button>
+          {showSourcePicker && config.sources.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-1 w-56 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+              {config.sources.map((source) => (
+                <button
+                  key={source.id}
+                  onClick={() => {
+                    setActiveSource(source.id)
+                    setShowSourcePicker(false)
+                  }}
+                  className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors ${
+                    source.id === config.activeSourceId
+                      ? 'bg-[#5E6AD2]/10 text-[#5E6AD2]'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate font-medium">{source.name}</div>
+                    <div className="text-xs text-gray-400 truncate">{source.model}</div>
+                  </div>
+                  {source.id === config.activeSourceId && (
+                    <Check className="h-4 w-4 flex-shrink-0" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className={`input-pill flex items-end gap-2 px-4 py-3 border border-black/[0.03] dark:border-white/[0.06] ${!isMultiLine ? 'single-line' : ''}`}>
+          {/* 图片附加按钮 */}
+          <button
+            onClick={handleImageAttach}
+            className="p-1 text-slate-400 hover:text-[#5E6AD2] transition-colors flex-shrink-0"
+            title="附加图片"
+          >
+            <Image className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+          />
           <textarea
             ref={textareaRef}
             value={input}
@@ -313,9 +461,9 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
             style={{ maxHeight: '150px' }}
           />
           <button
-            onClick={handleSend}
+            onClick={handleSendWithImages}
             disabled={!input.trim() || isStreaming}
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${
               input.trim() && !isStreaming
                 ? 'text-[#5E6AD2] hover:bg-[#5E6AD2]/10'
                 : 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
@@ -332,6 +480,163 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
           Shift + Enter 换行 · Enter 发送
         </p>
       </div>
+    </div>
+  )
+}
+
+// ============= Segments 渲染（流式 + 历史共用） =============
+
+function renderSegments(segments: StreamSegment[], isStreaming: boolean) {
+  return segments.map((seg, idx) => {
+    if (seg.type === 'tool_call') {
+      return <ToolCallCard key={`seg-${idx}`} name={seg.name} params={seg.params} result={seg.result} />
+    }
+    const isLastText = !segments.slice(idx + 1).some(s => s.type === 'text')
+    return (
+      <div key={`seg-${idx}`} className="text-[13px] leading-relaxed text-slate-700 dark:text-slate-300">
+        <div className="ai-chat-message prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {seg.content || ' '}
+          </ReactMarkdown>
+          {isLastText && isStreaming && <span className="ai-streaming-cursor" />}
+        </div>
+      </div>
+    )
+  })
+}
+
+function StreamingSegmentsRenderer({ segments, isStreamingActive }: { segments: StreamSegment[]; isStreamingActive: boolean }) {
+  return <>{renderSegments(segments, isStreamingActive)}</>
+}
+
+function MessagePartsRenderer({
+  content, isStreaming, onCopy, onDelete, onRetry, onInsertToNote, message, isAnyStreaming,
+}: {
+  content: string
+  isStreaming: boolean
+  onCopy: (content: string) => void
+  onDelete: (id: number) => void
+  onRetry: (message: ChatMessage) => void
+  onInsertToNote?: (content: string) => void
+  message: ChatMessage
+  isAnyStreaming: boolean
+}) {
+  // 尝试解析 parts 结构
+  let parts: StreamSegment[] | null = null
+  let plainText = content
+  try {
+    const parsed = JSON.parse(content)
+    if (parsed && parsed.parts && Array.isArray(parsed.parts)) {
+      parts = parsed.parts as StreamSegment[]
+      // 提取纯文本用于复制
+      plainText = parts.filter(p => p.type === 'text').map(p => (p as { content: string }).content).join('\n\n')
+    }
+  } catch {
+    // 不是 JSON，按纯文本处理
+  }
+
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    onCopy(plainText)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="group py-3">
+      {parts ? (
+        // 带 tool calls 的 parts 结构
+        renderSegments(parts, isStreaming)
+      ) : (
+        // 纯文本
+        <div className="text-[13px] leading-relaxed text-slate-700 dark:text-slate-300">
+          <div className="ai-chat-message prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {content || ' '}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+      {/* 操作按钮 */}
+      {!isStreaming && message.id && (
+        <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={handleCopy} className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]" title="复制">
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" strokeWidth={1.5} />}
+          </button>
+          <button onClick={() => onRetry(message)} className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]" title="重新生成">
+            <RotateCcw className="h-3 w-3" strokeWidth={1.5} />
+          </button>
+          {onInsertToNote && (
+            <button onClick={() => onInsertToNote(plainText)} className="p-1 rounded-md text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]" title="插入到笔记">
+              <FileInput className="h-3 w-3" strokeWidth={1.5} />
+            </button>
+          )}
+          <button onClick={() => onDelete(message.id)} className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]" title="删除">
+            <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============= Tool Call 展示组件（Cursor 风格） =============
+
+function ToolCallCard({ name, params, result }: { name: string; params: Record<string, unknown>; result?: string }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const toolLabels: Record<string, { label: string; icon: string }> = {
+    read_current_note: { label: '读取当前笔记', icon: '📄' },
+    search_notes: { label: '搜索笔记', icon: '🔍' },
+    read_note: { label: '读取笔记', icon: '📄' },
+    list_tags: { label: '列出标签', icon: '🏷️' },
+    get_notes_by_tag: { label: '按标签查找', icon: '🏷️' },
+    create_note: { label: '创建笔记', icon: '📝' },
+    update_note: { label: '修改笔记', icon: '✏️' },
+    delete_note: { label: '删除笔记', icon: '🗑️' },
+    get_note_images: { label: '获取图片', icon: '🖼️' },
+  }
+
+  const tool = toolLabels[name] || { label: name, icon: '🔧' }
+  const paramSummary = Object.entries(params)
+    .map(([k, v]) => `${k}: ${String(v).slice(0, 30)}`)
+    .join(', ')
+
+  return (
+    <div
+      className="my-1 rounded-md border border-black/[0.04] dark:border-white/[0.06] bg-slate-50/80 dark:bg-white/[0.02] text-[11px] overflow-hidden cursor-pointer"
+      onClick={() => result && setExpanded(!expanded)}
+    >
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+        <span className="flex-shrink-0 text-[10px]">{tool.icon}</span>
+        <span className="font-medium text-slate-600 dark:text-slate-400">{tool.label}</span>
+        {paramSummary && (
+          <span className="text-slate-400 dark:text-slate-500 truncate flex-1 min-w-0">
+            {paramSummary}
+          </span>
+        )}
+        <span className="flex-shrink-0 ml-auto">
+          {result ? (
+            <Check className="h-3 w-3 text-emerald-500" />
+          ) : (
+            <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
+          )}
+        </span>
+      </div>
+      {expanded && result && (
+        <div className="px-2.5 py-2 border-t border-black/[0.04] dark:border-white/[0.04] text-[10px] text-slate-500 dark:text-slate-400 max-h-28 overflow-y-auto">
+          <pre className="whitespace-pre-wrap break-all font-mono leading-relaxed">
+            {(() => {
+              try {
+                return JSON.stringify(JSON.parse(result), null, 2).slice(0, 800)
+              } catch {
+                return result.slice(0, 800)
+              }
+            })()}
+            {result.length > 800 ? '...' : ''}
+          </pre>
+        </div>
+      )}
     </div>
   )
 }

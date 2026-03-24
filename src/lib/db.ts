@@ -41,8 +41,10 @@ interface NoteRow {
 export interface ChatMessage {
   id: number
   noteId: number
-  role: 'user' | 'assistant'
+  conversationId: number | null
+  role: 'user' | 'assistant' | 'tool_call' | 'tool_result'
   content: string
+  images: string[] // base64 图片数组
   timestamp: Date
 }
 
@@ -50,9 +52,29 @@ export interface ChatMessage {
 interface ChatMessageRow {
   id: number
   note_id: number
+  conversation_id: number | null
   role: string
   content: string
+  images: string | null
   timestamp: string
+}
+
+// 对话数据类型
+export interface Conversation {
+  id: number
+  noteId: number
+  title: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// SQLite 返回的对话原始数据
+interface ConversationRow {
+  id: number
+  note_id: number
+  title: string
+  created_at: string
+  updated_at: string
 }
 
 /**
@@ -80,9 +102,24 @@ function rowToChatMessage(row: ChatMessageRow): ChatMessage {
   return {
     id: row.id,
     noteId: row.note_id,
-    role: row.role as 'user' | 'assistant',
+    conversationId: row.conversation_id,
+    role: row.role as ChatMessage['role'],
     content: row.content,
+    images: JSON.parse(row.images || '[]'),
     timestamp: new Date(row.timestamp),
+  }
+}
+
+/**
+ * 将 SQLite 行数据转换为 Conversation 对象
+ */
+function rowToConversation(row: ConversationRow): Conversation {
+  return {
+    id: row.id,
+    noteId: row.note_id,
+    title: row.title,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
   }
 }
 
@@ -496,37 +533,118 @@ export function formatDateKey(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-// 聊天消息操作函数
-export const chatOperations = {
-  // 添加消息
-  async add(noteId: number, role: 'user' | 'assistant', content: string): Promise<number> {
+// 对话操作函数
+export const conversationOperations = {
+  // 创建新对话
+  async create(noteId: number, title: string = '新对话'): Promise<number> {
     const db = await getDatabase()
     const now = new Date().toISOString()
-    
+
     const result = await db.execute(
-      `INSERT INTO chat_messages (note_id, role, content, timestamp) VALUES (?, ?, ?, ?)`,
-      [noteId, role, content, now]
+      `INSERT INTO conversations (note_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+      [noteId, title, now, now]
     )
-    
+
     return result.lastInsertId ?? 0
   },
 
-  // 获取笔记的所有消息
+  // 获取笔记的所有对话
+  async getByNoteId(noteId: number): Promise<Conversation[]> {
+    const db = await getDatabase()
+
+    const rows = await db.select<ConversationRow[]>(
+      `SELECT * FROM conversations WHERE note_id = ? ORDER BY updated_at DESC`,
+      [noteId]
+    )
+
+    return rows.map(rowToConversation)
+  },
+
+  // 重命名对话
+  async rename(id: number, title: string): Promise<void> {
+    const db = await getDatabase()
+
+    await db.execute(
+      `UPDATE conversations SET title = ? WHERE id = ?`,
+      [title, id]
+    )
+  },
+
+  // 删除对话及其消息
+  async delete(id: number): Promise<void> {
+    const db = await getDatabase()
+
+    await db.execute('DELETE FROM chat_messages WHERE conversation_id = ?', [id])
+    await db.execute('DELETE FROM conversations WHERE id = ?', [id])
+  },
+
+  // 更新对话的 updated_at
+  async touch(id: number): Promise<void> {
+    const db = await getDatabase()
+    const now = new Date().toISOString()
+
+    await db.execute(
+      `UPDATE conversations SET updated_at = ? WHERE id = ?`,
+      [now, id]
+    )
+  },
+}
+
+// 聊天消息操作函数
+export const chatOperations = {
+  // 添加消息
+  async add(
+    noteId: number,
+    role: ChatMessage['role'],
+    content: string,
+    conversationId?: number,
+    images?: string[]
+  ): Promise<number> {
+    const db = await getDatabase()
+    const now = new Date().toISOString()
+    const imagesJson = JSON.stringify(images || [])
+
+    const result = await db.execute(
+      `INSERT INTO chat_messages (note_id, conversation_id, role, content, images, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
+      [noteId, conversationId ?? null, role, content, imagesJson, now]
+    )
+
+    // 更新对话的 updated_at
+    if (conversationId) {
+      await conversationOperations.touch(conversationId)
+    }
+
+    return result.lastInsertId ?? 0
+  },
+
+  // 获取对话的所有消息
+  async getByConversationId(conversationId: number): Promise<ChatMessage[]> {
+    const db = await getDatabase()
+
+    const rows = await db.select<ChatMessageRow[]>(
+      `SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY timestamp ASC`,
+      [conversationId]
+    )
+
+    return rows.map(rowToChatMessage)
+  },
+
+  // 获取笔记的所有消息（兼容旧接口）
   async getByNoteId(noteId: number): Promise<ChatMessage[]> {
     const db = await getDatabase()
-    
+
     const rows = await db.select<ChatMessageRow[]>(
       `SELECT * FROM chat_messages WHERE note_id = ? ORDER BY timestamp ASC`,
       [noteId]
     )
-    
+
     return rows.map(rowToChatMessage)
   },
 
   // 更新消息内容
   async update(id: number, content: string): Promise<void> {
     const db = await getDatabase()
-    
+
     await db.execute(
       `UPDATE chat_messages SET content = ? WHERE id = ?`,
       [content, id]
@@ -536,24 +654,38 @@ export const chatOperations = {
   // 删除单条消息
   async delete(id: number): Promise<void> {
     const db = await getDatabase()
-    
+
     await db.execute('DELETE FROM chat_messages WHERE id = ?', [id])
   },
 
   // 删除某条消息之后的所有消息
-  async deleteAfter(noteId: number, timestamp: Date): Promise<void> {
+  async deleteAfter(noteId: number, timestamp: Date, conversationId?: number): Promise<void> {
     const db = await getDatabase()
-    
-    await db.execute(
-      `DELETE FROM chat_messages WHERE note_id = ? AND timestamp > ?`,
-      [noteId, timestamp.toISOString()]
-    )
+
+    if (conversationId) {
+      await db.execute(
+        `DELETE FROM chat_messages WHERE conversation_id = ? AND timestamp > ?`,
+        [conversationId, timestamp.toISOString()]
+      )
+    } else {
+      await db.execute(
+        `DELETE FROM chat_messages WHERE note_id = ? AND timestamp > ?`,
+        [noteId, timestamp.toISOString()]
+      )
+    }
+  },
+
+  // 清空对话的所有消息
+  async clearByConversationId(conversationId: number): Promise<void> {
+    const db = await getDatabase()
+
+    await db.execute('DELETE FROM chat_messages WHERE conversation_id = ?', [conversationId])
   },
 
   // 清空笔记的所有消息
   async clearByNoteId(noteId: number): Promise<void> {
     const db = await getDatabase()
-    
+
     await db.execute('DELETE FROM chat_messages WHERE note_id = ?', [noteId])
   },
 }

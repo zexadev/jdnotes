@@ -1,6 +1,13 @@
 import { useState, useCallback, useRef } from 'react'
 import { getSettings } from './useSettings'
 import type { AIProvider } from './useSettings'
+import {
+  toOpenAITools,
+  toAnthropicTools,
+  toGeminiTools,
+  executeToolCall,
+  type AIToolContext,
+} from '../lib/aiTools'
 
 export type AIAction = 'refine' | 'summarize' | 'translate' | 'continue' | 'custom' | 'template'
 
@@ -13,11 +20,42 @@ export interface AIContext {
   surroundingText?: string
 }
 
+// 多轮消息格式（provider 无关）
+export interface AIMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: string | AIContentBlock[]
+  tool_call_id?: string
+  tool_calls?: AIToolCall[]
+  images?: string[] // base64 图片
+}
+
+export interface AIContentBlock {
+  type: 'text' | 'image_url' | 'tool_use' | 'tool_result'
+  text?: string
+  image_url?: { url: string }
+  id?: string
+  name?: string
+  input?: Record<string, unknown>
+  tool_use_id?: string
+  content?: string
+}
+
+export interface AIToolCall {
+  id: string
+  type: 'function'
+  function: {
+    name: string
+    arguments: string
+  }
+}
+
 interface UseAIStreamOptions {
   onChunk?: (chunk: string) => void
-  onLine?: (line: string) => void  // 基于行的回调，用于更好的 Markdown 解析
+  onLine?: (line: string) => void
   onFinish?: (fullText: string) => void
   onError?: (error: string) => void
+  onToolCall?: (toolName: string, params: Record<string, unknown>) => void
+  onToolResult?: (toolName: string, result: string) => void
 }
 
 interface UseAIStreamReturn {
@@ -25,6 +63,7 @@ interface UseAIStreamReturn {
   streamText: string
   error: string | null
   startStream: (action: AIAction, text: string, customPrompt?: string, context?: AIContext, templateType?: TemplateType) => Promise<void>
+  startStreamWithTools: (messages: AIMessage[], toolContext: AIToolContext) => Promise<void>
   stopStream: () => void
 }
 
@@ -56,7 +95,7 @@ const TEMPLATE_PROMPTS: Record<TemplateType, string> = {
   code: `你是 JD Notes 的编程助手。请根据上下文中的描述，生成相应的代码实现。使用适当的编程语言，并添加简洁的注释。只返回代码块，不要任何额外解释。`,
 }
 
-// 构建上下文感知的系统提示
+// 构建上下文感知的系统提示（用于编辑器内联 AI，不带 tools）
 function buildSystemPrompt(action: AIAction, context?: AIContext, templateType?: TemplateType): string {
   if (action === 'template' && templateType) {
     let prompt = TEMPLATE_PROMPTS[templateType]
@@ -76,7 +115,6 @@ function buildSystemPrompt(action: AIAction, context?: AIContext, templateType?:
 
   let prompt = basePrompts[action as Exclude<AIAction, 'template'>]
 
-  // 添加上下文信息
   if (context?.noteTitle) {
     prompt += `\n\n当前笔记标题：「${context.noteTitle}」`
   }
@@ -87,8 +125,8 @@ function buildSystemPrompt(action: AIAction, context?: AIContext, templateType?:
   return prompt
 }
 
-// ============= OpenAI 兼容 API 调用 =============
-async function* streamOpenAICompatible(
+// ============= OpenAI 兼容 API（简单模式，无 tools） =============
+async function* streamOpenAISimple(
   baseUrl: string,
   apiKey: string,
   model: string,
@@ -117,41 +155,11 @@ async function* streamOpenAICompatible(
     throw new Error(`API 错误: ${response.status} ${response.statusText}`)
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('无法读取响应流')
-  }
-
-  const decoder = new TextDecoder()
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    const chunk = decoder.decode(value, { stream: true })
-    const lines = chunk.split('\n')
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') continue
-
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) {
-            yield content
-          }
-        } catch {
-          // 忽略解析错误
-        }
-      }
-    }
-  }
+  yield* readSSEStream(response)
 }
 
-// ============= Anthropic Claude API 调用 =============
-async function* streamAnthropic(
+// ============= Anthropic 简单模式 =============
+async function* streamAnthropicSimple(
   baseUrl: string,
   apiKey: string,
   model: string,
@@ -171,9 +179,7 @@ async function* streamAnthropic(
       model,
       max_tokens: 4096,
       system: systemPrompt,
-      messages: [
-        { role: 'user', content: userMessage },
-      ],
+      messages: [{ role: 'user', content: userMessage }],
       stream: true,
     }),
     signal,
@@ -184,41 +190,11 @@ async function* streamAnthropic(
     throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('无法读取响应流')
-  }
-
-  const decoder = new TextDecoder()
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    const chunk = decoder.decode(value, { stream: true })
-    const lines = chunk.split('\n')
-
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim()
-        if (!data) continue
-
-        try {
-          const parsed = JSON.parse(data)
-          // Anthropic 流式响应格式
-          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-            yield parsed.delta.text
-          }
-        } catch {
-          // 忽略解析错误
-        }
-      }
-    }
-  }
+  yield* readAnthropicSSE(response)
 }
 
-// ============= Google Gemini API 调用 =============
-async function* streamGoogle(
+// ============= Google 简单模式 =============
+async function* streamGoogleSimple(
   baseUrl: string,
   apiKey: string,
   model: string,
@@ -227,25 +203,14 @@ async function* streamGoogle(
   signal: AbortSignal
 ): AsyncGenerator<string> {
   const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
-  
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: userMessage }],
-        },
-      ],
-      systemInstruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      generationConfig: {
-        maxOutputTokens: 4096,
-      },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { maxOutputTokens: 4096 },
     }),
     signal,
   })
@@ -255,120 +220,583 @@ async function* streamGoogle(
     throw new Error(`Google API 错误: ${response.status} - ${errorText}`)
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('无法读取响应流')
-  }
+  yield* readGoogleSSE(response)
+}
 
+// ============= SSE 读取工具函数 =============
+
+function readSSELines(response: Response): AsyncGenerator<string>
+async function* readSSELines(response: Response): AsyncGenerator<string> {
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('无法读取响应流')
   const decoder = new TextDecoder()
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-
     const chunk = decoder.decode(value, { stream: true })
     const lines = chunk.split('\n')
-
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim()
-        if (!data) continue
-
-        try {
-          const parsed = JSON.parse(data)
-          // Gemini 流式响应格式
-          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-          if (text) {
-            yield text
-          }
-        } catch {
-          // 忽略解析错误
-        }
+        yield line.slice(6).trim()
       }
     }
   }
 }
 
-// ============= Ollama API 调用 (OpenAI 兼容) =============
-async function* streamOllama(
+async function* readSSEStream(response: Response): AsyncGenerator<string> {
+  for await (const data of readSSELines(response)) {
+    if (data === '[DONE]') continue
+    try {
+      const parsed = JSON.parse(data)
+      const content = parsed.choices?.[0]?.delta?.content
+      if (content) yield content
+    } catch { /* ignore */ }
+  }
+}
+
+async function* readAnthropicSSE(response: Response): AsyncGenerator<string> {
+  for await (const data of readSSELines(response)) {
+    if (!data) continue
+    try {
+      const parsed = JSON.parse(data)
+      if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+        yield parsed.delta.text
+      }
+    } catch { /* ignore */ }
+  }
+}
+
+async function* readGoogleSSE(response: Response): AsyncGenerator<string> {
+  for await (const data of readSSELines(response)) {
+    if (!data) continue
+    try {
+      const parsed = JSON.parse(data)
+      const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
+      if (text) yield text
+    } catch { /* ignore */ }
+  }
+}
+
+// ============= Tools 模式：OpenAI =============
+
+interface OpenAIToolsResult {
+  text: string
+  toolCalls: AIToolCall[]
+  finishReason: string | null
+}
+
+async function callOpenAIWithTools(
   baseUrl: string,
-  _apiKey: string,  // Ollama 不需要 API Key
+  apiKey: string,
   model: string,
-  systemPrompt: string,
-  userMessage: string,
-  signal: AbortSignal
-): AsyncGenerator<string> {
-  // Ollama 使用 OpenAI 兼容格式
+  messages: object[],
+  tools: object[],
+  signal: AbortSignal,
+  onChunk?: (chunk: string) => void
+): Promise<OpenAIToolsResult> {
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+      messages,
+      tools,
+      tool_choice: 'auto',
       stream: true,
     }),
     signal,
   })
 
   if (!response.ok) {
-    throw new Error(`Ollama API 错误: ${response.status} ${response.statusText}`)
+    const errorText = await response.text()
+    throw new Error(`API 错误: ${response.status} - ${errorText}`)
   }
 
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('无法读取响应流')
-  }
+  let text = ''
+  const toolCalls: Map<number, AIToolCall> = new Map()
+  let finishReason: string | null = null
 
-  const decoder = new TextDecoder()
+  for await (const data of readSSELines(response)) {
+    if (data === '[DONE]') continue
+    try {
+      const parsed = JSON.parse(data)
+      const choice = parsed.choices?.[0]
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+      if (choice?.finish_reason) {
+        finishReason = choice.finish_reason
+      }
 
-    const chunk = decoder.decode(value, { stream: true })
-    const lines = chunk.split('\n')
+      const delta = choice?.delta
+      if (!delta) continue
 
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') continue
+      // 文本内容
+      if (delta.content) {
+        text += delta.content
+        onChunk?.(delta.content)
+      }
 
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) {
-            yield content
+      // Tool calls（增量式）
+      if (delta.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          const idx = tc.index ?? 0
+          if (!toolCalls.has(idx)) {
+            toolCalls.set(idx, {
+              id: tc.id || '',
+              type: 'function',
+              function: { name: '', arguments: '' },
+            })
           }
-        } catch {
-          // 忽略解析错误
+          const existing = toolCalls.get(idx)!
+          if (tc.id) existing.id = tc.id
+          if (tc.function?.name) existing.function.name += tc.function.name
+          if (tc.function?.arguments) existing.function.arguments += tc.function.arguments
         }
+      }
+    } catch { /* ignore */ }
+  }
+
+  return {
+    text,
+    toolCalls: Array.from(toolCalls.values()),
+    finishReason,
+  }
+}
+
+// ============= Tools 模式：Anthropic =============
+
+interface AnthropicToolsResult {
+  text: string
+  toolUses: { id: string; name: string; input: Record<string, unknown> }[]
+  stopReason: string | null
+}
+
+async function callAnthropicWithTools(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  messages: object[],
+  tools: object[],
+  signal: AbortSignal,
+  onChunk?: (chunk: string) => void
+): Promise<AnthropicToolsResult> {
+  const response = await fetch(`${baseUrl}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages,
+      tools,
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
+  }
+
+  let text = ''
+  const toolUses: { id: string; name: string; input: Record<string, unknown> }[] = []
+  let currentToolUse: { id: string; name: string; inputJson: string } | null = null
+  let stopReason: string | null = null
+
+  for await (const data of readSSELines(response)) {
+    if (!data) continue
+    try {
+      const parsed = JSON.parse(data)
+
+      if (parsed.type === 'message_delta' && parsed.delta?.stop_reason) {
+        stopReason = parsed.delta.stop_reason
+      }
+
+      if (parsed.type === 'content_block_start') {
+        if (parsed.content_block?.type === 'tool_use') {
+          currentToolUse = {
+            id: parsed.content_block.id,
+            name: parsed.content_block.name,
+            inputJson: '',
+          }
+        }
+      }
+
+      if (parsed.type === 'content_block_delta') {
+        if (parsed.delta?.type === 'text_delta' && parsed.delta?.text) {
+          text += parsed.delta.text
+          onChunk?.(parsed.delta.text)
+        }
+        if (parsed.delta?.type === 'input_json_delta' && parsed.delta?.partial_json && currentToolUse) {
+          currentToolUse.inputJson += parsed.delta.partial_json
+        }
+      }
+
+      if (parsed.type === 'content_block_stop' && currentToolUse) {
+        try {
+          const input = JSON.parse(currentToolUse.inputJson || '{}')
+          toolUses.push({ id: currentToolUse.id, name: currentToolUse.name, input })
+        } catch {
+          toolUses.push({ id: currentToolUse.id, name: currentToolUse.name, input: {} })
+        }
+        currentToolUse = null
+      }
+    } catch { /* ignore */ }
+  }
+
+  return { text, toolUses, stopReason }
+}
+
+// ============= Tools 模式：Google =============
+
+interface GoogleToolsResult {
+  text: string
+  functionCalls: { name: string; args: Record<string, unknown> }[]
+}
+
+async function callGoogleWithTools(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  contents: object[],
+  tools: object[],
+  signal: AbortSignal,
+  onChunk?: (chunk: string) => void
+): Promise<GoogleToolsResult> {
+  const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      tools,
+      generationConfig: { maxOutputTokens: 4096 },
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Google API 错误: ${response.status} - ${errorText}`)
+  }
+
+  let text = ''
+  const functionCalls: { name: string; args: Record<string, unknown> }[] = []
+
+  for await (const data of readSSELines(response)) {
+    if (!data) continue
+    try {
+      const parsed = JSON.parse(data)
+      const parts = parsed.candidates?.[0]?.content?.parts || []
+      for (const part of parts) {
+        if (part.text) {
+          text += part.text
+          onChunk?.(part.text)
+        }
+        if (part.functionCall) {
+          functionCalls.push({
+            name: part.functionCall.name,
+            args: part.functionCall.args || {},
+          })
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  return { text, functionCalls }
+}
+
+// ============= 格式转换工具函数 =============
+
+function aiMessagesToOpenAI(messages: AIMessage[]): object[] {
+  return messages.map(msg => {
+    if (msg.role === 'tool') {
+      return { role: 'tool', tool_call_id: msg.tool_call_id, content: msg.content }
+    }
+    if (msg.tool_calls && msg.tool_calls.length > 0) {
+      return { role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls }
+    }
+    // 处理图片
+    if (msg.images && msg.images.length > 0 && msg.role === 'user') {
+      const content: object[] = []
+      if (msg.content) content.push({ type: 'text', text: msg.content })
+      for (const img of msg.images) {
+        content.push({ type: 'image_url', image_url: { url: img } })
+      }
+      return { role: msg.role, content }
+    }
+    return { role: msg.role, content: msg.content }
+  })
+}
+
+function aiMessagesToAnthropic(messages: AIMessage[]): object[] {
+  const result: object[] = []
+
+  for (const msg of messages) {
+    if (msg.role === 'system') continue // system 单独处理
+
+    if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+      const content: object[] = []
+      if (msg.content) content.push({ type: 'text', text: msg.content })
+      for (const tc of msg.tool_calls) {
+        content.push({
+          type: 'tool_use',
+          id: tc.id,
+          name: tc.function.name,
+          input: JSON.parse(tc.function.arguments || '{}'),
+        })
+      }
+      result.push({ role: 'assistant', content })
+      continue
+    }
+
+    if (msg.role === 'tool') {
+      result.push({
+        role: 'user',
+        content: [{
+          type: 'tool_result',
+          tool_use_id: msg.tool_call_id,
+          content: msg.content,
+        }],
+      })
+      continue
+    }
+
+    // 处理图片
+    if (msg.images && msg.images.length > 0 && msg.role === 'user') {
+      const content: object[] = []
+      if (msg.content) content.push({ type: 'text', text: msg.content as string })
+      for (const img of msg.images) {
+        const match = img.match(/^data:(image\/\w+);base64,(.+)$/)
+        if (match) {
+          content.push({
+            type: 'image',
+            source: { type: 'base64', media_type: match[1], data: match[2] },
+          })
+        }
+      }
+      result.push({ role: 'user', content })
+      continue
+    }
+
+    result.push({ role: msg.role, content: msg.content })
+  }
+
+  return result
+}
+
+function aiMessagesToGoogle(messages: AIMessage[]): object[] {
+  const contents: object[] = []
+
+  for (const msg of messages) {
+    if (msg.role === 'system') continue
+
+    if (msg.role === 'assistant') {
+      const parts: object[] = []
+      if (msg.content) parts.push({ text: msg.content })
+      if (msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          parts.push({
+            functionCall: {
+              name: tc.function.name,
+              args: JSON.parse(tc.function.arguments || '{}'),
+            },
+          })
+        }
+      }
+      contents.push({ role: 'model', parts })
+      continue
+    }
+
+    if (msg.role === 'tool') {
+      contents.push({
+        role: 'function',
+        parts: [{
+          functionResponse: {
+            name: 'tool_response',
+            response: { result: msg.content },
+          },
+        }],
+      })
+      continue
+    }
+
+    if (msg.role === 'user') {
+      const parts: object[] = []
+      if (msg.content) parts.push({ text: msg.content as string })
+      if (msg.images) {
+        for (const img of msg.images) {
+          const match = img.match(/^data:(image\/\w+);base64,(.+)$/)
+          if (match) {
+            parts.push({ inlineData: { mimeType: match[1], data: match[2] } })
+          }
+        }
+      }
+      contents.push({ role: 'user', parts })
+      continue
+    }
+  }
+
+  return contents
+}
+
+// ============= 根据 provider 获取简单流式生成器 =============
+
+function getSimpleStreamGenerator(provider: AIProvider): typeof streamOpenAISimple {
+  switch (provider) {
+    case 'anthropic':
+      return streamAnthropicSimple
+    case 'google':
+      return streamGoogleSimple
+    case 'ollama':
+      return streamOpenAISimple // Ollama 兼容 OpenAI 格式
+    case 'openai':
+    default:
+      return streamOpenAISimple
+  }
+}
+
+// ============= Tools 循环执行 =============
+
+const MAX_TOOL_ITERATIONS = 10
+
+async function runToolLoop(
+  provider: AIProvider,
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  messages: AIMessage[],
+  toolContext: AIToolContext,
+  signal: AbortSignal,
+  onChunk?: (chunk: string) => void,
+  onToolCall?: (toolName: string, params: Record<string, unknown>) => void,
+  onToolResult?: (toolName: string, result: string) => void,
+): Promise<string> {
+  let fullText = ''
+  const systemPrompt = messages.find(m => m.role === 'system')?.content as string || ''
+  const workingMessages = [...messages]
+
+  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    if (signal.aborted) break
+
+    if (provider === 'openai' || provider === 'ollama') {
+      const openaiMessages = aiMessagesToOpenAI(workingMessages)
+      const tools = toOpenAITools()
+      const result = await callOpenAIWithTools(
+        baseUrl, apiKey, model, openaiMessages, tools, signal, onChunk
+      )
+      fullText += result.text
+
+      if (result.toolCalls.length === 0) break
+
+      // 添加 assistant 消息（带 tool_calls）
+      workingMessages.push({
+        role: 'assistant',
+        content: result.text,
+        tool_calls: result.toolCalls,
+      })
+
+      // 执行每个 tool call
+      for (const tc of result.toolCalls) {
+        const params = JSON.parse(tc.function.arguments || '{}')
+        onToolCall?.(tc.function.name, params)
+        const toolResult = await executeToolCall(tc.function.name, params, toolContext)
+        onToolResult?.(tc.function.name, toolResult)
+        workingMessages.push({
+          role: 'tool',
+          content: toolResult,
+          tool_call_id: tc.id,
+        })
+      }
+    } else if (provider === 'anthropic') {
+      const anthropicMessages = aiMessagesToAnthropic(workingMessages)
+      const tools = toAnthropicTools()
+      const result = await callAnthropicWithTools(
+        baseUrl, apiKey, model, systemPrompt, anthropicMessages, tools, signal, onChunk
+      )
+      fullText += result.text
+
+      if (result.toolUses.length === 0) break
+
+      // 添加 assistant 消息
+      const assistantToolCalls: AIToolCall[] = result.toolUses.map(tu => ({
+        id: tu.id,
+        type: 'function' as const,
+        function: { name: tu.name, arguments: JSON.stringify(tu.input) },
+      }))
+      workingMessages.push({
+        role: 'assistant',
+        content: result.text,
+        tool_calls: assistantToolCalls,
+      })
+
+      // 执行 tool calls
+      for (const tu of result.toolUses) {
+        onToolCall?.(tu.name, tu.input)
+        const toolResult = await executeToolCall(tu.name, tu.input, toolContext)
+        onToolResult?.(tu.name, toolResult)
+        workingMessages.push({
+          role: 'tool',
+          content: toolResult,
+          tool_call_id: tu.id,
+        })
+      }
+    } else if (provider === 'google') {
+      const contents = aiMessagesToGoogle(workingMessages)
+      const tools = toGeminiTools()
+      const result = await callGoogleWithTools(
+        baseUrl, apiKey, model, systemPrompt, contents, tools, signal, onChunk
+      )
+      fullText += result.text
+
+      if (result.functionCalls.length === 0) break
+
+      // 添加 model response
+      const toolCalls: AIToolCall[] = result.functionCalls.map((fc, idx) => ({
+        id: `google_${idx}`,
+        type: 'function' as const,
+        function: { name: fc.name, arguments: JSON.stringify(fc.args) },
+      }))
+      workingMessages.push({
+        role: 'assistant',
+        content: result.text,
+        tool_calls: toolCalls,
+      })
+
+      // 执行 tool calls
+      for (const fc of result.functionCalls) {
+        onToolCall?.(fc.name, fc.args)
+        const toolResult = await executeToolCall(fc.name, fc.args, toolContext)
+        onToolResult?.(fc.name, toolResult)
+        workingMessages.push({
+          role: 'tool',
+          content: toolResult,
+          tool_call_id: `google_${result.functionCalls.indexOf(fc)}`,
+        })
       }
     }
   }
+
+  return fullText
 }
 
-// 根据 provider 获取流式生成器
-function getStreamGenerator(provider: AIProvider): typeof streamOpenAICompatible {
-  switch (provider) {
-    case 'anthropic':
-      return streamAnthropic
-    case 'google':
-      return streamGoogle
-    case 'ollama':
-      return streamOllama
-    case 'openai':
-    default:
-      return streamOpenAICompatible
-  }
-}
+// ============= Hook =============
 
 export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn {
-  const { onChunk, onLine, onFinish, onError } = options
+  const { onChunk, onLine, onFinish, onError, onToolCall, onToolResult } = options
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamText, setStreamText] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -384,11 +812,11 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
     lineBufferRef.current = ''
   }, [])
 
+  // 简单模式（编辑器内联 AI，不带 tools）
   const startStream = useCallback(
     async (action: AIAction, text: string, customPrompt?: string, context?: AIContext, templateType?: TemplateType) => {
       const settings = await getSettings()
 
-      // Ollama 不需要 API Key，其他都需要
       if (settings.aiProvider !== 'ollama' && !settings.aiApiKey) {
         const errorMsg = '请在设置中配置 API Key'
         setError(errorMsg)
@@ -396,9 +824,7 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
         return
       }
 
-      // 停止之前的流
       stopStream()
-
       setIsStreaming(true)
       setStreamText('')
       setError(null)
@@ -415,16 +841,14 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
         systemPrompt = buildSystemPrompt(action, context)
       }
 
-      const userMessage = text
-
       try {
-        const streamGenerator = getStreamGenerator(settings.aiProvider)
+        const streamGenerator = getSimpleStreamGenerator(settings.aiProvider)
         const stream = streamGenerator(
           settings.aiBaseUrl,
           settings.aiApiKey,
           settings.aiModel,
           systemPrompt,
-          userMessage,
+          text,
           abortControllerRef.current.signal
         )
 
@@ -435,12 +859,9 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
           setStreamText(fullText)
           onChunk?.(content)
 
-          // 基于行的缓冲处理
           if (onLine) {
             lineBufferRef.current += content
-            // 检查是否有完整的行
             const bufferLines = lineBufferRef.current.split('\n')
-            // 保留最后一个可能不完整的行
             if (bufferLines.length > 1) {
               const completeLines = bufferLines.slice(0, -1)
               lineBufferRef.current = bufferLines[bufferLines.length - 1]
@@ -449,7 +870,6 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
           }
         }
 
-        // 处理缓冲区中剩余的内容
         if (onLine && lineBufferRef.current) {
           onLine(lineBufferRef.current)
           lineBufferRef.current = ''
@@ -458,10 +878,7 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
         setIsStreaming(false)
         onFinish?.(fullText)
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          // 用户主动停止，不报错
-          return
-        }
+        if (err instanceof Error && err.name === 'AbortError') return
         const errorMsg = err instanceof Error ? err.message : '发生未知错误'
         setError(errorMsg)
         onError?.(errorMsg)
@@ -471,11 +888,79 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
     [onChunk, onLine, onFinish, onError, stopStream]
   )
 
+  // Tools 模式（AI 侧栏聊天，带 tools + 多轮历史）
+  const startStreamWithTools = useCallback(
+    async (messages: AIMessage[], toolContext: AIToolContext) => {
+      const settings = await getSettings()
+
+      if (settings.aiProvider !== 'ollama' && !settings.aiApiKey) {
+        const errorMsg = '请在设置中配置 API Key'
+        setError(errorMsg)
+        onError?.(errorMsg)
+        return
+      }
+
+      stopStream()
+      setIsStreaming(true)
+      setStreamText('')
+      setError(null)
+      lineBufferRef.current = ''
+
+      abortControllerRef.current = new AbortController()
+
+      try {
+        const chunkHandler = (chunk: string) => {
+          setStreamText(prev => prev + chunk)
+          onChunk?.(chunk)
+
+          if (onLine) {
+            lineBufferRef.current += chunk
+            const bufferLines = lineBufferRef.current.split('\n')
+            if (bufferLines.length > 1) {
+              const completeLines = bufferLines.slice(0, -1)
+              lineBufferRef.current = bufferLines[bufferLines.length - 1]
+              completeLines.forEach(l => onLine(l + '\n'))
+            }
+          }
+        }
+
+        const fullText = await runToolLoop(
+          settings.aiProvider,
+          settings.aiBaseUrl,
+          settings.aiApiKey,
+          settings.aiModel,
+          messages,
+          toolContext,
+          abortControllerRef.current.signal,
+          chunkHandler,
+          onToolCall,
+          onToolResult,
+        )
+
+        if (onLine && lineBufferRef.current) {
+          onLine(lineBufferRef.current)
+          lineBufferRef.current = ''
+        }
+
+        setIsStreaming(false)
+        onFinish?.(fullText)
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        const errorMsg = err instanceof Error ? err.message : '发生未知错误'
+        setError(errorMsg)
+        onError?.(errorMsg)
+        setIsStreaming(false)
+      }
+    },
+    [onChunk, onLine, onFinish, onError, onToolCall, onToolResult, stopStream]
+  )
+
   return {
     isStreaming,
     streamText,
     error,
     startStream,
+    startStreamWithTools,
     stopStream,
   }
 }
