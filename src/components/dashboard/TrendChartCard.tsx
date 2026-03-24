@@ -40,7 +40,7 @@ export function TrendChartCard({ data, className = '' }: TrendChartCardProps) {
 
       {/* 图表区 */}
       <div className="relative h-48">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
           <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
             <XAxis

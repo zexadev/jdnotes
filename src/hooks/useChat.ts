@@ -110,12 +110,14 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
       try {
         const data = await chatOperations.getByConversationId(activeConversationId)
         setMessages(data)
+        return data
       } catch (error) {
         console.error('Failed to load chat messages:', error)
       }
     } else {
       setMessages([])
     }
+    return []
   }, [activeConversationId])
 
   // Load conversations when noteId changes
@@ -320,12 +322,9 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
 
     await chatOperations.update(id, newContent)
 
-    // 从 DB 获取截断后的消息（不依赖 state）
-    const freshMessages = await chatOperations.getByConversationId(activeConversationId)
+    const freshMessages = (await refreshMessages()) || []
     // 排除当前编辑的消息本身（它将作为新的用户消息发送）
     const historyBeforeEdit = freshMessages.filter(m => m.id !== id)
-
-    await refreshMessages()
 
     setIsRetryMode(true)
     setIsStreamingActive(true)
@@ -354,12 +353,9 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
 
     await chatOperations.delete(message.id)
 
-    // 从 DB 获取删除后的消息
-    const freshMessages = await chatOperations.getByConversationId(activeConversationId)
+    const freshMessages = (await refreshMessages()) || []
     // 历史 = 删除 assistant 后剩余的消息，排除最后的 user 消息（它将重新发送）
     const historyBeforeRetry = freshMessages.filter(m => m.id !== userMessage.id)
-
-    await refreshMessages()
 
     setIsRetryMode(true)
     setIsStreamingActive(true)

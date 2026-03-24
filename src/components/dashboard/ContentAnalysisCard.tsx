@@ -102,7 +102,7 @@ export function ContentAnalysisCard({
               </div>
             </div>
             <div className="h-56 md:h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <BarChart data={wordDistribution} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
                   <XAxis

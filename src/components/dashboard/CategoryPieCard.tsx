@@ -40,7 +40,7 @@ export function CategoryPieCard({ data, className = '' }: CategoryPieCardProps) 
       {/* 图表区 */}
       <div className="relative h-64">
         {data.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <PieChart>
               <Pie
                 data={data}

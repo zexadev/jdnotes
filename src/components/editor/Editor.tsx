@@ -18,12 +18,12 @@ import { SlashCommand } from './SlashCommand'
 import { useEditorAI, useSlashCommand } from '../../hooks'
 import { useAutoTitle } from '../../hooks/useAutoTitle'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
-import Link from '@tiptap/extension-link'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { EditorHeader } from './EditorHeader'
 import { AIBubbleMenu } from '../ai/AIBubbleMenu'
+import { TableBubbleMenu } from './TableBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 import { AIHighlight } from '../ai/AIHighlightMark'
 
@@ -121,13 +121,6 @@ export function Editor({
         transformPastedText: true,
         transformCopiedText: false,
       }),
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        HTMLAttributes: {
-          class: 'cursor-text text-indigo-600 dark:text-indigo-400 underline underline-offset-4 transition-colors hover:text-indigo-500',
-        },
-      }),
       TaskList,
       TaskItem.configure({
         nested: true,
@@ -151,7 +144,7 @@ export function Editor({
     editorProps: {
       attributes: {
         class:
-          'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px]',
+          'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px] prose-a:cursor-text prose-a:text-indigo-600 dark:prose-a:text-indigo-400 prose-a:underline-offset-4 hover:prose-a:text-indigo-500 prose-a:transition-colors',
       },
       handleDOMEvents: {
         click: (_view, event) => {
@@ -431,6 +424,7 @@ export function Editor({
           className="mt-6 relative"
         >
           <AIBubbleMenu editor={editor} onAIAction={handleAIAction} />
+          <TableBubbleMenu editor={editor} />
           <EditorContent editor={editor} />
 
           {/* 斜杠命令菜单 */}
