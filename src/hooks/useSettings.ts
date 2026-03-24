@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 // AI 提供商类型
-export type AIProvider = 'openai' | 'anthropic' | 'google' | 'ollama'
+export type AIProvider = 'openai' | 'anthropic' | 'google' | 'ollama' | 'responses'
 
 // AI 来源
 export interface AISource {

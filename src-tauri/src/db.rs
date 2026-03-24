@@ -17,6 +17,8 @@ pub enum AIProvider {
     Google,
     /// Ollama 本地模型
     Ollama,
+    /// OpenAI Responses API（Azure AI Foundry 等）
+    Responses,
 }
 
 /// 单个 AI 来源配置
@@ -106,6 +108,7 @@ fn migrate_ai_settings_to_sources(old_config: &serde_json::Value) -> (Vec<AISour
             AIProvider::Anthropic => "Claude".to_string(),
             AIProvider::Google => "Gemini".to_string(),
             AIProvider::Ollama => "Ollama".to_string(),
+            AIProvider::Responses => "Responses API".to_string(),
             AIProvider::OpenAICompatible => {
                 if source.base_url.contains("deepseek") {
                     "DeepSeek".to_string()

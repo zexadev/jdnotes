@@ -5,6 +5,7 @@ import {
   toOpenAITools,
   toAnthropicTools,
   toGeminiTools,
+  toResponsesTools,
   executeToolCall,
   type AIToolContext,
 } from '../lib/aiTools'
@@ -158,6 +159,38 @@ async function* streamOpenAISimple(
   yield* readSSEStream(response)
 }
 
+// ============= OpenAI Responses API（简单模式） =============
+async function* streamResponsesSimple(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  signal: AbortSignal
+): AsyncGenerator<string> {
+  const response = await fetch(`${baseUrl}/responses`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      instructions: systemPrompt,
+      input: [{ role: 'user', content: userMessage }],
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Responses API 错误: ${response.status} - ${errorText}`)
+  }
+
+  yield* readResponsesSSE(response)
+}
+
 // ============= Anthropic 简单模式 =============
 async function* streamAnthropicSimple(
   baseUrl: string,
@@ -274,6 +307,18 @@ async function* readGoogleSSE(response: Response): AsyncGenerator<string> {
       const parsed = JSON.parse(data)
       const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
       if (text) yield text
+    } catch { /* ignore */ }
+  }
+}
+
+async function* readResponsesSSE(response: Response): AsyncGenerator<string> {
+  for await (const data of readSSELines(response)) {
+    if (!data) continue
+    try {
+      const parsed = JSON.parse(data)
+      if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+        yield parsed.delta
+      }
     } catch { /* ignore */ }
   }
 }
@@ -519,6 +564,89 @@ async function callGoogleWithTools(
   return { text, functionCalls }
 }
 
+// ============= Tools 模式：Responses API =============
+
+interface ResponsesToolsResult {
+  text: string
+  functionCalls: { callId: string; name: string; args: Record<string, unknown> }[]
+}
+
+async function callResponsesWithTools(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  instructions: string,
+  input: object[],
+  tools: object[],
+  signal: AbortSignal,
+  onChunk?: (chunk: string) => void
+): Promise<ResponsesToolsResult> {
+  const response = await fetch(`${baseUrl}/responses`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      instructions,
+      input,
+      tools,
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Responses API 错误: ${response.status} - ${errorText}`)
+  }
+
+  let text = ''
+  const functionCalls: { callId: string; name: string; args: Record<string, unknown> }[] = []
+  let currentFnCallId = ''
+  let currentFnName = ''
+  let currentFnArgs = ''
+
+  for await (const data of readSSELines(response)) {
+    if (!data) continue
+    try {
+      const parsed = JSON.parse(data)
+
+      // 文本增量
+      if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+        text += parsed.delta
+        onChunk?.(parsed.delta)
+      }
+
+      // 函数调用参数增量
+      if (parsed.type === 'response.function_call_arguments.delta' && parsed.delta) {
+        currentFnArgs += parsed.delta
+      }
+
+      // 新的 output item（可能是 function_call）
+      if (parsed.type === 'response.output_item.added' && parsed.item?.type === 'function_call') {
+        currentFnCallId = parsed.item.call_id || ''
+        currentFnName = parsed.item.name || ''
+        currentFnArgs = ''
+      }
+
+      // 函数调用完成
+      if (parsed.type === 'response.function_call_arguments.done') {
+        try {
+          const args = JSON.parse(currentFnArgs || '{}')
+          functionCalls.push({ callId: currentFnCallId, name: currentFnName, args })
+        } catch {
+          functionCalls.push({ callId: currentFnCallId, name: currentFnName, args: {} })
+        }
+        currentFnArgs = ''
+      }
+    } catch { /* ignore */ }
+  }
+
+  return { text, functionCalls }
+}
+
 // ============= 格式转换工具函数 =============
 
 function aiMessagesToOpenAI(messages: AIMessage[]): object[] {
@@ -653,6 +781,46 @@ function aiMessagesToGoogle(messages: AIMessage[]): object[] {
   return contents
 }
 
+function aiMessagesToResponses(messages: AIMessage[]): object[] {
+  const input: object[] = []
+
+  for (const msg of messages) {
+    if (msg.role === 'system') continue // instructions 单独处理
+
+    if (msg.role === 'assistant') {
+      // Responses API 用 output items 表示 assistant 消息
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        for (const tc of msg.tool_calls) {
+          input.push({
+            type: 'function_call',
+            call_id: tc.id,
+            name: tc.function.name,
+            arguments: tc.function.arguments,
+          })
+        }
+      }
+      if (msg.content) {
+        input.push({ role: 'assistant', content: msg.content })
+      }
+      continue
+    }
+
+    if (msg.role === 'tool') {
+      input.push({
+        type: 'function_call_output',
+        call_id: msg.tool_call_id,
+        output: msg.content,
+      })
+      continue
+    }
+
+    // user
+    input.push({ role: 'user', content: msg.content as string })
+  }
+
+  return input
+}
+
 // ============= 根据 provider 获取简单流式生成器 =============
 
 function getSimpleStreamGenerator(provider: AIProvider): typeof streamOpenAISimple {
@@ -663,6 +831,8 @@ function getSimpleStreamGenerator(provider: AIProvider): typeof streamOpenAISimp
       return streamGoogleSimple
     case 'ollama':
       return streamOpenAISimple // Ollama 兼容 OpenAI 格式
+    case 'responses':
+      return streamResponsesSimple
     case 'openai':
     default:
       return streamOpenAISimple
@@ -785,6 +955,39 @@ async function runToolLoop(
           role: 'tool',
           content: toolResult,
           tool_call_id: `google_${result.functionCalls.indexOf(fc)}`,
+        })
+      }
+    } else if (provider === 'responses') {
+      const input = aiMessagesToResponses(workingMessages)
+      const tools = toResponsesTools()
+      const result = await callResponsesWithTools(
+        baseUrl, apiKey, model, systemPrompt, input, tools, signal, onChunk
+      )
+      fullText += result.text
+
+      if (result.functionCalls.length === 0) break
+
+      // 添加 assistant 输出到消息历史
+      const toolCalls: AIToolCall[] = result.functionCalls.map(fc => ({
+        id: fc.callId,
+        type: 'function' as const,
+        function: { name: fc.name, arguments: JSON.stringify(fc.args) },
+      }))
+      workingMessages.push({
+        role: 'assistant',
+        content: result.text,
+        tool_calls: toolCalls,
+      })
+
+      // 执行 tool calls
+      for (const fc of result.functionCalls) {
+        onToolCall?.(fc.name, fc.args)
+        const toolResult = await executeToolCall(fc.name, fc.args, toolContext)
+        onToolResult?.(fc.name, toolResult)
+        workingMessages.push({
+          role: 'tool',
+          content: toolResult,
+          tool_call_id: fc.callId,
         })
       }
     }

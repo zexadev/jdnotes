@@ -395,3 +395,15 @@ export function toGeminiTools(): object[] {
     })),
   }]
 }
+
+/**
+ * 转换为 Responses API tools 格式
+ */
+export function toResponsesTools(): object[] {
+  return AI_TOOLS.map(tool => ({
+    type: 'function',
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+  }))
+}
