@@ -13,6 +13,9 @@ import {
   CodeSquare,
   ImagePlus,
   Table,
+  Rows3,
+  Columns3,
+  Trash2,
 } from 'lucide-react'
 
 interface EditorToolbarProps {
@@ -132,6 +135,42 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     ],
   ]
 
+  const isInTable = editor.isActive('table')
+
+  // 表格操作按钮（仅光标在表格内时显示）
+  const tableButtons: ToolbarButton[] = isInTable ? [
+    {
+      icon: <Rows3 className="h-4 w-4" />,
+      title: '上方插入行',
+      action: () => editor.chain().focus().addRowBefore().run(),
+      isActive: () => false,
+    },
+    {
+      icon: <Rows3 className="h-4 w-4 rotate-180" />,
+      title: '下方插入行',
+      action: () => editor.chain().focus().addRowAfter().run(),
+      isActive: () => false,
+    },
+    {
+      icon: <Columns3 className="h-4 w-4" />,
+      title: '左侧插入列',
+      action: () => editor.chain().focus().addColumnBefore().run(),
+      isActive: () => false,
+    },
+    {
+      icon: <Columns3 className="h-4 w-4 rotate-180" />,
+      title: '右侧插入列',
+      action: () => editor.chain().focus().addColumnAfter().run(),
+      isActive: () => false,
+    },
+    {
+      icon: <Trash2 className="h-4 w-4" />,
+      title: '删除表格',
+      action: () => editor.chain().focus().deleteTable().run(),
+      isActive: () => false,
+    },
+  ] : []
+
   return (
     <div className="flex items-center gap-0.5 py-1.5">
       {buttons.map((group, groupIndex) => (
@@ -155,6 +194,22 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           ))}
         </div>
       ))}
+      {/* 表格操作按钮 */}
+      {tableButtons.length > 0 && (
+        <div className="flex items-center gap-0.5">
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+          {tableButtons.map((button, idx) => (
+            <button
+              key={`table-${idx}`}
+              onClick={button.action}
+              title={button.title}
+              className="p-1.5 rounded-md transition-colors text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300"
+            >
+              {button.icon}
+            </button>
+          ))}
+        </div>
+      )}
       <input
         ref={fileInputRef}
         type="file"
