@@ -247,14 +247,17 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
     },
   })
 
-  // 构建 AI 消息历史
-  const buildAIMessages = useCallback((userMessage: string, images?: string[]): AIMessage[] => {
+  // 构建 AI 消息历史（可传入自定义消息列表，避免 state 延迟问题）
+  const buildAIMessages = useCallback((userMessage: string, images?: string[], historyOverride?: ChatMessage[]): AIMessage[] => {
     const aiMessages: AIMessage[] = [
       { role: 'system', content: buildSystemPrompt() },
     ]
 
-    // 添加历史消息
-    for (const msg of messages) {
+    // 使用传入的消息列表或当前 state
+    const history = historyOverride ?? messages
+
+    // 添加历史消息（跳过 tool_call 类型）
+    for (const msg of history) {
       if (msg.role === 'user' || msg.role === 'assistant') {
         const aiMsg: AIMessage = {
           role: msg.role,
@@ -316,6 +319,12 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
     }
 
     await chatOperations.update(id, newContent)
+
+    // 从 DB 获取截断后的消息（不依赖 state）
+    const freshMessages = await chatOperations.getByConversationId(activeConversationId)
+    // 排除当前编辑的消息本身（它将作为新的用户消息发送）
+    const historyBeforeEdit = freshMessages.filter(m => m.id !== id)
+
     await refreshMessages()
 
     setIsRetryMode(true)
@@ -325,7 +334,7 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
     lastSegmentWasToolRef.current = false
     streamTextRef.current = ''
 
-    const aiMessages = buildAIMessages(newContent)
+    const aiMessages = buildAIMessages(newContent, undefined, historyBeforeEdit)
     await startStreamWithTools(aiMessages, buildToolContext())
   }, [noteId, activeConversationId, startStreamWithTools, buildAIMessages, buildToolContext, refreshMessages])
 
@@ -345,6 +354,13 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
 
     await chatOperations.delete(message.id)
 
+    // 从 DB 获取删除后的消息
+    const freshMessages = await chatOperations.getByConversationId(activeConversationId)
+    // 历史 = 删除 assistant 后剩余的消息，排除最后的 user 消息（它将重新发送）
+    const historyBeforeRetry = freshMessages.filter(m => m.id !== userMessage.id)
+
+    await refreshMessages()
+
     setIsRetryMode(true)
     setIsStreamingActive(true)
     setStreamingSegments([])
@@ -352,7 +368,7 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
     lastSegmentWasToolRef.current = false
     streamTextRef.current = ''
 
-    const aiMessages = buildAIMessages(userMessage.content, userMessage.images)
+    const aiMessages = buildAIMessages(userMessage.content, userMessage.images, historyBeforeRetry)
     await startStreamWithTools(aiMessages, buildToolContext())
   }, [noteId, activeConversationId, messages, startStreamWithTools, buildAIMessages, buildToolContext])
 
