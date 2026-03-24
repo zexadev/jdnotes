@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { noteOperations, type Note } from '../lib/db'
 import { toast } from '../lib/toast'
+import { listen } from '@tauri-apps/api/event'
 
 export function useNotes(searchQuery: string, currentView: string) {
   // 存储所有笔记的状态
@@ -22,6 +23,16 @@ export function useNotes(searchQuery: string, currentView: string) {
   useEffect(() => {
     refreshNotes()
   }, [refreshNotes, refreshKey])
+
+  // 监听 MCP 等外部数据库变化
+  useEffect(() => {
+    const unlistenPromise = listen('db:changed', () => {
+      refreshNotes()
+    })
+    return () => {
+      unlistenPromise.then(unlisten => unlisten())
+    }
+  }, [refreshNotes])
 
   // 获取所有标签
   const allTags = useMemo(() => {

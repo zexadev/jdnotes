@@ -13,20 +13,30 @@ use rmcp::transport::streamable_http_server::StreamableHttpService;
 use serde::Deserialize;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{Row, SqlitePool};
+use tauri::Emitter;
 
 /// MCP Server 实例
 #[derive(Clone)]
 pub struct JdNotesMcpServer {
     pool: Arc<SqlitePool>,
+    app_handle: Option<tauri::AppHandle>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
 
 impl JdNotesMcpServer {
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(pool: SqlitePool, app_handle: Option<tauri::AppHandle>) -> Self {
         Self {
             pool: Arc::new(pool),
+            app_handle,
             tool_router: Self::tool_router(),
+        }
+    }
+
+    /// 通知前端数据库已变化
+    fn notify_db_changed(&self) {
+        if let Some(ref handle) = self.app_handle {
+            let _ = handle.emit("db:changed", ());
         }
     }
 }
@@ -93,10 +103,13 @@ impl JdNotesMcpServer {
         .await;
 
         match result {
-            Ok(r) => Ok(CallToolResult::success(vec![Content::text(format!(
-                "笔记创建成功，ID: {}",
-                r.last_insert_rowid()
-            ))])),
+            Ok(r) => {
+                self.notify_db_changed();
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "笔记创建成功，ID: {}",
+                    r.last_insert_rowid()
+                ))]))
+            }
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
                 "创建笔记失败: {}",
                 e
@@ -135,10 +148,13 @@ impl JdNotesMcpServer {
                     .execute(self.pool.as_ref())
                     .await
                 {
-                    Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
-                        "内容已追加到笔记「{}」(ID: {})",
-                        title, id
-                    ))])),
+                    Ok(_) => {
+                        self.notify_db_changed();
+                        Ok(CallToolResult::success(vec![Content::text(format!(
+                            "内容已追加到笔记「{}」(ID: {})",
+                            title, id
+                        ))]))
+                    }
                     Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
                         "更新笔记失败: {}",
                         e
@@ -219,10 +235,13 @@ impl JdNotesMcpServer {
                 query = query.bind(id);
 
                 match query.execute(self.pool.as_ref()).await {
-                    Ok(_) => Ok(CallToolResult::success(vec![Content::text(format!(
-                        "笔记「{}」(ID: {}) 已更新",
-                        old_title, id
-                    ))])),
+                    Ok(_) => {
+                        self.notify_db_changed();
+                        Ok(CallToolResult::success(vec![Content::text(format!(
+                            "笔记「{}」(ID: {}) 已更新",
+                            old_title, id
+                        ))]))
+                    }
                     Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
                         "更新笔记失败: {}",
                         e
@@ -429,7 +448,7 @@ fn register_mcp_entry_nested(
 }
 
 /// 启动 MCP HTTP Server
-pub async fn start_mcp_server(db_path: PathBuf) {
+pub async fn start_mcp_server(db_path: PathBuf, app_handle: tauri::AppHandle) {
     let db_url = format!("sqlite:{}?mode=rwc", db_path.to_string_lossy());
 
     let pool = match SqlitePoolOptions::new()
@@ -445,7 +464,7 @@ pub async fn start_mcp_server(db_path: PathBuf) {
     };
 
     let service = StreamableHttpService::new(
-        move || Ok(JdNotesMcpServer::new(pool.clone())),
+        move || Ok(JdNotesMcpServer::new(pool.clone(), Some(app_handle.clone()))),
         LocalSessionManager::default().into(),
         Default::default(),
     );

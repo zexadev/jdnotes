@@ -120,8 +120,9 @@ pub fn run() {
             // 启动 MCP Server
             mcp_server::register_in_ai_tools();
             let db_path_for_mcp = db_path.clone();
+            let app_handle_for_mcp = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                mcp_server::start_mcp_server(db_path_for_mcp).await;
+                mcp_server::start_mcp_server(db_path_for_mcp, app_handle_for_mcp).await;
             });
             
             Ok(())
