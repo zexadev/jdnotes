@@ -58,14 +58,22 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
 
   // Build system prompt (不再塞笔记内容，让模型通过 tools 按需获取)
   const buildSystemPrompt = useCallback(() => {
-    return `你是 JD Notes 的 AI 助手。你可以通过工具读取、搜索、创建和修改笔记。
+    const now = new Date()
+    const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
+
+    return `你是 JD Notes 的 AI 助手。当前时间：${dateStr}。
+
+你拥有以下能力：
+1. **笔记操作**：读取、搜索、创建、修改、删除笔记
+2. **联网搜索**：通过 web_search 搜索互联网获取最新信息
+3. **网页读取**：通过 web_fetch 读取指定网页的内容
 
 当前笔记：「${noteTitle || '无标题'}」(ID: ${noteId || '未知'})
 
 重要规则：
 - 当用户询问笔记内容时，使用 read_current_note 或 read_note 工具获取
-- 当用户要搜索信息时，使用 search_notes 工具
-- 当用户要创建或修改笔记时，使用对应的工具
+- 当用户需要最新信息、不确定的事实时，使用 web_search 搜索
+- 当用户提供 URL 或需要查看网页时，使用 web_fetch 读取
 - 不要猜测笔记内容，始终通过工具获取真实数据
 - 用中文回复用户`
   }, [noteTitle, noteId])
