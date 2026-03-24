@@ -131,7 +131,7 @@ export function Editor({
       AIHighlight,
     ],
     content: content,
-    editable: isEditing,
+    editable: true,
     onCreate: ({ editor }) => {
       const latestContent = contentRef.current
       if (latestContent) {
@@ -209,7 +209,7 @@ export function Editor({
   const [inlineHasSelection, setInlineHasSelection] = useState(false)
 
   useEffect(() => {
-    if (!editor || !editorContainerRef.current || !isEditing) return
+    if (!editor || !editorContainerRef.current) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
@@ -230,7 +230,7 @@ export function Editor({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [editor, editorContainerRef, isEditing, diffState.isActive])
+  }, [editor, editorContainerRef, diffState.isActive])
 
   // Ctrl 按住时链接显示手型光标
   useEffect(() => {
@@ -258,7 +258,7 @@ export function Editor({
 
   // Tauri 拖拽图片文件到编辑器
   useEffect(() => {
-    if (!editor || !isEditing) return
+    if (!editor) return
 
     const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
     let unlisten: (() => void) | undefined
@@ -294,7 +294,7 @@ export function Editor({
     return () => {
       unlisten?.()
     }
-  }, [editor, isEditing])
+  }, [editor])
 
   // Handle editor updates
   useEffect(() => {
@@ -314,12 +314,12 @@ export function Editor({
     }
   }, [editor, diffState.isActive, onContentChange])
 
-  // 当 isEditing 变化时更新编辑器可编辑状态
+  // 当 AI diff 状态变化时更新编辑器可编辑状态
   useEffect(() => {
     if (editor) {
-      editor.setEditable(isEditing && !diffState.isActive)
+      editor.setEditable(!diffState.isActive)
     }
-  }, [isEditing, editor, diffState.isActive])
+  }, [editor, diffState.isActive])
 
   // 当 content prop 变化时更新编辑器内容
   useEffect(() => {
@@ -418,13 +418,13 @@ export function Editor({
         {/* Tiptap 编辑器 */}
         <div
           ref={editorContainerRef}
-          className={`mt-6 relative ${!isEditing ? 'cursor-default' : ''}`}
+          className="mt-6 relative"
         >
-          {isEditing && <AIBubbleMenu editor={editor} onAIAction={handleAIAction} />}
+          <AIBubbleMenu editor={editor} onAIAction={handleAIAction} />
           <EditorContent editor={editor} />
 
           {/* 斜杠命令菜单 */}
-          {slashMenuPos && isEditing && (
+          {slashMenuPos && (
             <SlashCommand
               editor={editor}
               items={slashCommands}
@@ -435,7 +435,7 @@ export function Editor({
           )}
 
           {/* Ctrl+K 内联提问 */}
-          {inlinePromptPos && isEditing && !diffState.isActive && (
+          {inlinePromptPos && !diffState.isActive && (
             <AIInlinePrompt
               position={inlinePromptPos}
               hasSelection={inlineHasSelection}
