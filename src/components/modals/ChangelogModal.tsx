@@ -16,6 +16,26 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.5.0',
+    date: '2026-03-24',
+    notes: `## ✨ 新增功能
+### 🧠 AI Tools 函数调用
+- AI 助手可通过工具按需读取、搜索、创建、修改和删除笔记
+- 不再把笔记内容塞进提示词，上下文更高效
+- 支持 OpenAI / Anthropic / Google / Ollama 四种 provider 的 tool calling
+### 💬 多对话历史
+- 每个笔记支持多个独立对话
+- 可新建、切换、删除对话
+### 🖼️ 图片发送
+- 聊天中可附加图片发送给 AI（多模态支持）
+### 🔗 MCP 自动注册扩展
+- 启动时自动注册到 9 个 AI 工具（Claude Code/Desktop、Cursor、Windsurf、Gemini CLI、Kiro、Copilot CLI、OpenCode、Cline）
+## 💅 优化
+- AI 消息用 parts 结构渲染，tool calls 穿插在文字流中
+- 用户消息改为右对齐气泡样式
+- 模型选择器移至输入框上方`
+  },
+  {
     version: '1.4.1',
     date: '2026-03-23',
     notes: `## 🐛 修复
