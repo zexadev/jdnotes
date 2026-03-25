@@ -16,6 +16,29 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.6.0',
+    date: '2026-03-25',
+    notes: `## ✨ 新增功能
+### 📊 表格功能
+- 支持插入表格、调整列宽、表头行
+- 光标在表格内时显示增删行列的气泡菜单
+### 🌐 AI 联网能力
+- AI 助手可搜索互联网获取最新信息
+- 可读取指定网页内容
+- 支持 IP 地理定位
+### 🔗 Responses API
+- 新增 OpenAI Responses API provider
+- 支持 Azure AI Foundry、GPT-5 等
+## 💅 优化
+- 移除查看/编辑模式切换，笔记打开即可编辑
+- AI system prompt 注入当前时间
+- 表格操作重构为气泡菜单
+- MCP 写入笔记后前端实时刷新
+## 🐛 修复
+- 修复重试和编辑消息时旧对话仍发给模型的问题
+- 修复搜索结果为空的问题`
+  },
+  {
     version: '1.5.0',
     date: '2026-03-24',
     notes: `## ✨ 新增功能
