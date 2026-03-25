@@ -72,6 +72,14 @@ export const PROVIDER_PRESETS: Record<AIProvider, ProviderPreset> = {
     apiKeyRequired: false,
     description: '本地运行的 Ollama 服务',
   },
+  responses: {
+    name: 'Responses API',
+    baseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o',
+    apiKeyPlaceholder: 'sk-...',
+    apiKeyRequired: true,
+    description: 'OpenAI Responses API（Azure AI Foundry、GPT-5 等）',
+  },
 }
 
 // 常用 OpenAI 兼容服务预设
@@ -124,7 +132,7 @@ async function loadConfigFromBackend(): Promise<AIConfig> {
         activeSourceId: string
       }>('get_ai_config')
 
-      const validProviders: AIProvider[] = ['openai', 'anthropic', 'google', 'ollama']
+      const validProviders: AIProvider[] = ['openai', 'anthropic', 'google', 'ollama', 'responses']
 
       cachedConfig = {
         sources: result.sources.map(s => ({
