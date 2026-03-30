@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "jdnotes",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "identifier": "com.jdnotes.app",
   "build": {
     "frontendDist": "../dist",
@@ -42,7 +42,7 @@
       "endpoints": [
         "https://github.com/zexadev/jdnotes/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVDRUM0RjVDQzFFM0ZERDUKUldUVi9lUEJYRS9zN01wNTE0RTZoOStSYmVvclpMQ0dNN0sya01SVFdIdXBua24yMUJTeCtZMFEK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUxNEJDNTVCRkFERUQ5NDcKUldSSDJkNzZXOFZMVVdrekR2azI3VXV0eXJZTzR3b1NpQ0FielZONVpSUzdLQ2duUmtoaDFJaEcK"
     }
   }
 }
