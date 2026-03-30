@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { initializeDefaultNotes, noteOperations, type Note } from './lib/db'
 import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks'
+import { listen } from '@tauri-apps/api/event'
 import { CommandMenu } from './components/modals/CommandMenu'
 import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -105,6 +106,28 @@ function App() {
     }
     document.addEventListener('contextmenu', handleContextMenu)
     return () => document.removeEventListener('contextmenu', handleContextMenu)
+  }, [])
+
+  // 监听 MCP 等外部数据库变化，刷新当前打开笔记的内容
+  const activeNoteIdRef = useRef<number | null>(null)
+  useEffect(() => {
+    activeNoteIdRef.current = activeNoteId
+  }, [activeNoteId])
+
+  useEffect(() => {
+    const unlistenPromise = listen('db:changed', async () => {
+      const currentId = activeNoteIdRef.current
+      if (currentId) {
+        const latestNote = await noteOperations.get(currentId)
+        if (latestNote) {
+          setLocalTitle(latestNote.title)
+          setLocalContent(latestNote.content)
+        }
+      }
+    })
+    return () => {
+      unlistenPromise.then(unlisten => unlisten())
+    }
   }, [])
 
   // 初始化默认数据并恢复未保存的数据

@@ -16,6 +16,13 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.6.1',
+    date: '2026-03-30',
+    notes: `## 🐛 修复
+- 修复 MCP 写入笔记后前端列表和编辑器内容不刷新的问题
+- 修复 Responses API provider 预设缺失导致构建失败`
+  },
+  {
     version: '1.6.0',
     date: '2026-03-25',
     notes: `## ✨ 新增功能
