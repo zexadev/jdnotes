@@ -75,14 +75,14 @@ export function MainContent({
 
   return (
     <main className="flex-1 bg-[#F9FBFC] dark:bg-[#0B0D11] h-full overflow-hidden flex flex-col transition-colors duration-300">
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         {activeNoteId !== null ? (
           <motion.div
             key={activeNoteId}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
             className="flex-1 flex flex-col h-full overflow-hidden"
           >
             {/* 编辑器头部 - 毛玻璃效果 */}
