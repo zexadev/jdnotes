@@ -83,9 +83,10 @@
 ### MCP Server
 
 - **Built-in HTTP MCP Server** — Starts automatically on `127.0.0.1:19230`
-- **Auto Registration** — Registers with Claude Code on startup
-- **Three Tools** — `create_note`, `append_note`, `update_note`
-- **AI Tool Integration** — Say "save this to notes" in Claude Code
+- **Auto Registration** — Registers with Claude Code, Cursor, Windsurf and 9 other AI tools on startup
+- **6 Tools** — Read (`get_note`, `search_notes`, `list_notes`) + Write (`create_note`, `append_note`, `update_note`)
+- **Agent Skill Auto-Install** — Automatically installs Agent Skill to Claude Code, Copilot, Gemini CLI on startup
+- **AI Tool Integration** — Say "view my notes" or "save this to notes" in Claude Code
 
 ### Calendar View
 
