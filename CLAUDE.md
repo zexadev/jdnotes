@@ -99,18 +99,30 @@
    git push origin vx.y.z
    ```
 
-7. **本地打包**
-   ```bash
-   cd src-tauri
+7. **本地打包（需签名）**
+   构建时必须设置签名密钥环境变量：
+   ```powershell
+   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content '.\~\.tauri\jdnotes.key' -Raw
+   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<密码>'
    pnpm tauri build
    ```
-   产物位于 `src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe`
+   产物位于：
+   - `src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe` + `.sig`
+   - `src-tauri/target/release/bundle/msi/jdnotes_x.y.z_x64_en-US.msi` + `.sig`
 
-8. **创建 GitHub Release 并上传安装包**
+8. **创建 GitHub Release 并上传全部资产**
    ```bash
-   gh release create vx.y.z ./src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe --title "vx.y.z" --notes-file docs/src/content/changelog.mdx
+   # 创建 Release
+   gh release create vx.y.z --title "vx.y.z" --notes "..."
+   # 上传全部文件（exe + sig + msi + sig + latest.json）
+   gh release upload vx.y.z \
+     ./src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe \
+     ./src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe.sig \
+     ./src-tauri/target/release/bundle/msi/jdnotes_x.y.z_x64_en-US.msi \
+     ./src-tauri/target/release/bundle/msi/jdnotes_x.y.z_x64_en-US.msi.sig \
+     ./latest.json
    ```
-   或使用 changelog 中对应版本的内容作为 release notes。
+   其中 `latest.json` 需手动创建，格式参考之前版本，包含 version、notes、pub_date、platforms（signature + url）。
 
 9. **等待文档站部署**
    文档站通过 Cloudflare Pages 自动部署。
