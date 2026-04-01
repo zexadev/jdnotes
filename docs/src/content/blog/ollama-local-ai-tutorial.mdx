@@ -12,13 +12,19 @@ keywords:
   - DeepSeek本地
   - AI笔记配置
   - Ollama笔记应用
+  - Ollama 2026
+  - 本地AI Agent
+  - 免费GPT替代
+  - Ollama DeepSeek
+  - 生产力工具
+  - 知识管理
 ---
 
 # Ollama 本地部署 AI 大模型完整教程：让笔记应用接入免费 AI
 
-想用 AI 辅助写作，但不想付月费？不想把隐私数据传到云端？**Ollama** 让你在自己的电脑上免费运行 AI 大模型，完全离线、完全免费。
+想用 AI 辅助写作，但不想付月费？不想把隐私数据传到云端？**Ollama** 让你在自己的电脑上免费运行 AI 大模型，完全离线、完全免费，是 GPT-5 等云端服务的本地替代方案。
 
-本教程手把手教你从零开始，在 Windows 上安装 Ollama，运行本地大模型，并接入 JD Notes 实现 AI 辅助写作。
+本教程手把手教你从零开始，在 Windows 上安装 Ollama，运行本地大模型，搭建你的本地 AI Agent 写作助手，并接入 JD Notes 实现 AI 辅助写作。
 
 ---
 
@@ -27,7 +33,7 @@ keywords:
 Ollama 是一个开源的本地大模型运行工具，特点是：
 
 - **一键安装** — 不需要 Python、CUDA 环境，装好就能用
-- **模型丰富** — 支持 Llama、Qwen（通义千问）、DeepSeek、Gemma、Phi 等主流开源模型
+- **模型丰富** — 支持 Llama、Qwen（通义千问）、DeepSeek（含 DeepSeek V4 蒸馏版）、Gemma、Phi 等主流开源模型
 - **API 兼容** — 提供 OpenAI 兼容的 API 接口，大多数工具都能直接接入
 - **完全免费** — 开源软件 + 开源模型，零成本
 
@@ -158,10 +164,10 @@ ollama pull qwen2.5:7b
 ### Q: Ollama 和 ChatGPT 哪个好？
 
 各有优劣：
-- **Ollama**：免费、离线、隐私安全，但模型能力不如最新的 GPT-4o
-- **ChatGPT**：能力最强，但需要付费、需要联网、数据上传云端
+- **Ollama**：免费、离线、隐私安全，但模型能力不如 GPT-5、Claude 4 等云端模型
+- **ChatGPT**：云端模型能力强，但需要付费、需要联网、数据上传云端
 
-最佳策略是两者结合——日常写作用本地模型保护隐私，重要任务用云端 API 获得最强能力。JD Notes 支持同时配置多个来源，随时切换。
+两者可以结合使用——日常写作用本地模型保护隐私，重要任务用云端 API（GPT-5、DeepSeek V4、Claude 4 等）。JD Notes 支持同时配置多个来源，随时切换，是灵活的知识管理与生产力工具。
 
 ### Q: 模型下载太慢怎么办？
 

@@ -12,11 +12,17 @@ keywords:
   - Tauri vs Electron
   - Tauri SQLite
   - Tauri AI集成
+  - Tauri 2教程2026
+  - Rust桌面应用开发
+  - Electron替代方案
+  - 跨平台桌面应用
+  - 生产力工具
+  - 效率工具
 ---
 
 # Tauri 2 开发实战：从零构建一个带 AI 的桌面笔记应用
 
-为什么越来越多开发者选择 **Tauri** 而不是 Electron 来构建桌面应用？一个数据就能说明：同样的笔记应用，Electron 打包 90MB+，Tauri 只需要 **8MB**。
+为什么越来越多开发者选择 **Tauri** 作为 Electron 替代方案来构建跨平台桌面应用？一个数据可以参考：同样的笔记应用，Electron 打包 90MB+，Tauri 只需要 **8MB**。
 
 本文分享 [JD Notes](https://github.com/zexadev/jdnotes) 的开发经验——一个基于 Tauri 2 + React 的桌面笔记应用，集成了 AI 助手、MCP Server、SQLite 存储等功能。
 
@@ -72,7 +78,7 @@ JD Notes 的技术栈：
 |------|------|------|
 | 富文本编辑 | TipTap | 基于 ProseMirror，扩展性强，React 集成好 |
 | 代码高亮 | CodeMirror | 编辑器级别的代码支持，不只是高亮 |
-| 数据库 | SQLite | 本地存储的最佳选择，通过 tauri-plugin-sql |
+| 数据库 | SQLite | 本地存储方案，通过 tauri-plugin-sql |
 | 样式 | TailwindCSS 4 | 原子化 CSS，开发效率高 |
 | 动画 | Framer Motion | 声明式动画，和 React 集成完美 |
 | AI 通信 | fetch + streaming | 直接调用 OpenAI 兼容 API |
@@ -106,7 +112,7 @@ await db.execute(
 
 ### 2. AI 多模型集成
 
-JD Notes 支持 5 种 AI Provider，统一封装为相同的接口：
+JD Notes 支持多种 AI Provider（包括 GPT-5、Claude 4、DeepSeek V4、Gemini 3 等 2026 年主流模型），统一封装为相同的接口：
 
 ```typescript
 // 所有 Provider 都遵循 OpenAI 兼容的 Chat Completions 格式
@@ -138,7 +144,7 @@ let server = HttpServer::new(move || {
 .bind("127.0.0.1:19230")?;
 ```
 
-MCP Server 提供三个工具（create_note、append_note、update_note），让 Claude Code 等 AI 工具可以直接操作笔记数据库。
+MCP Server 提供三个工具（create_note、append_note、update_note），让 Claude Code、Cursor 等 AI Agent 工具可以直接操作笔记数据库，构建高效的知识管理工作流。
 
 ### 4. 自动更新
 
@@ -221,7 +227,7 @@ Tauri 不太适合：
 
 ## 总结
 
-Tauri 2 是 2026 年构建桌面应用的最佳选择之一。如果你已经有 React/Vue 前端经验，用 Tauri 可以快速构建出体积小、性能好的桌面应用。
+Tauri 2 是 2026 年 Rust 桌面应用开发的主流框架之一。如果你已经有 React/Vue 前端经验，用 Tauri 可以快速构建出体积小、性能好的跨平台桌面应用。配合 Claude Code 等 AI Agent 工具进行开发，可以进一步提升开发效率。
 
 JD Notes 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub](https://github.com/zexadev/jdnotes)，欢迎参考和贡献。
 
