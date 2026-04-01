@@ -27,11 +27,20 @@ export const metadata = {
   alternates: {
     canonical: 'https://jdnotes.zexa.cc',
   },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/app-icon.png',
+  },
 }
 
 const navbar = (
   <Navbar
-    logo={<b>JD Notes</b>}
+    logo={
+      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <img src="/app-icon.png" alt="JD Notes" width={24} height={24} />
+        <b>JD Notes</b>
+      </span>
+    }
     projectLink="https://github.com/zexadev/jdnotes"
   />
 )
