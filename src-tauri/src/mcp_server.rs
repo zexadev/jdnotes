@@ -61,6 +61,27 @@ pub struct AppendNoteParams {
     content: String,
 }
 
+/// get_note 工具参数
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GetNoteParams {
+    #[schemars(description = "要查找的笔记标题（模糊匹配）")]
+    title: String,
+}
+
+/// search_notes 工具参数
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SearchNotesParams {
+    #[schemars(description = "搜索关键词，会匹配标题和内容")]
+    query: String,
+}
+
+/// list_notes 工具参数
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ListNotesParams {
+    #[schemars(description = "返回数量限制，默认 50")]
+    limit: Option<i64>,
+}
+
 /// update_note 工具参数
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct UpdateNoteParams {
@@ -258,6 +279,121 @@ impl JdNotesMcpServer {
             ))])),
         }
     }
+
+    #[tool(description = "Find a note by title (fuzzy match) and return its content / 按标题模糊匹配笔记并返回内容")]
+    async fn get_note(
+        &self,
+        Parameters(params): Parameters<GetNoteParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let search_pattern = format!("%{}%", params.title);
+
+        let note = sqlx::query(
+            "SELECT id, title, content, tags, created_at, updated_at FROM notes WHERE title LIKE ?1 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 1"
+        )
+        .bind(&search_pattern)
+        .fetch_optional(self.pool.as_ref())
+        .await;
+
+        match note {
+            Ok(Some(row)) => {
+                let id: i64 = row.get("id");
+                let title: String = row.get("title");
+                let content: String = row.get("content");
+                let tags: String = row.get("tags");
+                let created_at: String = row.get("created_at");
+                let updated_at: String = row.get("updated_at");
+
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "# {}\n\nID: {} | 标签: {} | 创建: {} | 更新: {}\n\n---\n\n{}",
+                    title, id, tags, created_at, updated_at, content
+                ))]))
+            }
+            Ok(None) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "未找到标题匹配「{}」的笔记",
+                params.title
+            ))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "查询笔记失败: {}",
+                e
+            ))])),
+        }
+    }
+
+    #[tool(description = "Search notes by keyword in title and content / 按关键词搜索笔记标题和内容")]
+    async fn search_notes(
+        &self,
+        Parameters(params): Parameters<SearchNotesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let search_pattern = format!("%{}%", params.query);
+
+        let notes = sqlx::query(
+            "SELECT id, title, SUBSTR(content, 1, 100) as preview FROM notes WHERE (title LIKE ?1 OR content LIKE ?1) AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 20"
+        )
+        .bind(&search_pattern)
+        .fetch_all(self.pool.as_ref())
+        .await;
+
+        match notes {
+            Ok(rows) => {
+                if rows.is_empty() {
+                    return Ok(CallToolResult::success(vec![Content::text(format!(
+                        "未找到匹配「{}」的笔记",
+                        params.query
+                    ))]));
+                }
+
+                let mut result = format!("搜索「{}」找到 {} 篇笔记：\n\n", params.query, rows.len());
+                for row in &rows {
+                    let id: i64 = row.get("id");
+                    let title: String = row.get("title");
+                    let preview: String = row.get("preview");
+                    let preview_clean = preview.replace('\n', " ");
+                    result.push_str(&format!("- **{}** (ID: {}) — {}...\n", title, id, preview_clean));
+                }
+                Ok(CallToolResult::success(vec![Content::text(result)]))
+            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "搜索笔记失败: {}",
+                e
+            ))])),
+        }
+    }
+
+    #[tool(description = "List all note titles / 列出所有笔记标题")]
+    async fn list_notes(
+        &self,
+        Parameters(params): Parameters<ListNotesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let limit = params.limit.unwrap_or(50);
+
+        let notes = sqlx::query(
+            "SELECT id, title, updated_at FROM notes WHERE is_deleted = 0 ORDER BY updated_at DESC LIMIT ?1"
+        )
+        .bind(limit)
+        .fetch_all(self.pool.as_ref())
+        .await;
+
+        match notes {
+            Ok(rows) => {
+                if rows.is_empty() {
+                    return Ok(CallToolResult::success(vec![Content::text("暂无笔记")]));
+                }
+
+                let mut result = format!("共 {} 篇笔记：\n\n", rows.len());
+                for row in &rows {
+                    let id: i64 = row.get("id");
+                    let title: String = row.get("title");
+                    let updated_at: String = row.get("updated_at");
+                    result.push_str(&format!("- **{}** (ID: {}) — 更新于 {}\n", title, id, updated_at));
+                }
+                Ok(CallToolResult::success(vec![Content::text(result)]))
+            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
+                "列出笔记失败: {}",
+                e
+            ))])),
+        }
+    }
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -265,10 +401,14 @@ impl ServerHandler for JdNotesMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "JD Notes MCP Server - 将内容保存到本地笔记应用。\n\n\
+                "JD Notes MCP Server - 本地笔记应用的读写接口。\n\n\
                  可用工具：\n\
                  - create_note: 创建新笔记（标题、内容、标签）\n\
-                 - append_note: 按标题模糊匹配，追加内容到已有笔记",
+                 - append_note: 按标题模糊匹配，追加内容到已有笔记\n\
+                 - update_note: 按标题模糊匹配，修改笔记的标题、内容或标签\n\
+                 - get_note: 按标题模糊匹配，查看笔记完整内容\n\
+                 - search_notes: 按关键词搜索笔记（标题和内容）\n\
+                 - list_notes: 列出所有笔记标题",
             )
     }
 }
