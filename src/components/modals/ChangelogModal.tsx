@@ -16,6 +16,12 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.6.3',
+    date: '2026-04-01',
+    notes: `## 🐛 修复
+- 修复 CodeMirror 多实例导致代码块崩溃的问题`
+  },
+  {
     version: '1.6.2',
     date: '2026-04-01',
     notes: `## 🐛 修复
