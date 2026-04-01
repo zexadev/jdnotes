@@ -508,6 +508,17 @@ pub fn register_in_ai_tools() {
             serde_json::json!({ "url": url }),
         );
     }
+
+    // === 安装 Agent Skills ===
+
+    // Claude Code: ~/.claude/
+    install_skill(&home.join(".claude"), "Claude Code");
+
+    // Copilot CLI / VS Code: ~/.copilot/
+    install_skill(&home.join(".copilot"), "Copilot");
+
+    // Gemini CLI: ~/.gemini/
+    install_skill(&home.join(".gemini"), "Gemini CLI");
 }
 
 /// 通用注册函数：在 JSON 配置文件的指定 key 下添加 jdnotes 条目
@@ -584,6 +595,80 @@ fn register_mcp_entry_nested(
     match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
         Ok(_) => log::info!("已自动注册 JDNotes MCP 到 {}", tool_name),
         Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
+    }
+}
+
+/// Agent Skill 文件内容
+const SKILL_CONTENT: &str = r#"---
+name: jdnotes
+description: Read and write notes in JD Notes app via MCP / 通过 MCP 读写 JD Notes 笔记
+user-invocable: true
+---
+
+# JD Notes MCP
+
+JD Notes 提供本地 MCP Server，可读取和写入笔记。
+
+## 前提
+
+- JDNotes 应用必须正在运行
+- MCP Server 地址：http://127.0.0.1:19230/mcp
+
+## 可用工具
+
+### 写入
+
+#### create_note
+创建新笔记。
+- `title` (string, 必填): 笔记标题
+- `content` (string, 必填): 笔记内容，支持 Markdown
+- `tags` (string[], 可选): 标签列表
+
+#### append_note
+按标题模糊匹配已有笔记，追加内容。
+- `title` (string, 必填): 要匹配的笔记标题
+- `content` (string, 必填): 要追加的内容
+
+#### update_note
+按标题模糊匹配已有笔记，修改标题、内容或标签。
+- `title` (string, 必填): 要匹配的笔记标题
+- `new_title` (string, 可选): 新标题
+- `new_content` (string, 可选): 新内容（完全替换）
+- `new_tags` (string[], 可选): 新标签列表（完全替换）
+
+### 读取
+
+#### get_note
+按标题模糊匹配，查看笔记完整内容。
+- `title` (string, 必填): 要查找的笔记标题
+
+#### search_notes
+按关键词搜索笔记（匹配标题和内容）。
+- `query` (string, 必填): 搜索关键词
+
+#### list_notes
+列出所有笔记标题。
+- `limit` (number, 可选): 返回数量限制，默认 50
+"#;
+
+/// 安装 Agent Skill 到指定工具的 skills 目录
+/// 仅当工具的配置目录已存在时才安装
+fn install_skill(tool_dir: &std::path::Path, tool_name: &str) {
+    if !tool_dir.exists() {
+        return;
+    }
+
+    let skill_dir = tool_dir.join("skills").join("jdnotes");
+    let skill_path = skill_dir.join("SKILL.md");
+
+    if let Err(e) = std::fs::create_dir_all(&skill_dir) {
+        log::warn!("创建 {} skill 目录失败: {}", tool_name, e);
+        return;
+    }
+
+    match std::fs::write(&skill_path, SKILL_CONTENT) {
+        Ok(_) => log::info!("已安装 JDNotes Skill 到 {}", tool_name),
+        Err(e) => log::warn!("写入 {} skill 文件失败: {}", tool_name, e),
     }
 }
 
