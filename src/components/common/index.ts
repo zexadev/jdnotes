@@ -1,3 +1,4 @@
+export { ErrorBoundary } from './ErrorBoundary'
 export { TagsInput } from './TagsInput'
 export { ThemeToggleButton } from './ThemeToggleButton'
 export { SidebarItem } from './SidebarItem'
