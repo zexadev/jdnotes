@@ -16,6 +16,15 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.6.2',
+    date: '2026-04-01',
+    notes: `## 🐛 修复
+- 修复启动白屏问题，添加翻书加载动画
+- 修复切换笔记时白屏问题，优化编辑器切换动画
+- 添加全局错误边界，防止渲染错误导致白屏崩溃
+- 修复 recharts 图表容器尺寸警告`
+  },
+  {
     version: '1.6.1',
     date: '2026-03-30',
     notes: `## 🐛 修复
