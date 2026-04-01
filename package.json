@@ -84,5 +84,10 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "@codemirror/state": "6.5.3"
+    }
   }
 }
