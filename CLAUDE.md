@@ -138,6 +138,8 @@
 - 发布新版本 → 更新 changelog 页面，内容同步到 GitHub Release body
 - 修改 CLAUDE.md 规则或项目结构时，同步更新本文件
 
+**版本发布说明只写软件功能变更**（新功能、优化、修复），文档站优化、README 更新、SEO 等属于基建，不写入 changelog 和 Release notes。
+
 ---
 
 ## 快捷键

@@ -16,6 +16,17 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.7.0',
+    date: '2026-04-02',
+    notes: `## ✨ 新增功能
+### 🔍 MCP 读取能力
+- MCP Server 新增 get_note、search_notes、list_notes 三个读取工具
+- AI 工具现在可以查看、搜索和列出笔记内容
+### 🤖 Agent Skill 自动安装
+- 启动时自动安装 Agent Skill 到 Claude Code、Copilot、Gemini CLI
+- 各 AI 工具自动获知 JD Notes 的使用方法`
+  },
+  {
     version: '1.6.4',
     date: '2026-04-01',
     notes: `## 🐛 修复
