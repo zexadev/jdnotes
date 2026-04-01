@@ -83,9 +83,10 @@
 ### 🔗 MCP Server 集成
 
 - **内置 HTTP MCP Server** — JDNotes 启动时自动提供服务（`127.0.0.1:19230`）
-- **自动注册** — 启动时自动注册到 Claude Code，无需手动配置
-- **三个工具** — `create_note`（创建）、`append_note`（追加）、`update_note`（修改）
-- **AI 编程工具集成** — 在 Claude Code 中直接说"把这段代码保存到笔记"
+- **自动注册** — 启动时自动注册到 Claude Code、Cursor、Windsurf 等 9 个 AI 工具
+- **6 个工具** — 读取（`get_note`、`search_notes`、`list_notes`）+ 写入（`create_note`、`append_note`、`update_note`）
+- **Agent Skill 自动安装** — 启动时自动安装 Agent Skill 到 Claude Code、Copilot、Gemini CLI，AI 工具自动获知使用方法
+- **AI 编程工具集成** — 在 Claude Code 中直接说"查看笔记"或"把这段代码保存到笔记"
 
 ### 📅 日历视图
 
