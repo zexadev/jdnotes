@@ -29,6 +29,11 @@
 </p>
 
 <p align="center">
+  <a href="./README.md">中文</a> •
+  <a href="./README_EN.md">English</a>
+</p>
+
+<p align="center">
   <a href="https://jdnotes.zexa.cc">文档</a> •
   <a href="#-功能特性">功能特性</a> •
   <a href="#-下载安装">下载安装</a> •
