@@ -1,0 +1,230 @@
+---
+title: Tauri 2 开发实战：从零构建一个带 AI 的桌面笔记应用
+description: 分享使用 Tauri 2 + React + TypeScript 开发桌面笔记应用 JD Notes 的技术选型、架构设计和开发经验，包括 AI 集成、MCP Server、SQLite 存储等实践。
+keywords:
+  - Tauri教程
+  - Tauri 2开发
+  - Tauri桌面应用
+  - Tauri React
+  - 桌面应用开发
+  - Rust桌面应用
+  - Electron替代
+  - Tauri vs Electron
+  - Tauri SQLite
+  - Tauri AI集成
+---
+
+# Tauri 2 开发实战：从零构建一个带 AI 的桌面笔记应用
+
+为什么越来越多开发者选择 **Tauri** 而不是 Electron 来构建桌面应用？一个数据就能说明：同样的笔记应用，Electron 打包 90MB+，Tauri 只需要 **8MB**。
+
+本文分享 [JD Notes](https://github.com/zexadev/jdnotes) 的开发经验——一个基于 Tauri 2 + React 的桌面笔记应用，集成了 AI 助手、MCP Server、SQLite 存储等功能。
+
+---
+
+## 为什么选择 Tauri 2？
+
+### Tauri vs Electron 对比
+
+| 维度 | Electron | Tauri 2 |
+|------|----------|---------|
+| 打包体积 | 80-150 MB | 3-10 MB |
+| 内存占用 | 300-500 MB | 80-150 MB |
+| 后端语言 | Node.js | Rust |
+| 渲染引擎 | 自带 Chromium | 系统 WebView |
+| 安全性 | 一般 | 高（权限控制细粒度） |
+| 生态成熟度 | 成熟 | 快速发展中 |
+
+**Tauri 的核心优势：** 使用系统自带的 WebView（Windows 上是 Edge WebView2），不捆绑 Chromium，所以体积和内存都远优于 Electron。后端使用 Rust，性能和安全性更好。
+
+### Tauri 2 相比 1.x 的改进
+
+- **移动端支持** — 同一套代码可以编译到 iOS 和 Android
+- **插件系统重构** — 官方维护的插件生态更完善
+- **IPC 改进** — 前后端通信更高效
+- **安全模型升级** — 更细粒度的权限控制
+
+---
+
+## 技术架构
+
+JD Notes 的技术栈：
+
+```
+┌─────────────────────────────────────┐
+│           前端 (WebView)             │
+│  React 19 + TypeScript + TailwindCSS │
+│  TipTap 编辑器 + CodeMirror         │
+│  Framer Motion 动画                  │
+├─────────────────────────────────────┤
+│           Tauri IPC Bridge           │
+├─────────────────────────────────────┤
+│           后端 (Rust)                │
+│  SQLite (tauri-plugin-sql)           │
+│  MCP Server (rmcp)                   │
+│  文件系统 / 通知 / 更新器            │
+└─────────────────────────────────────┘
+```
+
+### 关键技术选型
+
+| 功能 | 选择 | 原因 |
+|------|------|------|
+| 富文本编辑 | TipTap | 基于 ProseMirror，扩展性强，React 集成好 |
+| 代码高亮 | CodeMirror | 编辑器级别的代码支持，不只是高亮 |
+| 数据库 | SQLite | 本地存储的最佳选择，通过 tauri-plugin-sql |
+| 样式 | TailwindCSS 4 | 原子化 CSS，开发效率高 |
+| 动画 | Framer Motion | 声明式动画，和 React 集成完美 |
+| AI 通信 | fetch + streaming | 直接调用 OpenAI 兼容 API |
+| MCP | rmcp (Rust) | Rust 原生 MCP SDK |
+
+---
+
+## 核心功能实现
+
+### 1. SQLite 数据存储
+
+Tauri 通过 `tauri-plugin-sql` 提供 SQLite 支持。前端可以直接执行 SQL：
+
+```typescript
+import Database from '@tauri-apps/plugin-sql'
+
+// 获取数据库连接
+const db = await Database.load('sqlite:notes.db')
+
+// 查询
+const notes = await db.select('SELECT * FROM notes WHERE is_deleted = 0')
+
+// 插入
+await db.execute(
+  'INSERT INTO notes (title, content) VALUES (?, ?)',
+  [title, content]
+)
+```
+
+**优点：** 比 IndexedDB 性能好得多，支持复杂查询，数据文件可以直接备份。
+
+### 2. AI 多模型集成
+
+JD Notes 支持 5 种 AI Provider，统一封装为相同的接口：
+
+```typescript
+// 所有 Provider 都遵循 OpenAI 兼容的 Chat Completions 格式
+const response = await fetch(apiUrl, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${apiKey}` },
+  body: JSON.stringify({
+    model: modelName,
+    messages: [{ role: 'user', content: prompt }],
+    stream: true,
+  }),
+})
+
+// 流式读取响应
+const reader = response.body.getReader()
+```
+
+关键设计决策：**所有 AI 调用都在前端完成**，不经过 Rust 后端。因为 AI API 调用本身就是 HTTPS 请求，不需要 Rust 的性能优势，前端直接调用更简单。
+
+### 3. MCP Server
+
+MCP Server 是在 Rust 后端实现的，使用 `rmcp` crate：
+
+```rust
+// 启动 MCP HTTP Server
+let server = HttpServer::new(move || {
+    App::new().service(mcp_endpoint)
+})
+.bind("127.0.0.1:19230")?;
+```
+
+MCP Server 提供三个工具（create_note、append_note、update_note），让 Claude Code 等 AI 工具可以直接操作笔记数据库。
+
+### 4. 自动更新
+
+使用 `tauri-plugin-updater`，配合 GitHub Releases 实现自动更新：
+
+```json
+// tauri.conf.json
+{
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/zexadev/jdnotes/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}
+```
+
+每次发版上传一个 `latest.json`，包含版本号、签名和下载地址，应用启动时自动检查更新。
+
+---
+
+## 开发中踩过的坑
+
+### 坑 1：WebView 兼容性
+
+Tauri 使用系统 WebView，不同系统版本的 WebView 行为可能不同。比如 Windows 10 早期版本的 Edge WebView2 对某些 CSS 特性支持不完整。
+
+**解决方案：** 避免使用太新的 CSS 特性，充分测试不同系统版本。
+
+### 坑 2：Rust 学习曲线
+
+如果你没有 Rust 经验，后端开发会有一定学习成本。不过对于简单的桌面应用，大部分逻辑在前端完成，Rust 后端只需要处理数据库和系统调用。
+
+**建议：** 先从 Tauri 官方模板开始，逐步学习需要的 Rust 知识。
+
+### 坑 3：打包签名
+
+Tauri 的更新器需要签名才能工作。需要生成签名密钥对，构建时设置环境变量。
+
+```bash
+# 生成密钥
+tauri signer generate -w ./keys/app.key
+
+# 构建时设置
+TAURI_SIGNING_PRIVATE_KEY=... pnpm tauri build
+```
+
+---
+
+## 性能数据
+
+JD Notes 的实际性能数据：
+
+| 指标 | 数值 |
+|------|------|
+| 安装包大小 | 8.3 MB |
+| 冷启动时间 | 不到 1 秒 |
+| 内存占用（空闲） | ~80 MB |
+| 内存占用（编辑中） | ~120 MB |
+| 构建时间 | ~60 秒 |
+
+相比 Electron 应用动辄 300MB+ 的内存占用，Tauri 的优势非常明显。
+
+---
+
+## 适合用 Tauri 的项目
+
+Tauri 适合：
+- 工具类应用（笔记、编辑器、文件管理）
+- 需要本地数据存储的应用
+- 对体积和性能有要求的应用
+- 有 Web 前端经验的团队
+
+Tauri 不太适合：
+- 需要深度操作系统集成的应用（用原生开发更好）
+- 团队完全没有 Rust 经验且不愿学习
+
+---
+
+## 总结
+
+Tauri 2 是 2026 年构建桌面应用的最佳选择之一。如果你已经有 React/Vue 前端经验，用 Tauri 可以快速构建出体积小、性能好的桌面应用。
+
+JD Notes 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub](https://github.com/zexadev/jdnotes)，欢迎参考和贡献。
+
+---
+
+*想体验 Tauri 构建的应用？[下载 JD Notes](https://github.com/zexadev/jdnotes/releases) 感受 8MB 安装包的轻量体验。*
