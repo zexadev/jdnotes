@@ -97,7 +97,7 @@ export function UpdateSettings() {
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
               <div
-                className="bg-[#5E6AD2] h-2.5 rounded-full transition-all duration-300"
+                className="bg-[#5E6AD2] h-2.5 rounded-full transition-[width] duration-100 ease-linear"
                 style={{ width: `${updater.progress.percentage}%` }}
               />
             </div>
