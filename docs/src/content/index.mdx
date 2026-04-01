@@ -1,25 +1,58 @@
 ---
 title: JD Notes — 简洁高效的本地笔记应用
-description: JD Notes 是基于 Tauri + React 的本地笔记应用，内置 AI 助手，支持 Markdown 编辑、多模型对话、日历提醒，数据完全存储在本地。
+description: JD Notes 是一款免费开源的 Windows 本地笔记软件，内置 AI 写作助手，支持 Markdown 富文本编辑、多模型 AI 对话（OpenAI/Claude/Gemini/Ollama）、日历提醒、代码高亮，数据完全离线存储，保护隐私安全。
+keywords:
+  - JD Notes
+  - 本地笔记应用
+  - Windows笔记软件
+  - AI写作助手
+  - Markdown编辑器
+  - 离线笔记工具
+  - 开源笔记应用
+  - Tauri桌面应用
+  - 免费笔记软件
+  - AI笔记应用
+  - 本地存储笔记
+  - 隐私安全笔记
 ---
 
-# JD Notes
+# JD Notes — 简洁高效的本地笔记应用
 
-简洁高效的本地笔记应用，基于 Tauri + React 构建。
+JD Notes 是一款**免费开源**的本地笔记应用，基于 Tauri + React 构建，专为注重**数据隐私**的用户设计。所有笔记数据完全存储在本地设备，无需联网即可使用。
 
-## 特性
+## 为什么选择 JD Notes？
 
-- 本地优先，数据完全存储在你的设备上
-- 内置 AI 助手，支持多种模型（OpenAI、Claude、Gemini、Ollama）
-- 富文本编辑器，支持 Markdown
-- 轻量快速，基于 Tauri 原生窗口
+### 本地优先，隐私安全
+你的笔记数据完全存储在本地 SQLite 数据库中，不经过任何云端服务器。即使断网也能正常使用，数据安全完全由你掌控。
+
+### 内置 AI 写作助手
+支持 OpenAI（GPT-4o）、Anthropic Claude、Google Gemini、本地 Ollama 等多种 AI 模型。选中文字即可一键改写、翻译、总结，或在侧栏与 AI 自由对话。
+
+### Markdown 富文本编辑
+基于 TipTap 的现代编辑器，支持 Markdown 快捷输入、代码块语法高亮、表格、待办列表、图片拖拽插入等功能。
+
+### 轻量快速
+基于 Tauri 原生窗口，安装包仅约 8MB，启动迅速，资源占用极低。
+
+## 核心功能一览
+
+- **AI 气泡菜单** — 选中文字自动弹出，一键改进、翻译、续写
+- **斜杠命令** — 输入 `/` 快速调用 AI 模板和编辑命令
+- **多 AI 来源** — 同时配置多个 AI 服务，随时切换
+- **日历提醒** — 为笔记设置提醒，到期系统通知
+- **标签管理** — 灵活的标签系统，快速分类和检索
+- **代码块高亮** — CodeMirror 驱动，支持 15+ 编程语言
+- **MCP 工具集成** — 与 Claude Code、Cursor 等 AI 工具无缝协作
+- **数据导入导出** — 支持 JSON 格式备份和迁移
 
 ## 快速开始
 
-前往 [GitHub Releases](https://github.com/zexadev/jdnotes/releases) 下载最新安装包。
+前往 [GitHub Releases](https://github.com/zexadev/jdnotes/releases) 下载最新安装包，一键安装即可使用。
+
+详细安装和配置教程请查看 [使用指南](/guide)。
 
 ## 链接
 
-- [GitHub](https://github.com/zexadev/jdnotes)
+- [GitHub 开源仓库](https://github.com/zexadev/jdnotes)
 - [功能介绍](/features)
 - [更新日志](/changelog)
