@@ -47,11 +47,57 @@ const navbar = (
 
 const footer = <Footer>MIT {new Date().getFullYear()} © JD Notes.</Footer>
 
+// JSON-LD 结构化数据
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'WebSite',
+      '@id': 'https://jdnotes.zexa.cc/#website',
+      url: 'https://jdnotes.zexa.cc',
+      name: 'JD Notes',
+      description: '简洁高效的本地笔记应用，内置 AI 写作助手',
+      inLanguage: 'zh-CN',
+    },
+    {
+      '@type': 'SoftwareApplication',
+      '@id': 'https://jdnotes.zexa.cc/#app',
+      name: 'JD Notes',
+      description: '免费开源的 Windows 本地笔记软件，内置 AI 写作助手，支持 Markdown 编辑、多模型 AI 对话、日历提醒，数据完全离线存储。',
+      applicationCategory: 'ProductivityApplication',
+      operatingSystem: 'Windows 10/11',
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'CNY',
+      },
+      downloadUrl: 'https://github.com/zexadev/jdnotes/releases',
+      softwareVersion: '1.6.4',
+      author: {
+        '@type': 'Organization',
+        name: 'Zexa',
+        url: 'https://zexa.cc',
+      },
+      aggregateRating: undefined,
+    },
+    {
+      '@type': 'Organization',
+      '@id': 'https://jdnotes.zexa.cc/#org',
+      name: 'Zexa',
+      url: 'https://zexa.cc',
+    },
+  ],
+}
+
 export default async function RootLayout({ children }) {
   return (
     <html lang="zh-CN" dir="ltr" suppressHydrationWarning>
       <Head />
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <Layout
           navbar={navbar}
           pageMap={await getPageMap()}
