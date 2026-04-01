@@ -1,0 +1,187 @@
+---
+title: MCP 是什么？如何让 Claude Code 直接操作你的笔记
+description: 详解 Model Context Protocol (MCP) 的工作原理，以及如何利用 MCP 让 Claude Code、Cursor 等 AI 编程工具直接创建和编辑笔记，打通 AI 与笔记的工作流。
+keywords:
+  - MCP是什么
+  - MCP教程
+  - Model Context Protocol
+  - Claude Code使用
+  - Claude Code MCP
+  - AI工具集成
+  - MCP Server
+  - AI编程工具
+  - Claude Code笔记
+  - Cursor MCP
+---
+
+# MCP 是什么？如何让 Claude Code 直接操作你的笔记
+
+如果你在用 Claude Code、Cursor、Windsurf 等 AI 编程工具，你一定经历过这样的场景：
+
+> AI 帮你分析了一段代码，输出了很好的总结，但你得手动复制粘贴到笔记里。
+
+有没有可能让 AI 工具**直接把内容保存到你的笔记应用**？有，答案就是 **MCP（Model Context Protocol）**。
+
+---
+
+## MCP 是什么？
+
+**MCP** 是 Anthropic 在 2024 年底推出的开放协议，全称 Model Context Protocol（模型上下文协议）。它的作用是：
+
+**让 AI 助手能够使用外部工具和数据源。**
+
+简单来说，MCP 就是 AI 的"USB 接口"——通过标准化协议，AI 可以连接各种外部服务：
+
+- 读写文件
+- 查询数据库
+- 调用 API
+- **操作笔记应用**
+- 搜索网页
+- 执行命令
+
+### MCP 的架构
+
+```
+AI 助手 (Claude Code / Cursor)
+    ↓ MCP 协议
+MCP Client（内置于 AI 工具中）
+    ↓ HTTP / stdio
+MCP Server（由应用提供）
+    ↓
+实际服务（笔记应用、数据库、API...）
+```
+
+你不需要理解底层细节。重要的是：**如果一个应用提供了 MCP Server，AI 工具就能直接操作它。**
+
+---
+
+## 实际场景：Claude Code + 笔记
+
+### 场景 1：保存代码分析结果
+
+```
+你：分析这个函数的性能问题，把结论保存到笔记
+
+Claude Code：
+1. 分析代码（正常 AI 能力）
+2. 调用 MCP 工具 create_note（通过 MCP Server）
+3. 笔记自动创建在你的笔记应用中
+```
+
+### 场景 2：追加内容到已有笔记
+
+```
+你：把这次 debug 的过程追加到"项目日志"笔记里
+
+Claude Code：
+1. 整理 debug 过程
+2. 调用 MCP 工具 append_note，按标题匹配"项目日志"
+3. 内容自动追加到笔记末尾
+```
+
+### 场景 3：AI 工具之间的桥梁
+
+```
+在 Cursor 中写代码
+  ↓ 通过 MCP 保存到笔记
+JD Notes 中查看和编辑
+  ↓ AI 侧栏继续完善
+最终得到完整的技术文档
+```
+
+---
+
+## 怎么用？以 JD Notes + Claude Code 为例
+
+[JD Notes](https://github.com/zexadev/jdnotes) 内置了 MCP Server，开箱即用。
+
+### 第一步：启动 JD Notes
+
+启动 JD Notes 后，MCP Server 自动运行在 `http://127.0.0.1:19230/mcp`，并且**自动注册到 Claude Code**，无需手动配置。
+
+你会在日志中看到：
+```
+MCP Server 已启动: http://127.0.0.1:19230/mcp
+```
+
+### 第二步：在 Claude Code 中使用
+
+打开 Claude Code，直接说：
+
+```
+把以下内容保存到笔记，标题是"API 设计规范"：
+
+1. RESTful 命名约定
+2. 错误码规范
+3. 分页参数标准
+```
+
+Claude Code 会自动调用 JD Notes 的 MCP 工具，创建一篇新笔记。
+
+### 第三步：在 JD Notes 中查看
+
+回到 JD Notes，你会看到笔记列表自动刷新，新笔记已经出现。你可以继续在 JD Notes 中编辑、用 AI 改写、添加标签等。
+
+### 手动注册（如果自动注册失败）
+
+```bash
+claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
+```
+
+---
+
+## JD Notes MCP 提供的工具
+
+| 工具 | 功能 | 示例 |
+|------|------|------|
+| `create_note` | 创建新笔记 | "创建一篇标题为 X 的笔记" |
+| `append_note` | 追加内容到已有笔记 | "把这段代码追加到项目日志" |
+| `update_note` | 修改已有笔记 | "更新 API 文档的第三节" |
+
+这些工具都支持标题模糊匹配，不需要记住笔记 ID。
+
+---
+
+## 支持 MCP 的 AI 工具
+
+JD Notes 的 MCP Server 兼容所有支持 MCP 协议的客户端：
+
+| AI 工具 | 支持情况 |
+|---------|----------|
+| Claude Code | 自动注册 |
+| Claude Desktop | 自动注册 |
+| Cursor | 自动注册 |
+| Windsurf | 自动注册 |
+| Gemini CLI | 自动注册 |
+| Copilot CLI | 自动注册 |
+| Cline | 自动注册 |
+| OpenCode | 自动注册 |
+| Kiro | 自动注册 |
+
+JD Notes 启动时会自动检测并注册到以上所有已安装的 AI 工具。
+
+---
+
+## MCP 的更多可能
+
+MCP 不仅仅用于笔记，还有很多有趣的 MCP Server：
+
+- **文件系统** — AI 直接读写文件
+- **GitHub** — AI 创建 PR、查看 Issue
+- **数据库** — AI 查询和分析数据
+- **浏览器** — AI 搜索和读取网页
+- **Slack** — AI 发送消息
+
+MCP 正在快速发展，未来会有越来越多的应用提供 MCP 集成。
+
+---
+
+## 总结
+
+MCP 打通了 AI 工具和外部应用之间的壁垒。对于日常使用来说，最实用的场景就是**让 AI 编程工具直接操作笔记**——不再需要复制粘贴，AI 生成的内容自动保存到你的笔记系统中。
+
+JD Notes 的 MCP 集成是开箱即用的，启动应用就自动完成注册，没有额外配置成本。
+
+---
+
+*[下载 JD Notes](https://github.com/zexadev/jdnotes/releases)，体验 AI 工具 + 笔记的无缝工作流。*

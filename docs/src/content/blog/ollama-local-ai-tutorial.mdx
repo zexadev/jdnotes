@@ -1,0 +1,184 @@
+---
+title: Ollama 本地部署 AI 大模型完整教程：让笔记应用接入免费 AI
+description: 手把手教你在 Windows 上安装 Ollama、下载运行本地大模型（Qwen、DeepSeek、Llama），并接入笔记应用实现免费 AI 写作辅助。
+keywords:
+  - Ollama教程
+  - Ollama安装
+  - 本地AI部署
+  - 本地大模型
+  - 免费AI
+  - Ollama Windows安装
+  - Qwen本地运行
+  - DeepSeek本地
+  - AI笔记配置
+  - Ollama笔记应用
+---
+
+# Ollama 本地部署 AI 大模型完整教程：让笔记应用接入免费 AI
+
+想用 AI 辅助写作，但不想付月费？不想把隐私数据传到云端？**Ollama** 让你在自己的电脑上免费运行 AI 大模型，完全离线、完全免费。
+
+本教程手把手教你从零开始，在 Windows 上安装 Ollama，运行本地大模型，并接入 JD Notes 实现 AI 辅助写作。
+
+---
+
+## 什么是 Ollama？
+
+Ollama 是一个开源的本地大模型运行工具，特点是：
+
+- **一键安装** — 不需要 Python、CUDA 环境，装好就能用
+- **模型丰富** — 支持 Llama、Qwen（通义千问）、DeepSeek、Gemma、Phi 等主流开源模型
+- **API 兼容** — 提供 OpenAI 兼容的 API 接口，大多数工具都能直接接入
+- **完全免费** — 开源软件 + 开源模型，零成本
+
+---
+
+## 第一步：安装 Ollama
+
+### Windows 安装
+
+1. 访问 [ollama.com](https://ollama.com)
+2. 点击 Download for Windows
+3. 运行安装程序，按提示完成安装
+4. 安装完成后，Ollama 会在后台运行（系统托盘可见）
+
+验证安装成功：
+
+```bash
+ollama --version
+```
+
+---
+
+## 第二步：选择并下载模型
+
+根据你的电脑配置选择合适的模型：
+
+### 推荐模型
+
+| 模型 | 参数量 | 显存需求 | 中文能力 | 适合场景 |
+|------|--------|----------|----------|----------|
+| `qwen2.5:7b` | 7B | 6GB | 极强 | 中文写作首选 |
+| `deepseek-r1:7b` | 7B | 6GB | 强 | 推理和代码 |
+| `llama3.2:3b` | 3B | 3GB | 一般 | 低配电脑 |
+| `gemma2:9b` | 9B | 8GB | 中等 | 英文写作 |
+| `qwen2.5:14b` | 14B | 12GB | 极强 | 高质量中文（需好显卡）|
+
+### 下载模型
+
+```bash
+# 推荐：通义千问 7B（中文最强的小模型）
+ollama pull qwen2.5:7b
+
+# 或者 DeepSeek（推理能力强）
+ollama pull deepseek-r1:7b
+
+# 低配电脑用 3B 模型
+ollama pull llama3.2:3b
+```
+
+首次下载需要几分钟到十几分钟，取决于网速。
+
+### 测试模型
+
+```bash
+ollama run qwen2.5:7b
+```
+
+输入任意文字测试，能正常回复就说明安装成功。按 `Ctrl+D` 退出。
+
+---
+
+## 第三步：接入笔记应用
+
+Ollama 启动后会在 `localhost:11434` 提供 API 服务，兼容 OpenAI 格式。大多数支持自定义 API 的工具都能接入。
+
+### 接入 JD Notes
+
+[JD Notes](https://github.com/zexadev/jdnotes) 原生支持 Ollama，配置非常简单：
+
+1. 确保 Ollama 在后台运行
+2. 打开 JD Notes → 设置 → AI 设置
+3. 点击「添加来源」
+4. 填写配置：
+   - **名称**：本地 AI（随便取）
+   - **Provider**：Ollama
+   - **模型**：qwen2.5:7b（填你下载的模型名）
+5. 保存，回到编辑器
+
+现在你可以：
+- 选中文字 → 弹出 AI 气泡菜单 → 改写/翻译/总结
+- 按 `Ctrl+L` → 打开 AI 侧栏 → 自由对话
+- 输入 `/` → 斜杠命令 → 调用 AI 模板
+
+所有 AI 处理都在你的电脑上完成，不联网、不花钱。
+
+---
+
+## 第四步：性能优化
+
+### 没有独立显卡？
+
+Ollama 支持 CPU 运行，但会比较慢。建议：
+- 使用 3B 参数的小模型（如 `llama3.2:3b`）
+- 关闭其他占内存的程序
+
+### 有 NVIDIA 显卡？
+
+Ollama 会自动检测并使用 GPU 加速。确保安装了最新的 NVIDIA 驱动。
+
+```bash
+# 查看 GPU 使用情况
+nvidia-smi
+```
+
+### 模型管理
+
+```bash
+# 查看已下载的模型
+ollama list
+
+# 删除不需要的模型（释放磁盘空间）
+ollama rm llama3.2:3b
+
+# 更新模型到最新版本
+ollama pull qwen2.5:7b
+```
+
+---
+
+## 常见问题
+
+### Q: 最低配置要求是多少？
+
+- **CPU 运行**：8GB 内存 + 3B 模型可以跑，但较慢
+- **GPU 运行**：6GB 显存 + 7B 模型体验良好
+- **推荐配置**：16GB 内存 + 8GB 显存，可以跑 14B 模型
+
+### Q: Ollama 和 ChatGPT 哪个好？
+
+各有优劣：
+- **Ollama**：免费、离线、隐私安全，但模型能力不如最新的 GPT-4o
+- **ChatGPT**：能力最强，但需要付费、需要联网、数据上传云端
+
+最佳策略是两者结合——日常写作用本地模型保护隐私，重要任务用云端 API 获得最强能力。JD Notes 支持同时配置多个来源，随时切换。
+
+### Q: 模型下载太慢怎么办？
+
+可以使用镜像源加速。在国内可以通过设置环境变量切换镜像。
+
+---
+
+## 总结
+
+| 步骤 | 操作 | 时间 |
+|------|------|------|
+| 1. 安装 Ollama | 下载安装包 | 2 分钟 |
+| 2. 下载模型 | `ollama pull qwen2.5:7b` | 5-15 分钟 |
+| 3. 接入 JD Notes | 设置中添加 Ollama 来源 | 1 分钟 |
+
+总共不到 20 分钟，你就拥有了一个**完全免费、完全离线、隐私安全**的 AI 写作环境。
+
+---
+
+*下载 [JD Notes](https://github.com/zexadev/jdnotes/releases) 搭配 Ollama，体验本地 AI 写作。*
