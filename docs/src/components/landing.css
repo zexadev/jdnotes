@@ -1,0 +1,387 @@
+/* ===== Landing Page Styles ===== */
+
+.landing {
+  --accent: #5E6AD2;
+  --accent-light: #7C83E0;
+  --accent-glow: rgba(94, 106, 210, 0.4);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ===== Hero ===== */
+.landing-hero {
+  position: relative;
+  text-align: center;
+  padding: 5rem 1.5rem 3rem;
+  overflow: hidden;
+}
+
+.landing-hero-glow {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
+  pointer-events: none;
+  animation: hero-glow-pulse 4s ease-in-out infinite;
+}
+
+@keyframes hero-glow-pulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
+}
+
+.landing-hero-logo {
+  border-radius: 1.5rem;
+  margin-bottom: 1.5rem;
+  animation: hero-logo-float 3s ease-in-out infinite;
+  position: relative;
+}
+
+@keyframes hero-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.landing-hero-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.landing-hero-subtitle {
+  font-size: 1.2rem;
+  color: #6b7280;
+  margin-top: 1rem;
+  margin-bottom: 2.5rem;
+  line-height: 1.8;
+}
+
+.landing-hero-badges {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+/* ===== Buttons ===== */
+.landing-hero-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.landing-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 2.25rem;
+  background: var(--accent);
+  color: white !important;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none !important;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+.landing-btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.landing-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--accent-glow);
+}
+
+.landing-btn-primary:hover::before {
+  left: 100%;
+}
+
+.landing-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 2.25rem;
+  background: #f3f4f6;
+  color: #374151 !important;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none !important;
+  transition: all 0.3s ease;
+}
+
+.landing-btn-secondary:hover {
+  background: #e5e7eb;
+  transform: translateY(-2px);
+}
+
+/* Dark mode buttons */
+:is(html[class~="dark"]) .landing-btn-secondary {
+  background: #1f2937;
+  color: #d1d5db !important;
+}
+
+:is(html[class~="dark"]) .landing-btn-secondary:hover {
+  background: #374151;
+}
+
+/* ===== Sections ===== */
+.landing-section {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.landing-section-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.landing-section-subtitle {
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 2.5rem;
+}
+
+/* ===== Feature Cards ===== */
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.landing-card {
+  padding: 1.75rem;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  background: white;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  cursor: default;
+}
+
+.landing-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem;
+  padding: 1px;
+  background: linear-gradient(135deg, transparent 40%, var(--accent-light) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(94, 106, 210, 0.12);
+  border-color: transparent;
+}
+
+.landing-card:hover::before {
+  opacity: 1;
+}
+
+.landing-card-icon {
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+  transition: transform 0.3s ease;
+}
+
+.landing-card:hover .landing-card-icon {
+  transform: scale(1.15);
+}
+
+.landing-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.landing-card-desc {
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Dark mode cards */
+:is(html[class~="dark"]) .landing-card {
+  background: #111827;
+  border-color: #1f2937;
+}
+
+:is(html[class~="dark"]) .landing-card:hover {
+  box-shadow: 0 12px 40px rgba(94, 106, 210, 0.15);
+}
+
+/* ===== Comparison Table ===== */
+.landing-table-wrap {
+  overflow-x: auto;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+:is(html[class~="dark"]) .landing-table-wrap {
+  border-color: #1f2937;
+}
+
+.landing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.landing-table th,
+.landing-table td {
+  padding: 0.85rem 1.25rem;
+  text-align: left;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+:is(html[class~="dark"]) .landing-table th,
+:is(html[class~="dark"]) .landing-table td {
+  border-bottom-color: #1f2937;
+}
+
+.landing-table th {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.landing-table-highlight {
+  background: rgba(94, 106, 210, 0.06);
+  font-weight: 500;
+}
+
+:is(html[class~="dark"]) .landing-table-highlight {
+  background: rgba(94, 106, 210, 0.1);
+}
+
+.landing-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.landing-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+:is(html[class~="dark"]) .landing-table tbody tr:hover {
+  background: #111827;
+}
+
+/* ===== Blog Cards ===== */
+.landing-blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.landing-blog-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  text-decoration: none !important;
+  color: inherit !important;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.landing-blog-card:hover {
+  border-color: var(--accent);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(94, 106, 210, 0.08);
+}
+
+.landing-blog-arrow {
+  color: var(--accent);
+  font-weight: 700;
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.landing-blog-card:hover .landing-blog-arrow {
+  transform: translateX(4px);
+}
+
+:is(html[class~="dark"]) .landing-blog-card {
+  border-color: #1f2937;
+}
+
+:is(html[class~="dark"]) .landing-blog-card:hover {
+  border-color: var(--accent);
+}
+
+/* ===== CTA ===== */
+.landing-cta {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  position: relative;
+}
+
+.landing-cta-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.landing-cta-subtitle {
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.landing-cta-footer {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.landing-cta-footer a {
+  color: #9ca3af;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+  .landing-hero-title {
+    font-size: 2.5rem;
+  }
+  .landing-hero-subtitle {
+    font-size: 1rem;
+  }
+  .landing-section-title {
+    font-size: 1.5rem;
+  }
+}
