@@ -166,56 +166,25 @@
   margin-bottom: 2.5rem;
 }
 
-/* ===== Feature Cards ===== */
+/* ===== Feature Cards (MagicCard) ===== */
 .landing-features {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.25rem;
 }
 
-.landing-card {
-  padding: 1.75rem;
-  border-radius: 1rem;
-  border: 1px solid #e5e7eb;
-  background: white;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+.landing-magic-card {
   cursor: default;
-}
-
-.landing-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
   border-radius: 1rem;
-  padding: 1px;
-  background: linear-gradient(135deg, transparent 40%, var(--accent-light) 100%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.4s ease;
 }
 
-.landing-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(94, 106, 210, 0.12);
-  border-color: transparent;
-}
-
-.landing-card:hover::before {
-  opacity: 1;
+.landing-card-inner {
+  padding: 1.75rem;
 }
 
 .landing-card-icon {
   font-size: 1.75rem;
   margin-bottom: 0.75rem;
-  transition: transform 0.3s ease;
-}
-
-.landing-card:hover .landing-card-icon {
-  transform: scale(1.15);
 }
 
 .landing-card-title {
@@ -229,16 +198,6 @@
   font-size: 0.9rem;
   line-height: 1.6;
   margin: 0;
-}
-
-/* Dark mode cards */
-:is(html[class~="dark"]) .landing-card {
-  background: #111827;
-  border-color: #1f2937;
-}
-
-:is(html[class~="dark"]) .landing-card:hover {
-  box-shadow: 0 12px 40px rgba(94, 106, 210, 0.15);
 }
 
 /* ===== Comparison Table ===== */

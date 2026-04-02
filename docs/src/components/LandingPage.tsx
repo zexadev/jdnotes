@@ -1,5 +1,7 @@
 'use client'
 
+import { MagicCard } from './magic-card'
+
 const features = [
   {
     icon: '🔒',
@@ -80,17 +82,23 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Features with MagicCard */}
       <section className="landing-section">
         <h2 className="landing-section-title">为什么选择 JD Notes？</h2>
         <p className="landing-section-subtitle">专为注重隐私和效率的用户设计</p>
         <div className="landing-features">
           {features.map((f) => (
-            <div key={f.title} className="landing-card">
-              <div className="landing-card-icon">{f.icon}</div>
-              <h3 className="landing-card-title">{f.title}</h3>
-              <p className="landing-card-desc">{f.desc}</p>
-            </div>
+            <MagicCard
+              key={f.title}
+              className="landing-magic-card"
+              gradientColor="rgba(94, 106, 210, 0.15)"
+            >
+              <div className="landing-card-inner">
+                <div className="landing-card-icon">{f.icon}</div>
+                <h3 className="landing-card-title">{f.title}</h3>
+                <p className="landing-card-desc">{f.desc}</p>
+              </div>
+            </MagicCard>
           ))}
         </div>
       </section>
