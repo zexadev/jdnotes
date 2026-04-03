@@ -37,7 +37,7 @@ const features = [
 
 const comparisons = [
   { feature: '安装包大小', jd: '8MB', obsidian: '~90MB', siyuan: '~120MB' },
-  { feature: 'AI 内置', jd: '多模型，免费', obsidian: '需插件', siyuan: '需订阅' },
+  { feature: 'AI 集成', jd: '内置多模型支持', obsidian: '需插件', siyuan: '需订阅' },
   { feature: 'MCP 集成', jd: '内置 6 个工具', obsidian: '需插件', siyuan: '不支持' },
   { feature: '数据存储', jd: '本地 SQLite', obsidian: '本地 Markdown', siyuan: '本地自定义格式' },
   { feature: '双向链接', jd: '不支持', obsidian: '支持', siyuan: '支持' },
