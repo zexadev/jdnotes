@@ -5,8 +5,11 @@ import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks
 import { listen } from '@tauri-apps/api/event'
 import { CommandMenu } from './components/modals/CommandMenu'
 import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
+import type { SidebarState } from './components/layout/Sidebar'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SettingsModal } from './components/modals/SettingsModal'
+import { TemplateModal } from './components/modals/TemplateModal'
+import type { NoteTemplate } from './components/modals/TemplateModal'
 import { AIChatSidebar } from './components/ai/AIChatSidebar'
 import { CalendarView, ReminderNotification } from './components/calendar'
 import { ToastContainer } from './components/common/Toast'
@@ -16,6 +19,9 @@ import { DashboardPage } from './pages/DashboardPage'
 
 // 视图类型
 type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'settings' | `tag-${string}`
+
+// 侧栏状态循环顺序
+const SIDEBAR_CYCLE: SidebarState[] = ['expanded', 'collapsed', 'hidden']
 
 function App() {
   const [isReady, setIsReady] = useState(false)
@@ -27,7 +33,40 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [toasts, setToasts] = useState(toast.getToasts())
+
+  // 侧栏状态（从 localStorage 恢复）
+  const [sidebarState, setSidebarState] = useState<SidebarState>(() => {
+    const saved = localStorage.getItem('jdnotes-sidebar-state')
+    if (saved === 'expanded' || saved === 'collapsed' || saved === 'hidden') {
+      return saved
+    }
+    return 'expanded'
+  })
+
+  // 侧栏状态变化时持久化到 localStorage
+  const handleSidebarStateChange = useCallback((state: SidebarState) => {
+    setSidebarState(state)
+    localStorage.setItem('jdnotes-sidebar-state', state)
+  }, [])
+
+  // Ctrl+\ 快捷键循环切换侧栏状态
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault()
+        setSidebarState((prev) => {
+          const idx = SIDEBAR_CYCLE.indexOf(prev)
+          const next = SIDEBAR_CYCLE[(idx + 1) % SIDEBAR_CYCLE.length]
+          localStorage.setItem('jdnotes-sidebar-state', next)
+          return next
+        })
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // 订阅 toast 变化
   useEffect(() => {
@@ -207,7 +246,12 @@ function App() {
     }
   }, [activeNoteId, localTitle, localContent, saveNoteById, hasUnsavedChanges, currentView])
 
-  // 创建新笔记
+  // 显示模板选择弹窗
+  const handleShowTemplateModal = () => {
+    setShowTemplateModal(true)
+  }
+
+  // 创建新笔记（空白，内部使用）
   const handleCreateNote = async () => {
     try {
       if (activeNoteId !== null && hasUnsavedChanges()) {
@@ -220,6 +264,37 @@ function App() {
       setLocalContent('')
     } catch (error) {
       console.error('Failed to create note:', error)
+    }
+  }
+
+  // 从模板创建新笔记
+  const handleCreateNoteFromTemplate = async (template: NoteTemplate) => {
+    try {
+      if (activeNoteId !== null && hasUnsavedChanges()) {
+        await saveNoteById(activeNoteId, localTitle, localContent)
+      }
+
+      if (template.id === 'blank') {
+        // 空白模板走原有逻辑
+        const id = await createNote()
+        setActiveNoteId(Number(id))
+        setLocalTitle('无标题')
+        setLocalContent('')
+      } else {
+        // 使用模板内容创建
+        const id = await noteOperations.create(template.noteTitle, template.content)
+        await refreshNotes()
+        setActiveNoteId(Number(id))
+        setLocalTitle(template.noteTitle)
+        setLocalContent(template.content)
+      }
+
+      // 确保在笔记列表视图
+      if (currentView !== 'inbox' && !currentView.startsWith('tag-')) {
+        setCurrentView('inbox')
+      }
+    } catch (error) {
+      console.error('Failed to create note from template:', error)
     }
   }
 
@@ -312,7 +387,7 @@ function App() {
       <CommandMenu
         notes={notes}
         onSelectNote={handleCommandSelectNote}
-        onCreateNote={handleCreateNote}
+        onCreateNote={handleShowTemplateModal}
       />
 
       {/* 设置模态框 */}
@@ -322,6 +397,13 @@ function App() {
         onDataChange={refreshNotes}
       />
 
+      {/* 模板选择弹窗 */}
+      <TemplateModal
+        open={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onSelect={handleCreateNoteFromTemplate}
+      />
+
       <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
         {/* 自定义标题栏 */}
         <TitleBar />
@@ -329,114 +411,116 @@ function App() {
         {/* 主内容区域 */}
         <div className="flex-1 flex overflow-hidden">
           <Sidebar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          currentView={currentView}
-          onViewChange={setCurrentView}
-          counts={counts}
-          allTags={allTags}
-          allNotes={allNotes || []}
-          onOpenSettings={() => setCurrentView('settings')}
-        />
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            currentView={currentView}
+            onViewChange={setCurrentView}
+            counts={counts}
+            allTags={allTags}
+            allNotes={allNotes || []}
+            onOpenSettings={() => setCurrentView('settings')}
+            sidebarState={sidebarState}
+            onSidebarStateChange={handleSidebarStateChange}
+          />
 
-        <AnimatePresence mode="wait">
-          {/* Dashboard 页面 */}
-          {currentView === 'dashboard' ? (
-            <motion.div
-              key="dashboard"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="flex-1 h-full"
-            >
-              <DashboardPage
-                onNavigate={(view) => setCurrentView(view)}
-                onCreateNote={handleCreateNote}
-              />
-            </motion.div>
-          ) : currentView === 'settings' ? (
-            <motion.div
-              key="settings"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="flex-1 h-full overflow-hidden"
-            >
-              <SettingsPage
-                onClose={() => setCurrentView('inbox')}
-                onDataChange={refreshNotes}
-              />
-            </motion.div>
-          ) : currentView === 'calendar' ? (
-            <motion.div
-              key="calendar"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="flex-1 h-full overflow-hidden"
-            >
-              <CalendarView
-                onSelectNote={handleSelectNote}
-                onBack={() => setCurrentView('inbox')}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="notes"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="flex-1 flex h-full overflow-hidden"
-            >
-              <NoteList
-                searchQuery={searchQuery}
-                currentView={currentView}
-                notes={notes}
-                activeNoteId={activeNoteId}
-                onSelectNote={handleSelectNote}
-                onCreateNote={handleCreateNote}
-                onDeleteNote={handleDeleteNote}
-                onRestoreNote={handleRestoreNote}
-                onPermanentDelete={handlePermanentDelete}
-              />
-
-              {/* 右侧编辑器 + AI 侧栏 */}
-              <div className="flex-1 flex h-full overflow-hidden">
-                <MainContent
+          <AnimatePresence mode="wait">
+            {/* Dashboard 页面 */}
+            {currentView === 'dashboard' ? (
+              <motion.div
+                key="dashboard"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                className="flex-1 h-full"
+              >
+                <DashboardPage
+                  onNavigate={(view) => setCurrentView(view)}
+                  onCreateNote={handleShowTemplateModal}
+                />
+              </motion.div>
+            ) : currentView === 'settings' ? (
+              <motion.div
+                key="settings"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                className="flex-1 h-full overflow-hidden"
+              >
+                <SettingsPage
+                  onClose={() => setCurrentView('inbox')}
+                  onDataChange={refreshNotes}
+                />
+              </motion.div>
+            ) : currentView === 'calendar' ? (
+              <motion.div
+                key="calendar"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                className="flex-1 h-full overflow-hidden"
+              >
+                <CalendarView
+                  onSelectNote={handleSelectNote}
+                  onBack={() => setCurrentView('inbox')}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="notes"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                className="flex-1 flex h-full overflow-hidden"
+              >
+                <NoteList
+                  searchQuery={searchQuery}
+                  currentView={currentView}
+                  notes={notes}
                   activeNoteId={activeNoteId}
-                  activeNote={activeNote}
-                  localTitle={localTitle}
-                  localContent={localContent}
-                  isChatOpen={isChatOpen}
-                  contentToInsert={contentToInsert}
-                  onTitleChange={handleTitleChange}
-                  onContentChange={handleContentChange}
-                  onTagsChange={handleTagsChange}
-                  onToggleFavorite={handleToggleFavorite}
-                  onToggleChat={toggleChat}
-                  onCreateNote={handleCreateNote}
-                  onContentInserted={handleContentInserted}
-                  onSetReminder={handleSetReminder}
-                  onClearReminder={handleClearReminder}
+                  onSelectNote={handleSelectNote}
+                  onCreateNote={handleShowTemplateModal}
+                  onDeleteNote={handleDeleteNote}
+                  onRestoreNote={handleRestoreNote}
+                  onPermanentDelete={handlePermanentDelete}
                 />
 
-                {/* AI 聊天侧栏 */}
-                <AIChatSidebar
-                  isOpen={isChatOpen}
-                  onClose={() => setIsChatOpen(false)}
-                  noteId={activeNoteId}
-                  noteTitle={localTitle}
-                  noteContent={localContent}
-                  onInsertToNote={handleInsertToNote}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                {/* 右侧编辑器 + AI 侧栏 */}
+                <div className="flex-1 flex h-full overflow-hidden">
+                  <MainContent
+                    activeNoteId={activeNoteId}
+                    activeNote={activeNote}
+                    localTitle={localTitle}
+                    localContent={localContent}
+                    isChatOpen={isChatOpen}
+                    contentToInsert={contentToInsert}
+                    onTitleChange={handleTitleChange}
+                    onContentChange={handleContentChange}
+                    onTagsChange={handleTagsChange}
+                    onToggleFavorite={handleToggleFavorite}
+                    onToggleChat={toggleChat}
+                    onCreateNote={handleCreateNote}
+                    onContentInserted={handleContentInserted}
+                    onSetReminder={handleSetReminder}
+                    onClearReminder={handleClearReminder}
+                  />
+
+                  {/* AI 聊天侧栏 */}
+                  <AIChatSidebar
+                    isOpen={isChatOpen}
+                    onClose={() => setIsChatOpen(false)}
+                    noteId={activeNoteId}
+                    noteTitle={localTitle}
+                    noteContent={localContent}
+                    onInsertToNote={handleInsertToNote}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

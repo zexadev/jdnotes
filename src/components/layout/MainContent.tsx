@@ -4,6 +4,7 @@ import { Star, Sparkles, Bell, X } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
+import { WritingStats } from '../editor/WritingStats'
 import { formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import { formatTimeRemaining } from '../calendar/ReminderNotification'
@@ -169,7 +170,7 @@ export function MainContent({
                       ? 'text-[#5E6AD2] bg-[#5E6AD2]/10'
                       : 'text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
                   }`}
-                  title="AI 助手 (⌘J)"
+                  title="AI 助手 (Ctrl+L)"
                 >
                   <Sparkles className="h-4 w-4" strokeWidth={1.5} />
                 </motion.button>
@@ -207,6 +208,11 @@ export function MainContent({
               onContentInserted={onContentInserted}
               onEditorReady={handleEditorReady}
             />
+
+            {/* 写作统计栏 */}
+            {editorInstance && (
+              <WritingStats editor={editorInstance} />
+            )}
           </motion.div>
         ) : (
           <motion.div
