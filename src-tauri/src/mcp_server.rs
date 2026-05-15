@@ -39,6 +39,44 @@ impl JdNotesMcpServer {
             let _ = handle.emit("db:changed", ());
         }
     }
+
+    /// 按 ID 或标题模糊匹配查找笔记，返回 (id, title) 或错误信息
+    async fn find_note_by_id_or_title(
+        &self,
+        id: Option<i64>,
+        title: Option<&str>,
+    ) -> Result<(i64, String), String> {
+        if let Some(note_id) = id {
+            let row = sqlx::query(
+                "SELECT id, title FROM notes WHERE id = ?1 AND is_deleted = 0"
+            )
+            .bind(note_id)
+            .fetch_optional(self.pool.as_ref())
+            .await
+            .map_err(|e| format!("查询笔记失败: {}", e))?;
+
+            match row {
+                Some(r) => Ok((r.get("id"), r.get("title"))),
+                None => Err(format!("未找到 ID 为 {} 的笔记", note_id)),
+            }
+        } else if let Some(t) = title {
+            let search_pattern = format!("%{}%", t);
+            let row = sqlx::query(
+                "SELECT id, title FROM notes WHERE title LIKE ?1 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 1"
+            )
+            .bind(&search_pattern)
+            .fetch_optional(self.pool.as_ref())
+            .await
+            .map_err(|e| format!("查询笔记失败: {}", e))?;
+
+            match row {
+                Some(r) => Ok((r.get("id"), r.get("title"))),
+                None => Err(format!("未找到标题匹配「{}」的笔记", t)),
+            }
+        } else {
+            Err("必须提供 id 或 title 参数".to_string())
+        }
+    }
 }
 
 /// create_note 工具参数
@@ -55,8 +93,10 @@ pub struct CreateNoteParams {
 /// append_note 工具参数
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct AppendNoteParams {
-    #[schemars(description = "要查找的笔记标题（模糊匹配）")]
-    title: String,
+    #[schemars(description = "笔记 ID（与 title 二选一，优先使用 ID）")]
+    id: Option<i64>,
+    #[schemars(description = "要查找的笔记标题（模糊匹配，与 id 二选一）")]
+    title: Option<String>,
     #[schemars(description = "要追加的内容，支持 Markdown 格式")]
     content: String,
 }
@@ -64,8 +104,14 @@ pub struct AppendNoteParams {
 /// get_note 工具参数
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct GetNoteParams {
-    #[schemars(description = "要查找的笔记标题（模糊匹配）")]
-    title: String,
+    #[schemars(description = "笔记 ID（与 title 二选一，优先使用 ID）")]
+    id: Option<i64>,
+    #[schemars(description = "要查找的笔记标题（模糊匹配，与 id 二选一）")]
+    title: Option<String>,
+    #[schemars(description = "最大返回内容字符数，不传则返回全部")]
+    max_length: Option<i64>,
+    #[schemars(description = "内容起始偏移字符数，默认 0")]
+    offset: Option<i64>,
 }
 
 /// search_notes 工具参数
@@ -73,6 +119,8 @@ pub struct GetNoteParams {
 pub struct SearchNotesParams {
     #[schemars(description = "搜索关键词，会匹配标题和内容")]
     query: String,
+    #[schemars(description = "按标签过滤（可选）")]
+    tag: Option<String>,
 }
 
 /// list_notes 工具参数
@@ -85,9 +133,12 @@ pub struct ListNotesParams {
 /// update_note 工具参数
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct UpdateNoteParams {
-    /// 要查找的笔记标题（模糊匹配）
-    #[schemars(description = "要查找的笔记标题（模糊匹配）")]
-    title: String,
+    /// 笔记 ID（与 title 二选一，优先使用 ID）
+    #[schemars(description = "笔记 ID（与 title 二选一，优先使用 ID）")]
+    id: Option<i64>,
+    /// 要查找的笔记标题（模糊匹配，与 id 二选一）
+    #[schemars(description = "要查找的笔记标题（模糊匹配，与 id 二选一）")]
+    title: Option<String>,
     /// 新标题（可选，不传则不修改）
     #[schemars(description = "新标题，不传则保持原标题")]
     new_title: Option<String>,
@@ -138,24 +189,26 @@ impl JdNotesMcpServer {
         }
     }
 
-    #[tool(description = "Find a note by title (fuzzy match) and append content / 按标题模糊匹配笔记并追加内容")]
+    #[tool(description = "Find a note by ID or title (fuzzy match) and append content / 按 ID 或标题模糊匹配笔记并追加内容")]
     async fn append_note(
         &self,
         Parameters(params): Parameters<AppendNoteParams>,
     ) -> Result<CallToolResult, McpError> {
-        let search_pattern = format!("%{}%", params.title);
+        let (note_id, title) = match self
+            .find_note_by_id_or_title(params.id, params.title.as_deref())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => return Ok(CallToolResult::error(vec![Content::text(e)])),
+        };
 
-        let note = sqlx::query(
-            "SELECT id, title, content FROM notes WHERE title LIKE ?1 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 1"
-        )
-        .bind(&search_pattern)
-        .fetch_optional(self.pool.as_ref())
-        .await;
+        let existing = sqlx::query("SELECT content FROM notes WHERE id = ?1")
+            .bind(note_id)
+            .fetch_one(self.pool.as_ref())
+            .await;
 
-        match note {
-            Ok(Some(row)) => {
-                let id: i64 = row.get("id");
-                let title: String = row.get("title");
+        match existing {
+            Ok(row) => {
                 let existing_content: String = row.get("content");
                 let now = chrono::Local::now()
                     .format("%Y-%m-%dT%H:%M:%S%.3fZ")
@@ -165,7 +218,7 @@ impl JdNotesMcpServer {
                 match sqlx::query("UPDATE notes SET content = ?1, updated_at = ?2 WHERE id = ?3")
                     .bind(&new_content)
                     .bind(&now)
-                    .bind(id)
+                    .bind(note_id)
                     .execute(self.pool.as_ref())
                     .await
                 {
@@ -173,7 +226,7 @@ impl JdNotesMcpServer {
                         self.notify_db_changed();
                         Ok(CallToolResult::success(vec![Content::text(format!(
                             "内容已追加到笔记「{}」(ID: {})",
-                            title, id
+                            title, note_id
                         ))]))
                     }
                     Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
@@ -182,119 +235,120 @@ impl JdNotesMcpServer {
                     ))])),
                 }
             }
-            Ok(None) => Ok(CallToolResult::error(vec![Content::text(format!(
-                "未找到标题匹配「{}」的笔记",
-                params.title
-            ))])),
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
-                "查询笔记失败: {}",
+                "查询笔记内容失败: {}",
                 e
             ))])),
         }
     }
 
-    #[tool(description = "Find a note by title (fuzzy match) and update its title, content or tags / 按标题模糊匹配笔记并修改内容")]
+    #[tool(description = "Find a note by ID or title (fuzzy match) and update its title, content or tags / 按 ID 或标题模糊匹配笔记并修改内容")]
     async fn update_note(
         &self,
         Parameters(params): Parameters<UpdateNoteParams>,
     ) -> Result<CallToolResult, McpError> {
-        let search_pattern = format!("%{}%", params.title);
+        let (note_id, old_title) = match self
+            .find_note_by_id_or_title(params.id, params.title.as_deref())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => return Ok(CallToolResult::error(vec![Content::text(e)])),
+        };
 
-        let note = sqlx::query(
-            "SELECT id, title FROM notes WHERE title LIKE ?1 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 1"
-        )
-        .bind(&search_pattern)
-        .fetch_optional(self.pool.as_ref())
-        .await;
+        let now = chrono::Local::now()
+            .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+            .to_string();
 
-        match note {
-            Ok(Some(row)) => {
-                let id: i64 = row.get("id");
-                let old_title: String = row.get("title");
-                let now = chrono::Local::now()
-                    .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                    .to_string();
+        let mut updates = vec!["updated_at = ?1".to_string()];
+        let mut param_index = 2;
+        let mut bind_values: Vec<String> = vec![now];
 
-                let mut updates = vec!["updated_at = ?1".to_string()];
-                let mut param_index = 2;
-                let mut bind_values: Vec<String> = vec![now];
+        if let Some(ref new_title) = params.new_title {
+            updates.push(format!("title = ?{}", param_index));
+            bind_values.push(new_title.clone());
+            param_index += 1;
+        }
+        if let Some(ref new_content) = params.new_content {
+            updates.push(format!("content = ?{}", param_index));
+            bind_values.push(new_content.clone());
+            param_index += 1;
+        }
+        if let Some(ref new_tags) = params.new_tags {
+            updates.push(format!("tags = ?{}", param_index));
+            bind_values.push(
+                serde_json::to_string(new_tags).unwrap_or_else(|_| "[]".to_string()),
+            );
+            param_index += 1;
+        }
 
-                if let Some(ref new_title) = params.new_title {
-                    updates.push(format!("title = ?{}", param_index));
-                    bind_values.push(new_title.clone());
-                    param_index += 1;
-                }
-                if let Some(ref new_content) = params.new_content {
-                    updates.push(format!("content = ?{}", param_index));
-                    bind_values.push(new_content.clone());
-                    param_index += 1;
-                }
-                if let Some(ref new_tags) = params.new_tags {
-                    updates.push(format!("tags = ?{}", param_index));
-                    bind_values.push(
-                        serde_json::to_string(new_tags).unwrap_or_else(|_| "[]".to_string()),
-                    );
-                    param_index += 1;
-                }
+        if param_index == 2 {
+            return Ok(CallToolResult::error(vec![Content::text(
+                "未指定任何要修改的字段（new_title / new_content / new_tags）",
+            )]));
+        }
 
-                if param_index == 2 {
-                    return Ok(CallToolResult::error(vec![Content::text(
-                        "未指定任何要修改的字段（new_title / new_content / new_tags）",
-                    )]));
-                }
+        let sql = format!(
+            "UPDATE notes SET {} WHERE id = ?{}",
+            updates.join(", "),
+            param_index
+        );
 
-                let sql = format!(
-                    "UPDATE notes SET {} WHERE id = ?{}",
-                    updates.join(", "),
-                    param_index
-                );
+        let mut query = sqlx::query(&sql);
+        for val in &bind_values {
+            query = query.bind(val);
+        }
+        query = query.bind(note_id);
 
-                let mut query = sqlx::query(&sql);
-                for val in &bind_values {
-                    query = query.bind(val);
-                }
-                query = query.bind(id);
-
-                match query.execute(self.pool.as_ref()).await {
-                    Ok(_) => {
-                        self.notify_db_changed();
-                        Ok(CallToolResult::success(vec![Content::text(format!(
-                            "笔记「{}」(ID: {}) 已更新",
-                            old_title, id
-                        ))]))
-                    }
-                    Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
-                        "更新笔记失败: {}",
-                        e
-                    ))])),
-                }
+        match query.execute(self.pool.as_ref()).await {
+            Ok(_) => {
+                self.notify_db_changed();
+                Ok(CallToolResult::success(vec![Content::text(format!(
+                    "笔记「{}」(ID: {}) 已更新",
+                    old_title, note_id
+                ))]))
             }
-            Ok(None) => Ok(CallToolResult::error(vec![Content::text(format!(
-                "未找到标题匹配「{}」的笔记",
-                params.title
-            ))])),
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
-                "查询笔记失败: {}",
+                "更新笔记失败: {}",
                 e
             ))])),
         }
     }
 
-    #[tool(description = "Find a note by title (fuzzy match) and return its content / 按标题模糊匹配笔记并返回内容")]
+    #[tool(description = "Find a note by ID or title (fuzzy match) and return its content / 按 ID 或标题模糊匹配笔记并返回内容")]
     async fn get_note(
         &self,
         Parameters(params): Parameters<GetNoteParams>,
     ) -> Result<CallToolResult, McpError> {
-        let search_pattern = format!("%{}%", params.title);
+        let (note_id, _title) = match self
+            .find_note_by_id_or_title(params.id, params.title.as_deref())
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => return Ok(CallToolResult::error(vec![Content::text(e)])),
+        };
 
-        let note = sqlx::query(
-            "SELECT id, title, content, tags, created_at, updated_at FROM notes WHERE title LIKE ?1 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 1"
-        )
-        .bind(&search_pattern)
-        .fetch_optional(self.pool.as_ref())
-        .await;
+        let offset = params.offset.unwrap_or(0).max(0);
 
-        match note {
+        // 根据是否有 max_length 选择不同查询
+        let row = if let Some(max_len) = params.max_length {
+            sqlx::query(
+                "SELECT id, title, SUBSTR(content, ?1, ?2) as content, tags, created_at, updated_at, LENGTH(content) as total_length FROM notes WHERE id = ?3 AND is_deleted = 0"
+            )
+            .bind(offset + 1) // SQL SUBSTR 从 1 开始
+            .bind(max_len)
+            .bind(note_id)
+            .fetch_optional(self.pool.as_ref())
+            .await
+        } else {
+            sqlx::query(
+                "SELECT id, title, content, tags, created_at, updated_at, LENGTH(content) as total_length FROM notes WHERE id = ?1 AND is_deleted = 0"
+            )
+            .bind(note_id)
+            .fetch_optional(self.pool.as_ref())
+            .await
+        };
+
+        match row {
             Ok(Some(row)) => {
                 let id: i64 = row.get("id");
                 let title: String = row.get("title");
@@ -302,16 +356,20 @@ impl JdNotesMcpServer {
                 let tags: String = row.get("tags");
                 let created_at: String = row.get("created_at");
                 let updated_at: String = row.get("updated_at");
+                let total_length: i64 = row.get("total_length");
+
+                let length_info = if params.max_length.is_some() && (content.len() as i64) < total_length - offset {
+                    format!(" | 内容长度: {} 字符（已截断，共 {} 字符）", content.len(), total_length)
+                } else {
+                    format!(" | 内容长度: {} 字符", total_length)
+                };
 
                 Ok(CallToolResult::success(vec![Content::text(format!(
-                    "# {}\n\nID: {} | 标签: {} | 创建: {} | 更新: {}\n\n---\n\n{}",
-                    title, id, tags, created_at, updated_at, content
+                    "# {}\n\nID: {} | 标签: {} | 创建: {} | 更新: {}{}\n\n---\n\n{}",
+                    title, id, tags, created_at, updated_at, length_info, content
                 ))]))
             }
-            Ok(None) => Ok(CallToolResult::error(vec![Content::text(format!(
-                "未找到标题匹配「{}」的笔记",
-                params.title
-            ))])),
+            Ok(None) => Ok(CallToolResult::error(vec![Content::text("笔记不存在")])),
             Err(e) => Ok(CallToolResult::error(vec![Content::text(format!(
                 "查询笔记失败: {}",
                 e
@@ -319,19 +377,29 @@ impl JdNotesMcpServer {
         }
     }
 
-    #[tool(description = "Search notes by keyword in title and content / 按关键词搜索笔记标题和内容")]
+    #[tool(description = "Search notes by keyword in title and content, optionally filter by tag / 按关键词搜索笔记标题和内容，可按标签过滤")]
     async fn search_notes(
         &self,
         Parameters(params): Parameters<SearchNotesParams>,
     ) -> Result<CallToolResult, McpError> {
         let search_pattern = format!("%{}%", params.query);
 
-        let notes = sqlx::query(
-            "SELECT id, title, SUBSTR(content, 1, 100) as preview FROM notes WHERE (title LIKE ?1 OR content LIKE ?1) AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 20"
-        )
-        .bind(&search_pattern)
-        .fetch_all(self.pool.as_ref())
-        .await;
+        let (sql, has_tag) = if let Some(ref tag) = params.tag {
+            let tag_pattern = format!("%\"{}\"%" , tag);
+            // 需要两个 bind：?1 是搜索关键词，?2 是标签
+            (format!(
+                "SELECT id, title, SUBSTR(content, 1, 100) as preview FROM notes WHERE (title LIKE ?1 OR content LIKE ?1) AND tags LIKE ?2 AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 20"
+            ), Some(tag_pattern))
+        } else {
+            ("SELECT id, title, SUBSTR(content, 1, 100) as preview FROM notes WHERE (title LIKE ?1 OR content LIKE ?1) AND is_deleted = 0 ORDER BY updated_at DESC LIMIT 20".to_string(), None)
+        };
+
+        let mut query = sqlx::query(&sql).bind(&search_pattern);
+        if let Some(ref tag_pattern) = has_tag {
+            query = query.bind(tag_pattern);
+        }
+
+        let notes = query.fetch_all(self.pool.as_ref()).await;
 
         match notes {
             Ok(rows) => {
@@ -359,7 +427,7 @@ impl JdNotesMcpServer {
         }
     }
 
-    #[tool(description = "List all note titles / 列出所有笔记标题")]
+    #[tool(description = "List all note titles with tags and content length / 列出所有笔记标题、标签和内容长度")]
     async fn list_notes(
         &self,
         Parameters(params): Parameters<ListNotesParams>,
@@ -367,7 +435,7 @@ impl JdNotesMcpServer {
         let limit = params.limit.unwrap_or(50);
 
         let notes = sqlx::query(
-            "SELECT id, title, updated_at FROM notes WHERE is_deleted = 0 ORDER BY updated_at DESC LIMIT ?1"
+            "SELECT id, title, tags, LENGTH(content) as content_length, updated_at FROM notes WHERE is_deleted = 0 ORDER BY updated_at DESC LIMIT ?1"
         )
         .bind(limit)
         .fetch_all(self.pool.as_ref())
@@ -383,8 +451,13 @@ impl JdNotesMcpServer {
                 for row in &rows {
                     let id: i64 = row.get("id");
                     let title: String = row.get("title");
+                    let tags: String = row.get("tags");
+                    let content_length: i64 = row.get("content_length");
                     let updated_at: String = row.get("updated_at");
-                    result.push_str(&format!("- **{}** (ID: {}) — 更新于 {}\n", title, id, updated_at));
+                    result.push_str(&format!(
+                        "- **{}** (ID: {}) — 标签: {} | {}字 | 更新于 {}\n",
+                        title, id, tags, content_length, updated_at
+                    ));
                 }
                 Ok(CallToolResult::success(vec![Content::text(result)]))
             }
@@ -404,11 +477,12 @@ impl ServerHandler for JdNotesMcpServer {
                 "JD Notes MCP Server - 本地笔记应用的读写接口。\n\n\
                  可用工具：\n\
                  - create_note: 创建新笔记（标题、内容、标签）\n\
-                 - append_note: 按标题模糊匹配，追加内容到已有笔记\n\
-                 - update_note: 按标题模糊匹配，修改笔记的标题、内容或标签\n\
-                 - get_note: 按标题模糊匹配，查看笔记完整内容\n\
-                 - search_notes: 按关键词搜索笔记（标题和内容）\n\
-                 - list_notes: 列出所有笔记标题",
+                 - append_note: 按 ID 或标题模糊匹配，追加内容到已有笔记\n\
+                 - update_note: 按 ID 或标题模糊匹配，修改笔记的标题、内容或标签\n\
+                 - get_note: 按 ID 或标题模糊匹配，查看笔记内容（支持分页截断）\n\
+                 - search_notes: 按关键词搜索笔记（标题和内容），可按标签过滤\n\
+                 - list_notes: 列出所有笔记标题、标签和内容长度\n\n\
+                 建议：先用 list_notes 获取笔记 ID，再用 ID 进行读写操作，比标题匹配更精确安全。",
             )
     }
 }
@@ -614,6 +688,11 @@ JD Notes 提供本地 MCP Server，可读取和写入笔记。
 - JDNotes 应用必须正在运行
 - MCP Server 地址：http://127.0.0.1:19230/mcp
 
+## 最佳实践
+
+先用 `list_notes` 获取笔记 ID，再用 ID 进行读写操作（比标题匹配更精确安全）。
+对于长笔记，使用 `get_note` 的 `max_length` 参数避免一次性加载过多内容。
+
 ## 可用工具
 
 ### 写入
@@ -625,13 +704,15 @@ JD Notes 提供本地 MCP Server，可读取和写入笔记。
 - `tags` (string[], 可选): 标签列表
 
 #### append_note
-按标题模糊匹配已有笔记，追加内容。
-- `title` (string, 必填): 要匹配的笔记标题
+按 ID 或标题模糊匹配已有笔记，追加内容。
+- `id` (number, 可选): 笔记 ID（与 title 二选一，优先使用）
+- `title` (string, 可选): 要匹配的笔记标题（与 id 二选一）
 - `content` (string, 必填): 要追加的内容
 
 #### update_note
-按标题模糊匹配已有笔记，修改标题、内容或标签。
-- `title` (string, 必填): 要匹配的笔记标题
+按 ID 或标题模糊匹配已有笔记，修改标题、内容或标签。
+- `id` (number, 可选): 笔记 ID（与 title 二选一，优先使用）
+- `title` (string, 可选): 要匹配的笔记标题（与 id 二选一）
 - `new_title` (string, 可选): 新标题
 - `new_content` (string, 可选): 新内容（完全替换）
 - `new_tags` (string[], 可选): 新标签列表（完全替换）
@@ -639,15 +720,19 @@ JD Notes 提供本地 MCP Server，可读取和写入笔记。
 ### 读取
 
 #### get_note
-按标题模糊匹配，查看笔记完整内容。
-- `title` (string, 必填): 要查找的笔记标题
+按 ID 或标题模糊匹配，查看笔记内容（支持分页截断）。
+- `id` (number, 可选): 笔记 ID（与 title 二选一，优先使用）
+- `title` (string, 可选): 要查找的笔记标题（与 id 二选一）
+- `max_length` (number, 可选): 最大返回内容字符数，不传则返回全部
+- `offset` (number, 可选): 内容起始偏移字符数，默认 0
 
 #### search_notes
-按关键词搜索笔记（匹配标题和内容）。
+按关键词搜索笔记（匹配标题和内容），可按标签过滤。
 - `query` (string, 必填): 搜索关键词
+- `tag` (string, 可选): 按标签过滤
 
 #### list_notes
-列出所有笔记标题。
+列出所有笔记标题、标签和内容长度。
 - `limit` (number, 可选): 返回数量限制，默认 50
 "#;
 
