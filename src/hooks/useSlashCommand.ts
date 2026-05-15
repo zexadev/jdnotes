@@ -52,7 +52,7 @@ export function useSlashCommand({
   const slashCommands = useMemo(() => {
     const commands = getDefaultSlashCommands(handleAISlashSelect)
     return commands.map((cmd) => {
-      if (cmd.group === 'editor') {
+      if (cmd.group !== 'ai') {
         const originalAction = cmd.action
         return {
           ...cmd,
@@ -90,9 +90,9 @@ export function useSlashCommand({
         const coords = editor.view.coordsAtPos(from)
         const containerRect = editorContainerRef.current.getBoundingClientRect()
 
-        // 预估菜单尺寸：2 个分组标题(28px) + 6 个命令项(40px) + 底部提示(28px) + padding(8px)
-        const menuHeight = 2 * 28 + 6 * 40 + 28 + 8
-        const menuWidth = 256 // w-64 = 16rem = 256px
+        // 预估菜单尺寸：有滚动区域限制 max-h-[320px]，加上搜索提示和底栏
+        const menuHeight = 360
+        const menuWidth = 288 // w-72 = 18rem = 288px
         const margin = 12
 
         // 找到编辑器所在的滚动容器的可视边界
