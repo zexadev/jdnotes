@@ -15,7 +15,7 @@
 - **名称**：JD Notes — 简洁高效的本地笔记应用
 - **技术栈**：Tauri v2 (tauri 2.9.5, tauri-build 2.5.3) + Vite + React + TypeScript
 - **包管理器**：pnpm
-- **版本**：1.6.1
+- **版本**：1.8.0
 - **标识符**：com.jdnotes.app
 - **窗口**：1200x800，无边框 (decorations: false)
 - **前端开发端口**：5173
@@ -149,6 +149,7 @@
 | `Ctrl+K` | 搜索笔记 |
 | `Ctrl+L` | 打开/关闭 AI 侧栏 |
 | `Ctrl+J` | 内联提问（选中文本后） |
+| `Ctrl+\` | 循环切换侧栏（展开/收起/隐藏） |
 | `Ctrl+B` | 粗体 |
 | `Ctrl+I` | 斜体 |
 | `Ctrl+Shift+C` | 代码块 |

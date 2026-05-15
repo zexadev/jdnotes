@@ -16,6 +16,26 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.8.0',
+    date: '2026-05-15',
+    notes: `## ✨ 新增功能
+### 📝 富文本扩展
+- 编辑器支持下划线、文本高亮（5 色）、左/中/右对齐、智能排版
+- 新增 Callout 提示块（信息/警告/提示/错误 4 类）
+### 📊 写作统计与模板
+- 编辑器底栏实时显示字数、字符、阅读时间、段落数（中英分别计算）
+- 新建笔记弹窗提供 5 个内置模板（空白/会议记录/项目计划/读书笔记/周报）
+### 🎛️ 侧栏三态切换
+- 展开 → 收起（仅图标）→ 隐藏，Ctrl+\\ 循环切换，状态持久化
+### ⚡ 斜杠命令搜索
+- 输入 / 后键盘字符实时过滤，命令分组重构为基础/格式/高级/AI
+## 💅 优化
+- MCP Server：append/update/get 支持按 ID 精确操作
+- MCP Server：get_note 支持 max_length/offset 分页
+- MCP Server：search_notes 支持按 tag 过滤
+- MCP Server：list_notes 返回内容长度`
+  },
+  {
     version: '1.7.0',
     date: '2026-04-02',
     notes: `## ✨ 新增功能
