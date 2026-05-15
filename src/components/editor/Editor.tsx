@@ -5,6 +5,14 @@ import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
+import CharacterCount from '@tiptap/extension-character-count'
+import Highlight from '@tiptap/extension-highlight'
+import TextAlign from '@tiptap/extension-text-align'
+import Underline from '@tiptap/extension-underline'
+import Typography from '@tiptap/extension-typography'
+import Focus from '@tiptap/extension-focus'
+import { TextStyle } from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table'
 import { TableCell } from '@tiptap/extension-table'
@@ -26,6 +34,7 @@ import { AIBubbleMenu } from '../ai/AIBubbleMenu'
 import { TableBubbleMenu } from './TableBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 import { AIHighlight } from '../ai/AIHighlightMark'
+import { Callout } from './CalloutBlock'
 
 interface EditorProps {
   title: string
@@ -132,6 +141,15 @@ export function Editor({
       TableCell,
       TableHeader,
       AIHighlight,
+      Callout,
+      CharacterCount.configure({}),
+      Highlight.configure({ multicolor: true }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Underline,
+      Typography,
+      Focus.configure({ className: 'has-focus', mode: 'deepest' }),
+      TextStyle,
+      Color,
     ],
     content: content,
     editable: true,

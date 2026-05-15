@@ -1187,3 +1187,82 @@ body {
   background-color: #818cf8;
   border-color: #818cf8;
 }
+
+
+/* ===== 高亮标记样式 ===== */
+.tiptap mark {
+  background-color: rgba(250, 204, 21, 0.4);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.dark .tiptap mark {
+  background-color: rgba(250, 204, 21, 0.25);
+}
+
+/* 高亮颜色变体 */
+.tiptap mark[data-color="yellow"] { background-color: rgba(250, 204, 21, 0.4); }
+.tiptap mark[data-color="green"] { background-color: rgba(74, 222, 128, 0.4); }
+.tiptap mark[data-color="blue"] { background-color: rgba(96, 165, 250, 0.4); }
+.tiptap mark[data-color="pink"] { background-color: rgba(244, 114, 182, 0.4); }
+.tiptap mark[data-color="purple"] { background-color: rgba(167, 139, 250, 0.4); }
+
+.dark .tiptap mark[data-color="yellow"] { background-color: rgba(250, 204, 21, 0.25); }
+.dark .tiptap mark[data-color="green"] { background-color: rgba(74, 222, 128, 0.25); }
+.dark .tiptap mark[data-color="blue"] { background-color: rgba(96, 165, 250, 0.25); }
+.dark .tiptap mark[data-color="pink"] { background-color: rgba(244, 114, 182, 0.25); }
+.dark .tiptap mark[data-color="purple"] { background-color: rgba(167, 139, 250, 0.25); }
+
+/* ===== Callout 提示框样式 ===== */
+.callout-block {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid;
+  margin: 1rem 0;
+}
+
+.callout-block[data-type="info"] {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-left-color: #3b82f6;
+}
+
+.callout-block[data-type="warning"] {
+  background-color: rgba(245, 158, 11, 0.05);
+  border-left-color: #f59e0b;
+}
+
+.callout-block[data-type="tip"] {
+  background-color: rgba(16, 185, 129, 0.05);
+  border-left-color: #10b981;
+}
+
+.callout-block[data-type="error"] {
+  background-color: rgba(239, 68, 68, 0.05);
+  border-left-color: #ef4444;
+}
+
+.dark .callout-block[data-type="info"] { background-color: rgba(59, 130, 246, 0.1); }
+.dark .callout-block[data-type="warning"] { background-color: rgba(245, 158, 11, 0.1); }
+.dark .callout-block[data-type="tip"] { background-color: rgba(16, 185, 129, 0.1); }
+.dark .callout-block[data-type="error"] { background-color: rgba(239, 68, 68, 0.1); }
+
+.callout-block .callout-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.callout-block .callout-content > * {
+  margin: 0;
+}
+
+/* ===== 文本对齐样式 ===== */
+.tiptap [style*="text-align: center"] { text-align: center; }
+.tiptap [style*="text-align: right"] { text-align: right; }
+.tiptap [style*="text-align: justify"] { text-align: justify; }
+
+/* ===== 侧边栏过渡动画 ===== */
+.sidebar-transition {
+  transition: width 0.2s ease, padding 0.2s ease, opacity 0.15s ease;
+}

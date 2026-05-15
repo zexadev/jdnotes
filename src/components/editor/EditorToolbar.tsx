@@ -1,10 +1,12 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import {
   Bold,
   Italic,
+  Underline,
   Strikethrough,
   Code,
+  Highlighter,
   List,
   ListOrdered,
   ListChecks,
@@ -13,6 +15,9 @@ import {
   CodeSquare,
   ImagePlus,
   Table,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from 'lucide-react'
 
 interface EditorToolbarProps {
@@ -48,6 +53,16 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     e.target.value = ''
   }
 
+  const [showHighlightColors, setShowHighlightColors] = useState(false)
+
+  const highlightColors = [
+    { name: '黄色', color: '#fcd34d' },
+    { name: '绿色', color: '#6ee7b7' },
+    { name: '蓝色', color: '#93c5fd' },
+    { name: '粉色', color: '#f9a8d4' },
+    { name: '紫色', color: '#c4b5fd' },
+  ]
+
   const buttons: ToolbarButton[][] = [
     // 文本格式
     [
@@ -64,6 +79,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         isActive: () => editor.isActive('italic'),
       },
       {
+        icon: <Underline className="h-4 w-4" />,
+        title: '下划线',
+        action: () => editor.chain().focus().toggleUnderline().run(),
+        isActive: () => editor.isActive('underline'),
+      },
+      {
         icon: <Strikethrough className="h-4 w-4" />,
         title: '删除线',
         action: () => editor.chain().focus().toggleStrike().run(),
@@ -74,6 +95,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title: '内联代码',
         action: () => editor.chain().focus().toggleCode().run(),
         isActive: () => editor.isActive('code'),
+      },
+      {
+        icon: <Highlighter className="h-4 w-4" />,
+        title: '高亮',
+        action: () => setShowHighlightColors(!showHighlightColors),
+        isActive: () => editor.isActive('highlight'),
       },
     ],
     // 列表操作
@@ -95,6 +122,27 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         title: '待办列表',
         action: () => editor.chain().focus().toggleTaskList().run(),
         isActive: () => editor.isActive('taskList'),
+      },
+    ],
+    // 对齐
+    [
+      {
+        icon: <AlignLeft className="h-4 w-4" />,
+        title: '左对齐',
+        action: () => editor.chain().focus().setTextAlign('left').run(),
+        isActive: () => editor.isActive({ textAlign: 'left' }),
+      },
+      {
+        icon: <AlignCenter className="h-4 w-4" />,
+        title: '居中',
+        action: () => editor.chain().focus().setTextAlign('center').run(),
+        isActive: () => editor.isActive({ textAlign: 'center' }),
+      },
+      {
+        icon: <AlignRight className="h-4 w-4" />,
+        title: '右对齐',
+        action: () => editor.chain().focus().setTextAlign('right').run(),
+        isActive: () => editor.isActive({ textAlign: 'right' }),
       },
     ],
     // 其他
@@ -133,7 +181,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   ]
 
   return (
-    <div className="flex items-center gap-0.5 py-1.5">
+    <div className="flex items-center gap-0.5 py-1.5 relative">
       {buttons.map((group, groupIndex) => (
         <div key={groupIndex} className="flex items-center gap-0.5">
           {groupIndex > 0 && (
@@ -155,6 +203,35 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           ))}
         </div>
       ))}
+
+      {/* 高亮颜色选择器 */}
+      {showHighlightColors && (
+        <div className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-[#16181D] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 flex items-center gap-1.5">
+          {highlightColors.map((c) => (
+            <button
+              key={c.color}
+              title={c.name}
+              onClick={() => {
+                editor.chain().focus().toggleHighlight({ color: c.color }).run()
+                setShowHighlightColors(false)
+              }}
+              className="w-6 h-6 rounded-full border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+              style={{ backgroundColor: c.color }}
+            />
+          ))}
+          <button
+            title="清除高亮"
+            onClick={() => {
+              editor.chain().focus().unsetHighlight().run()
+              setShowHighlightColors(false)
+            }}
+            className="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <input
         ref={fileInputRef}
         type="file"
