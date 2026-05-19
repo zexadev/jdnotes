@@ -16,6 +16,14 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '1.8.1',
+    date: '2026-05-20',
+    notes: `## 🐛 修复
+- 拖放图片：仅在拖放位置落在编辑器容器内时才插入，避免在侧栏等区域误触发
+- 拖放图片：组件卸载时清理监听器，避免切换笔记后重复绑定
+- 斜杠命令：/ 必须在段落开头或空白后才触发，避免在词中间（如 abc/）误触发菜单`
+  },
+  {
     version: '1.8.0',
     date: '2026-05-15',
     notes: `## ✨ 新增功能

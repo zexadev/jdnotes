@@ -85,7 +85,16 @@ export function useSlashCommand({
       const { from } = editor.state.selection
       const textBefore = editor.state.doc.textBetween(Math.max(0, from - 1), from)
 
-      if (textBefore === '/') {
+      // / 必须在段落开头,或前一个字符是空白/换行才触发菜单,避免在词中间(如 "abc/")误触发
+      const $from = editor.state.selection.$from
+      const isAtBlockStart = $from.parentOffset === 1
+      let prevChar = ''
+      if (!isAtBlockStart && from >= 2) {
+        prevChar = editor.state.doc.textBetween(from - 2, from - 1, ' ')
+      }
+      const isAfterWhitespace = prevChar === ' ' || prevChar === '\t' || prevChar === '\n'
+
+      if (textBefore === '/' && (isAtBlockStart || isAfterWhitespace)) {
         // 显示斜杠菜单 - 预先计算位置，避免超出可视区域
         const coords = editor.view.coordsAtPos(from)
         const containerRect = editorContainerRef.current.getBoundingClientRect()

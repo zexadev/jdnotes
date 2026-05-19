@@ -283,36 +283,54 @@ export function Editor({
 
     const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
     let unlisten: (() => void) | undefined
+    let cancelled = false
 
     getCurrentWebview().onDragDropEvent(async (event) => {
-      if (event.payload.type === 'drop') {
-        const paths = event.payload.paths
-        for (const filePath of paths) {
-          const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
-          if (!imageExts.includes(ext)) continue
+      if (event.payload.type !== 'drop') return
 
-          try {
-            const data = await readFile(filePath)
-            const mimeType = ext === '.png' ? 'image/png'
-              : ext === '.svg' ? 'image/svg+xml'
-              : ext === '.gif' ? 'image/gif'
-              : ext === '.webp' ? 'image/webp'
-              : ext === '.bmp' ? 'image/bmp'
-              : 'image/jpeg'
-            const base64 = btoa(
-              Array.from(data).map(b => String.fromCharCode(b)).join('')
-            )
-            editor.chain().focus().setImage({ src: `data:${mimeType};base64,${base64}` }).run()
-          } catch (err) {
-            console.error('拖拽图片插入失败:', err)
-          }
+      // 仅当拖放位置落在编辑器容器内时才插入
+      const container = editorContainerRef.current
+      if (!container) return
+      const rect = container.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const x = event.payload.position.x / dpr
+      const y = event.payload.position.y / dpr
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        return
+      }
+
+      const paths = event.payload.paths
+      for (const filePath of paths) {
+        const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
+        if (!imageExts.includes(ext)) continue
+
+        try {
+          const data = await readFile(filePath)
+          const mimeType = ext === '.png' ? 'image/png'
+            : ext === '.svg' ? 'image/svg+xml'
+            : ext === '.gif' ? 'image/gif'
+            : ext === '.webp' ? 'image/webp'
+            : ext === '.bmp' ? 'image/bmp'
+            : 'image/jpeg'
+          const base64 = btoa(
+            Array.from(data).map(b => String.fromCharCode(b)).join('')
+          )
+          editor.chain().focus().setImage({ src: `data:${mimeType};base64,${base64}` }).run()
+        } catch (err) {
+          console.error('拖拽图片插入失败:', err)
         }
       }
     }).then((fn) => {
-      unlisten = fn
+      if (cancelled) {
+        // 注册期间组件已卸载,立刻清理
+        fn()
+      } else {
+        unlisten = fn
+      }
     })
 
     return () => {
+      cancelled = true
       unlisten?.()
     }
   }, [editor])
