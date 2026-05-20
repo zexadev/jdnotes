@@ -28,3 +28,6 @@ release/
 
 # Signing keys
 src-tauri/keys/
+
+# 本地文档（不入库的临时笔记/设计探索/调试草稿）
+docs/local/

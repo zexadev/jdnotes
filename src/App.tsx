@@ -10,18 +10,23 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { SettingsModal } from './components/modals/SettingsModal'
 import { TemplateModal } from './components/modals/TemplateModal'
 import type { NoteTemplate } from './components/modals/TemplateModal'
+import { UpdateAvailableModal } from './components/modals/UpdateAvailableModal'
 import { AIChatSidebar } from './components/ai/AIChatSidebar'
 import { CalendarView, ReminderNotification } from './components/calendar'
 import { ToastContainer } from './components/common/Toast'
 import { toast } from './lib/toast'
 import { SettingsPage } from './pages/SettingsPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { useUpdater } from './hooks/useUpdater'
 
 // 视图类型
 type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'settings' | `tag-${string}`
 
 // 侧栏状态循环顺序
 const SIDEBAR_CYCLE: SidebarState[] = ['expanded', 'collapsed', 'hidden']
+
+// 跳过版本的 localStorage key
+const SKIPPED_VERSION_KEY = 'jdnotes-skipped-version'
 
 function App() {
   const [isReady, setIsReady] = useState(false)
@@ -147,6 +152,42 @@ function App() {
     document.addEventListener('contextmenu', handleContextMenu)
     return () => document.removeEventListener('contextmenu', handleContextMenu)
   }, [])
+
+  // 更新检测
+  const updater = useUpdater()
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
+  const hasCheckedUpdateRef = useRef(false)
+  const updaterRef = useRef(updater)
+  updaterRef.current = updater
+
+  // 启动后延迟检查更新（避开初始化高峰）
+  useEffect(() => {
+    if (!isReady || hasCheckedUpdateRef.current) return
+    hasCheckedUpdateRef.current = true
+    const timer = setTimeout(() => {
+      updaterRef.current.checkForUpdates().catch((err) => {
+        console.error('[App] 启动检查更新失败:', err)
+      })
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [isReady])
+
+  // 检测到新版本时弹窗（跳过用户已忽略的版本）
+  useEffect(() => {
+    if (updater.status === 'available' && updater.updateInfo) {
+      const skipped = localStorage.getItem(SKIPPED_VERSION_KEY)
+      if (skipped !== updater.updateInfo.version) {
+        setShowUpdateModal(true)
+      }
+    }
+  }, [updater.status, updater.updateInfo])
+
+  const handleSkipUpdate = useCallback(() => {
+    if (updater.updateInfo) {
+      localStorage.setItem(SKIPPED_VERSION_KEY, updater.updateInfo.version)
+    }
+    setShowUpdateModal(false)
+  }, [updater.updateInfo])
 
   // 监听 MCP 等外部数据库变化，刷新当前打开笔记的内容
   const activeNoteIdRef = useRef<number | null>(null)
@@ -404,6 +445,19 @@ function App() {
         open={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
         onSelect={handleCreateNoteFromTemplate}
+      />
+
+      {/* 启动时新版本提示 */}
+      <UpdateAvailableModal
+        open={showUpdateModal}
+        updateInfo={updater.updateInfo}
+        status={updater.status}
+        progress={updater.progress}
+        error={updater.error}
+        onUpdate={updater.downloadAndInstall}
+        onInstall={updater.installUpdate}
+        onLater={() => setShowUpdateModal(false)}
+        onSkip={handleSkipUpdate}
       />
 
       <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
