@@ -79,7 +79,7 @@ export function SettingsPage({ onClose, onDataChange }: SettingsPageProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="max-w-3xl mx-auto p-8"
+            className="p-8"
           >
             {activeSection === 'ai' && <AISettings />}
             {activeSection === 'data' && <DataSettings onDataChange={onDataChange} />}
