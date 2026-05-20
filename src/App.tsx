@@ -227,6 +227,11 @@ function App() {
   const handleSelectNote = useCallback(async (note: Note) => {
     console.log('[App] handleSelectNote - 点击笔记:', note.id, '当前笔记:', activeNoteId)
 
+    // view 切换先行：即使点的是当前已激活的笔记，从 dashboard/calendar 也要切回 inbox
+    if (currentView === 'calendar' || currentView === 'dashboard') {
+      setCurrentView('inbox')
+    }
+
     if (note.id === activeNoteId) return
 
     // 保存当前笔记未保存的变化
@@ -241,9 +246,6 @@ function App() {
     setActiveNoteId(latestNote.id)
     setLocalTitle(latestNote.title)
     setLocalContent(latestNote.content)
-    if (currentView === 'calendar') {
-      setCurrentView('inbox')
-    }
   }, [activeNoteId, localTitle, localContent, saveNoteById, hasUnsavedChanges, currentView])
 
   // 显示模板选择弹窗
@@ -437,6 +439,7 @@ function App() {
                 <DashboardPage
                   onNavigate={(view) => setCurrentView(view)}
                   onCreateNote={handleShowTemplateModal}
+                  onOpenNote={handleCommandSelectNote}
                 />
               </motion.div>
             ) : currentView === 'settings' ? (
