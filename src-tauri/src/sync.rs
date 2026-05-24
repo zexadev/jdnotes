@@ -53,6 +53,9 @@ pub struct SyncPackage {
     /// 正文引用到的图片附件（serde default 兼容旧版无此字段的包）
     #[serde(default)]
     pub attachments: Vec<SyncAttachment>,
+    /// 发送方设备名（用于对端冲突副本标注来源；serde default 兼容旧包）
+    #[serde(default)]
+    pub device_name: String,
 }
 
 /// 同步结果统计
@@ -187,10 +190,11 @@ fn now_iso() -> String {
 }
 
 /// 把对端笔记另存为一条"冲突副本"新笔记（绝不丢数据：两版都保留）
-async fn create_conflict_copy(pool: &SqlitePool, remote: &SyncNote) -> Result<(), String> {
+async fn create_conflict_copy(pool: &SqlitePool, remote: &SyncNote, peer_name: &str) -> Result<(), String> {
     let new_uuid = Uuid::new_v4().to_string();
     let now = now_iso();
-    let title = format!("{}（冲突副本 {}）", remote.title, &now[..10.min(now.len())]);
+    let from = if peer_name.is_empty() { String::new() } else { format!("来自{} ", peer_name) };
+    let title = format!("{}（冲突副本 {}{}）", remote.title, from, &now[..10.min(now.len())]);
     sqlx::query(
         "INSERT INTO notes (uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled,synced_content,has_conflict) \
          VALUES (?,?,?,?,?,?,?,?,?,?,?,1)",
@@ -222,7 +226,7 @@ async fn apply_remote(pool: &SqlitePool, n: &SyncNote) -> Result<(), String> {
 /// git 式三路合并：base(共同祖先 synced_content) / local(本地) / remote(对端)
 /// 绝不静默丢数据：仅一方改→取那方；两方改不同处→自动合并；两方改同处→冲突副本。
 /// 返回 (inserted, updated, conflicts)
-async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote]) -> Result<(usize, usize, usize), String> {
+async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote], peer_name: &str) -> Result<(usize, usize, usize), String> {
     let mut inserted = 0usize;
     let mut updated = 0usize;
     let mut conflicts = 0usize;
@@ -291,7 +295,7 @@ async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote]) -> Result<(usize, u
         // ---- 无共同祖先（首次同步/老数据）且内容不同 → 冲突副本兜底 ----
         let base = match base {
             None => {
-                create_conflict_copy(pool, n).await?;
+                create_conflict_copy(pool, n, peer_name).await?;
                 sqlx::query("UPDATE notes SET synced_content=? WHERE uuid=?")
                     .bind(&l.content).bind(&n.uuid)
                     .execute(pool).await.map_err(|e| e.to_string())?;
@@ -328,7 +332,7 @@ async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote]) -> Result<(usize, u
                 }
                 Err(_conflict_text) => {
                     // 改了同一处 → 真冲突：远端另存冲突副本，本地保留，基准推进到远端避免重复冲突
-                    create_conflict_copy(pool, n).await?;
+                    create_conflict_copy(pool, n, peer_name).await?;
                     sqlx::query("UPDATE notes SET synced_content=?,has_conflict=1 WHERE uuid=?")
                         .bind(&n.content).bind(&n.uuid)
                         .execute(pool).await.map_err(|e| e.to_string())?;
@@ -365,7 +369,7 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     let local = read_local_notes(&pool).await?;
     let sent = local.len();
     let attachments = collect_attachments(&app, &local);
-    let pkg = SyncPackage { version: 1, notes: local, attachments };
+    let pkg = SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
     let mut stream = TcpStream::connect(addr)
@@ -377,7 +381,7 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
         serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
-    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
+    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
 
     if inserted > 0 || updated > 0 || conflicts > 0 {
@@ -395,10 +399,10 @@ async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> 
     save_attachments(&app, &remote.attachments);
     let local = read_local_notes(&pool).await?;
     let attachments = collect_attachments(&app, &local);
-    let pkg = SyncPackage { version: 1, notes: local, attachments };
+    let pkg = SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
     write_msg(&mut stream, &bytes).await?;
-    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
+    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
@@ -456,13 +460,21 @@ pub fn local_ip() -> String {
     "127.0.0.1".to_string()
 }
 
+/// 本设备名称（空则给个默认，发送同步包时带上）
+fn local_device_name(app: &AppHandle) -> String {
+    crate::db::get_device_name(app)
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "未命名设备".to_string())
+}
+
 /// 导出同步包为 JSON 字符串（异地手动传输用，内联图片附件，自包含）
 pub async fn export_package(app: &AppHandle, db_path: &str) -> Result<String, String> {
     let pool = open_pool(db_path).await?;
     let notes = read_local_notes(&pool).await?;
     pool.close().await;
     let attachments = collect_attachments(app, &notes);
-    let pkg = SyncPackage { version: 1, notes, attachments };
+    let pkg = SyncPackage { version: 1, notes, attachments, device_name: local_device_name(app) };
     serde_json::to_string(&pkg).map_err(|e| e.to_string())
 }
 
@@ -473,7 +485,7 @@ pub async fn import_package(app: AppHandle, db_path: &str, json_data: &str) -> R
     save_attachments(&app, &pkg.attachments);
     let received = pkg.notes.len();
     let pool = open_pool(db_path).await?;
-    let (inserted, updated, conflicts) = merge_notes(&pool, &pkg.notes).await?;
+    let (inserted, updated, conflicts) = merge_notes(&pool, &pkg.notes, &pkg.device_name).await?;
     pool.close().await;
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
@@ -554,10 +566,10 @@ async fn handle_iroh_conn(
     save_attachments(&app, &remote.attachments);
     let local = read_local_notes(&pool).await?;
     let attachments = collect_attachments(&app, &local);
-    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments }).map_err(|e| e.to_string())?;
+    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
     send.finish().map_err(|e| e.to_string())?;
-    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
+    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
     conn.closed().await;
     if inserted > 0 || updated > 0 || conflicts > 0 {
@@ -592,7 +604,7 @@ pub async fn iroh_sync_connect(
     let local = read_local_notes(&pool).await?;
     let sent = local.len();
     let attachments = collect_attachments(&app, &local);
-    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments }).map_err(|e| e.to_string())?;
+    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
     send.finish().map_err(|e| e.to_string())?;
     let resp = recv
@@ -603,7 +615,7 @@ pub async fn iroh_sync_connect(
         serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
-    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
+    let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
     conn.close(0u8.into(), b"done");
     if inserted > 0 || updated > 0 || conflicts > 0 {

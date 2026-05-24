@@ -67,6 +67,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
   const [irohSyncing, setIrohSyncing] = useState(false)
   const [irohResult, setIrohResult] = useState<string | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => localStorage.getItem('jdnotes_last_sync'))
+  const [deviceName, setDeviceName] = useState('')
 
   // 记录一次成功同步的时间
   const markSynced = () => {
@@ -94,6 +95,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
       loadDatabaseInfo()
       loadSyncInfo()
       loadIrohId()
+      loadDeviceName()
     }
   }, [open])
 
@@ -124,6 +126,22 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
       setIrohId(id)
     } catch (e) {
       console.warn('获取 iroh 设备 ID 失败:', e)
+    }
+  }
+
+  // 加载 / 保存本设备名称
+  const loadDeviceName = async () => {
+    try {
+      setDeviceName(await invoke<string>('get_device_name'))
+    } catch (e) {
+      console.warn('获取设备名失败:', e)
+    }
+  }
+  const saveDeviceName = async () => {
+    try {
+      await invoke('set_device_name', { name: deviceName })
+    } catch (e) {
+      console.warn('保存设备名失败:', e)
     }
   }
 
@@ -611,6 +629,18 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
                 上次同步：{new Date(lastSyncAt).toLocaleString()}
               </p>
             )}
+
+            <div className="mb-3">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">本设备名称（冲突时用于标注来源）</label>
+              <input
+                type="text"
+                value={deviceName}
+                onChange={(e) => setDeviceName(e.target.value)}
+                onBlur={saveDeviceName}
+                placeholder="如：公司电脑 / 家里台式机"
+                className="w-full px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all"
+              />
+            </div>
 
             {/* 本机地址 */}
             <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">

@@ -195,6 +195,18 @@ pub async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
     db::get_config_file_path(&app)
 }
 
+/// 获取本设备名称
+#[tauri::command]
+pub async fn get_device_name(app: tauri::AppHandle) -> Result<String, String> {
+    db::get_device_name(&app)
+}
+
+/// 设置本设备名称
+#[tauri::command]
+pub async fn set_device_name(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    db::set_device_name(&app, name)
+}
+
 // ============= 多设备同步 =============
 
 /// 获取本机同步信息（局域网地址）并启动监听

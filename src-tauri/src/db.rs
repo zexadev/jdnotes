@@ -56,6 +56,9 @@ pub struct AppConfig {
     /// 当前激活的来源 ID
     #[serde(default)]
     pub active_source_id: String,
+    /// 本设备名称（同步时随包发送，用于在对端的冲突副本里标注来源）
+    #[serde(default)]
+    pub device_name: String,
 }
 
 fn default_ai_sources() -> Vec<AISource> {
@@ -410,6 +413,18 @@ pub fn save_ai_config(app: &tauri::AppHandle, sources: Vec<AISource>, active_sou
 pub fn get_config_file_path(app: &tauri::AppHandle) -> Result<String, String> {
     let config_path = get_config_path(app)?;
     Ok(config_path.to_string_lossy().to_string())
+}
+
+/// 获取本设备名称
+pub fn get_device_name(app: &tauri::AppHandle) -> Result<String, String> {
+    Ok(load_config(app)?.device_name)
+}
+
+/// 设置本设备名称
+pub fn set_device_name(app: &tauri::AppHandle, name: String) -> Result<(), String> {
+    let mut config = load_config(app)?;
+    config.device_name = name;
+    save_config(app, &config)
 }
 
 // ============= 旧版本数据迁移 =============
