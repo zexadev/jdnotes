@@ -1,6 +1,6 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, ImageOff } from 'lucide-react'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 
 // 从图片 src 解析底层引用、附件 hash、尺寸：attachment://<hash>?w=<宽度>
@@ -144,17 +144,27 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
 
   // attachment://<hash> 引用 → 运行时转本机 asset URL；data:/http 直接用
   const [resolvedSrc, setResolvedSrc] = useState<string>(parsed.hash ? '' : parsed.ref)
+  const [loadFailed, setLoadFailed] = useState(false)
   useEffect(() => {
     let cancelled = false
     const p = parseImageSrc(src)
     if (p.hash) {
       invoke<string | null>('get_attachment_path', { hash: p.hash })
         .then((path) => {
-          if (!cancelled && path) setResolvedSrc(convertFileSrc(path))
+          if (cancelled) return
+          if (path) {
+            setResolvedSrc(convertFileSrc(path))
+            setLoadFailed(false)
+          } else {
+            setLoadFailed(true)
+          }
         })
-        .catch(() => {})
+        .catch(() => {
+          if (!cancelled) setLoadFailed(true)
+        })
     } else {
       setResolvedSrc(p.ref)
+      setLoadFailed(false)
     }
     return () => {
       cancelled = true
@@ -214,16 +224,26 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
         className={`relative inline-block group ${selected && isEditable ? 'ring-2 ring-[#5E6AD2] ring-offset-2 dark:ring-offset-gray-900 rounded-lg' : ''}`}
         style={{ width: displayWidth ? `${displayWidth}px` : 'auto', maxWidth: '100%' }}
       >
-        <img
-          ref={imageRef}
-          src={resolvedSrc}
-          alt={alt || ''}
-          title={title || ''}
-          onClick={handleImageClick}
-          className="block max-w-full h-auto rounded-lg shadow-sm dark:border dark:border-white/[0.06] cursor-zoom-in"
-          style={{ width: displayWidth ? `${displayWidth}px` : 'auto', maxWidth: '100%' }}
-          draggable={false}
-        />
+        {loadFailed ? (
+          <div
+            className="flex flex-col items-center justify-center gap-2 px-6 py-10 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-400 dark:text-gray-500 text-sm"
+            style={{ minWidth: 180 }}
+          >
+            <ImageOff className="h-6 w-6" />
+            图片未找到（可能尚未同步到本设备）
+          </div>
+        ) : (
+          <img
+            ref={imageRef}
+            src={resolvedSrc}
+            alt={alt || ''}
+            title={title || ''}
+            onClick={handleImageClick}
+            className="block max-w-full h-auto rounded-lg shadow-sm dark:border dark:border-white/[0.06] cursor-zoom-in"
+            style={{ width: displayWidth ? `${displayWidth}px` : 'auto', maxWidth: '100%' }}
+            draggable={false}
+          />
+        )}
 
         {/* 悬浮删除按钮 - 仅编辑模式 */}
         {isEditable && (
