@@ -1,6 +1,7 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
+import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 
 interface ImagePreviewProps {
   src: string
@@ -117,6 +118,27 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
   const { src, alt, title, width } = node.attrs
   const isEditable = editor.isEditable
 
+  // 解析图片地址：attachment://<hash> 引用 → 运行时转本机 asset URL；data:/http 直接用
+  const [resolvedSrc, setResolvedSrc] = useState<string>(
+    typeof src === 'string' && src.startsWith('attachment://') ? '' : src
+  )
+  useEffect(() => {
+    let cancelled = false
+    if (typeof src === 'string' && src.startsWith('attachment://')) {
+      const hash = src.slice('attachment://'.length)
+      invoke<string | null>('get_attachment_path', { hash })
+        .then((path) => {
+          if (!cancelled && path) setResolvedSrc(convertFileSrc(path))
+        })
+        .catch(() => {})
+    } else {
+      setResolvedSrc(src)
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [src])
+
   // 获取编辑器容器最大可用宽度
   const getMaxWidth = useCallback(() => {
     const container = editor.view.dom.parentElement
@@ -172,7 +194,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
       >
         <img
           ref={imageRef}
-          src={src}
+          src={resolvedSrc}
           alt={alt || ''}
           title={title || ''}
           onClick={handleImageClick}
@@ -237,7 +259,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
 
       {/* 图片预览模态框 */}
       {showPreview && (
-        <ImagePreview src={src} onClose={() => setShowPreview(false)} />
+        <ImagePreview src={resolvedSrc} onClose={() => setShowPreview(false)} />
       )}
     </NodeViewWrapper>
   )
