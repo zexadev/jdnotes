@@ -224,7 +224,7 @@ pub async fn sync_connect_lan(
 #[tauri::command]
 pub async fn sync_export_package(app: tauri::AppHandle) -> Result<String, String> {
     let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
-    sync::export_package(&db_path).await
+    sync::export_package(&app, &db_path).await
 }
 
 /// 导入同步包（合并入本地）

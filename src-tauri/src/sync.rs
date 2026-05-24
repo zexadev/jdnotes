@@ -37,11 +37,22 @@ pub struct SyncNote {
     pub reminder_enabled: i64,
 }
 
+/// 同步附件（图片字节，base64 内联在同步包里；正文仍只存 attachment://hash 引用）
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SyncAttachment {
+    pub hash: String,
+    pub ext: String,
+    pub data: String,
+}
+
 /// 同步包（一次交换传输的内容）
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SyncPackage {
     pub version: u32,
     pub notes: Vec<SyncNote>,
+    /// 正文引用到的图片附件（serde default 兼容旧版无此字段的包）
+    #[serde(default)]
+    pub attachments: Vec<SyncAttachment>,
 }
 
 /// 同步结果统计
@@ -75,6 +86,55 @@ async fn read_local_notes(pool: &SqlitePool) -> Result<Vec<SyncNote>, String> {
     .fetch_all(pool)
     .await
     .map_err(|e| format!("读取本地笔记失败: {}", e))
+}
+
+/// 从正文提取所有 attachment://<hash> 引用的 hash
+fn find_attachment_hashes(content: &str) -> Vec<String> {
+    let marker = "attachment://";
+    let mut hashes = Vec::new();
+    let mut rest = content;
+    while let Some(pos) = rest.find(marker) {
+        let after = &rest[pos + marker.len()..];
+        let hash: String = after.chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+        rest = &after[hash.len()..];
+        if !hash.is_empty() {
+            hashes.push(hash);
+        }
+    }
+    hashes
+}
+
+/// 收集这批笔记正文引用到的附件（base64 内联进同步包，对端去重落盘）
+fn collect_attachments(app: &AppHandle, notes: &[SyncNote]) -> Vec<SyncAttachment> {
+    use base64::Engine;
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for n in notes {
+        for hash in find_attachment_hashes(&n.content) {
+            if !seen.insert(hash.clone()) {
+                continue;
+            }
+            if let Ok(Some(bytes)) = crate::attachments::read_bytes(app, &hash) {
+                let ext = crate::attachments::find_ext(app, &hash)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "png".to_string());
+                let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                result.push(SyncAttachment { hash, ext, data });
+            }
+        }
+    }
+    result
+}
+
+/// 把对端传来的附件按 hash 落盘（内容寻址去重，已存在则跳过）
+fn save_attachments(app: &AppHandle, atts: &[SyncAttachment]) {
+    use base64::Engine;
+    for a in atts {
+        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(a.data.as_bytes()) {
+            let _ = crate::attachments::save_bytes(app, &bytes, &a.ext);
+        }
+    }
 }
 
 /// 本地笔记的完整状态（含同步基准 synced_content = 共同祖先 base）
@@ -281,7 +341,8 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     let pool = open_pool(db_path).await?;
     let local = read_local_notes(&pool).await?;
     let sent = local.len();
-    let pkg = SyncPackage { version: 1, notes: local };
+    let attachments = collect_attachments(&app, &local);
+    let pkg = SyncPackage { version: 1, notes: local, attachments };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
     let mut stream = TcpStream::connect(addr)
@@ -291,6 +352,7 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     let resp = read_msg(&mut stream).await?;
     let remote: SyncPackage =
         serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
     pool.close().await;
@@ -307,8 +369,10 @@ async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> 
     let remote: SyncPackage =
         serde_json::from_slice(&req).map_err(|e| format!("解析对端数据失败: {}", e))?;
     let pool = open_pool(&db_path).await?;
+    save_attachments(&app, &remote.attachments);
     let local = read_local_notes(&pool).await?;
-    let pkg = SyncPackage { version: 1, notes: local };
+    let attachments = collect_attachments(&app, &local);
+    let pkg = SyncPackage { version: 1, notes: local, attachments };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
     write_msg(&mut stream, &bytes).await?;
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
@@ -369,12 +433,13 @@ pub fn local_ip() -> String {
     "127.0.0.1".to_string()
 }
 
-/// 导出同步包为 JSON 字符串（异地手动传输用）
-pub async fn export_package(db_path: &str) -> Result<String, String> {
+/// 导出同步包为 JSON 字符串（异地手动传输用，内联图片附件，自包含）
+pub async fn export_package(app: &AppHandle, db_path: &str) -> Result<String, String> {
     let pool = open_pool(db_path).await?;
     let notes = read_local_notes(&pool).await?;
     pool.close().await;
-    let pkg = SyncPackage { version: 1, notes };
+    let attachments = collect_attachments(app, &notes);
+    let pkg = SyncPackage { version: 1, notes, attachments };
     serde_json::to_string(&pkg).map_err(|e| e.to_string())
 }
 
@@ -382,6 +447,7 @@ pub async fn export_package(db_path: &str) -> Result<String, String> {
 pub async fn import_package(app: AppHandle, db_path: &str, json_data: &str) -> Result<SyncStats, String> {
     let pkg: SyncPackage =
         serde_json::from_str(json_data).map_err(|e| format!("解析同步包失败: {}", e))?;
+    save_attachments(&app, &pkg.attachments);
     let received = pkg.notes.len();
     let pool = open_pool(db_path).await?;
     let (inserted, updated, conflicts) = merge_notes(&pool, &pkg.notes).await?;
@@ -462,8 +528,10 @@ async fn handle_iroh_conn(
     let remote: SyncPackage =
         serde_json::from_slice(&req).map_err(|e| format!("解析对端数据失败: {}", e))?;
     let pool = open_pool(&db_path).await?;
+    save_attachments(&app, &remote.attachments);
     let local = read_local_notes(&pool).await?;
-    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local }).map_err(|e| e.to_string())?;
+    let attachments = collect_attachments(&app, &local);
+    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
     send.finish().map_err(|e| e.to_string())?;
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
@@ -500,7 +568,8 @@ pub async fn iroh_sync_connect(
     let pool = open_pool(db_path).await?;
     let local = read_local_notes(&pool).await?;
     let sent = local.len();
-    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local }).map_err(|e| e.to_string())?;
+    let attachments = collect_attachments(&app, &local);
+    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
     send.finish().map_err(|e| e.to_string())?;
     let resp = recv
@@ -509,6 +578,7 @@ pub async fn iroh_sync_connect(
         .map_err(|e| e.to_string())?;
     let remote: SyncPackage =
         serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes).await?;
     pool.close().await;
