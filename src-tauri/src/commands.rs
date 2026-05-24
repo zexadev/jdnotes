@@ -1,3 +1,4 @@
+use crate::attachments;
 use crate::db;
 use crate::models::ExportData;
 use crate::sync;
@@ -251,6 +252,47 @@ pub async fn sync_iroh_connect(
 ) -> Result<sync::SyncStats, String> {
     let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
     sync::iroh_sync_connect(app.clone(), &db_path, &peer_id).await
+}
+
+// ============= 图片附件 =============
+
+/// 保存 base64 图片为附件，返回内容 hash（前端粘贴/选文件用）
+#[tauri::command]
+pub async fn save_attachment_base64(
+    app: tauri::AppHandle,
+    base64_data: String,
+    ext: String,
+) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_data.as_bytes())
+        .map_err(|e| format!("base64 解码失败: {}", e))?;
+    attachments::save_bytes(&app, &bytes, &ext)
+}
+
+/// 从本地文件路径保存附件（系统拖拽用），返回 { hash, ext }
+#[tauri::command]
+pub async fn save_attachment_from_path(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<serde_json::Value, String> {
+    let bytes = std::fs::read(&path).map_err(|e| format!("读取文件失败: {}", e))?;
+    let ext = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_lowercase();
+    let hash = attachments::save_bytes(&app, &bytes, &ext)?;
+    Ok(serde_json::json!({ "hash": hash, "ext": ext }))
+}
+
+/// 取附件文件绝对路径（供前端 convertFileSrc 渲染）
+#[tauri::command]
+pub async fn get_attachment_path(
+    app: tauri::AppHandle,
+    hash: String,
+) -> Result<Option<String>, String> {
+    Ok(attachments::find_path(&app, &hash)?.map(|p| p.to_string_lossy().to_string()))
 }
 
 // ============= 联网功能 =============

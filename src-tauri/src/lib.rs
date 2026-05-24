@@ -1,3 +1,4 @@
+mod attachments;
 mod commands;
 mod db;
 mod mcp_server;
@@ -166,6 +167,10 @@ pub fn run() {
             commands::sync_import_package,
             commands::sync_iroh_get_id,
             commands::sync_iroh_connect,
+            // 图片附件
+            commands::save_attachment_base64,
+            commands::save_attachment_from_path,
+            commands::get_attachment_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

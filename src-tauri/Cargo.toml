@@ -21,7 +21,7 @@ tauri-build = { version = "2.5.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.9.5", features = ["tray-icon"] }
+tauri = { version = "2.9.5", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
@@ -48,3 +48,6 @@ ego-tree = "0.11.0"
 iroh = "=1.0.0-rc.0"
 # 三路文本合并（git 式 diff3）
 diffy = "0.4"
+# 图片附件：内容寻址（sha256）+ base64 编解码
+sha2 = "0.10"
+base64 = "0.22"
