@@ -66,6 +66,14 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
   const [irohPeerId, setIrohPeerId] = useState('')
   const [irohSyncing, setIrohSyncing] = useState(false)
   const [irohResult, setIrohResult] = useState<string | null>(null)
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => localStorage.getItem('jdnotes_last_sync'))
+
+  // 记录一次成功同步的时间
+  const markSynced = () => {
+    const now = new Date().toISOString()
+    localStorage.setItem('jdnotes_last_sync', now)
+    setLastSyncAt(now)
+  }
 
   // 检查通知权限状态
   useEffect(() => {
@@ -132,6 +140,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
       )
       setIrohResult(`同步完成：新增 ${stats.inserted}，更新 ${stats.updated}` + (stats.conflicts > 0 ? `，⚠️ 冲突 ${stats.conflicts}（已存为"冲突副本"笔记，请打开核对）` : '，无冲突'))
       onDataChange?.()
+      markSynced()
     } catch (e) {
       setIrohResult('同步失败：' + (e instanceof Error ? e.message : String(e)))
     }
@@ -151,6 +160,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
       )
       setSyncResult(`同步完成：新增 ${stats.inserted}，更新 ${stats.updated}` + (stats.conflicts > 0 ? `，⚠️ 冲突 ${stats.conflicts}（已存为"冲突副本"笔记，请打开核对）` : '，无冲突'))
       onDataChange?.()
+      markSynced()
     } catch (e) {
       setSyncResult('同步失败：' + (e instanceof Error ? e.message : String(e)))
     }
@@ -191,6 +201,7 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
         })
         showMessage('success', `合并完成：新增 ${stats.inserted}，更新 ${stats.updated}` + (stats.conflicts > 0 ? `，冲突 ${stats.conflicts}（已存为冲突副本）` : ''))
         onDataChange?.()
+        markSynced()
       }
     } catch (e) {
       showMessage('error', '导入失败: ' + (e instanceof Error ? e.message : String(e)))
@@ -595,6 +606,11 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
               两台设备在同一网络下同时打开 JD Notes，把下方“本机地址”告诉对方，或输入对方地址点击同步。异地可用“同步包”手动传输。
             </p>
+            {lastSyncAt && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+                上次同步：{new Date(lastSyncAt).toLocaleString()}
+              </p>
+            )}
 
             {/* 本机地址 */}
             <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
