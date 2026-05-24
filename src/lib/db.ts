@@ -173,17 +173,17 @@ async function backfillUuids(): Promise<void> {
 // 无内嵌图时原样快速返回（保存路径几乎零开销）。
 async function externalizeImages(content: string): Promise<string> {
   if (!content.includes('data:image')) return content
-  const re = /!\[([^\]]*)\]\(data:image\/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+?)\)/g
+  const re = /!\[([^\]]*)\]\(data:image\/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+?)(\?w=\d+)?\)/g
   let result = content
   for (const m of [...content.matchAll(re)]) {
-    const [full, alt, mimeExt, base64] = m
+    const [full, alt, mimeExt, base64, widthPart] = m
     try {
       const ext = mimeExt === 'jpeg' ? 'jpg' : mimeExt === 'svg+xml' ? 'svg' : mimeExt
       const hash = await invoke<string>('save_attachment_base64', {
         base64Data: base64.replace(/\s/g, ''),
         ext,
       })
-      result = result.replace(full, `![${alt}](attachment://${hash})`)
+      result = result.replace(full, `![${alt}](attachment://${hash}${widthPart || ''})`)
     } catch (e) {
       console.warn('图片附件化失败:', e)
     }
@@ -225,13 +225,13 @@ async function migrateImagesToAttachments(): Promise<void> {
 // 把 content 里的 attachment://<hash> 引用还原成 base64 内嵌（导出自包含 JSON 用）
 async function internalizeImages(content: string): Promise<string> {
   if (!content.includes('attachment://')) return content
-  const re = /!\[([^\]]*)\]\(attachment:\/\/([a-f0-9]+)\)/g
+  const re = /!\[([^\]]*)\]\(attachment:\/\/([a-f0-9]+)(\?w=\d+)?\)/g
   let result = content
   for (const m of [...content.matchAll(re)]) {
-    const [full, alt, hash] = m
+    const [full, alt, hash, widthPart] = m
     try {
       const dataUrl = await invoke<string | null>('read_attachment_data_url', { hash })
-      if (dataUrl) result = result.replace(full, `![${alt}](${dataUrl})`)
+      if (dataUrl) result = result.replace(full, `![${alt}](${dataUrl}${widthPart || ''})`)
     } catch (e) {
       console.warn('附件还原失败:', e)
     }

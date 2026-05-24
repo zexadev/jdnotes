@@ -3,6 +3,26 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 
+// 从图片 src 解析底层引用、附件 hash、尺寸：attachment://<hash>?w=<宽度>
+function parseImageSrc(src: unknown): { ref: string; hash: string | null; width: number | null } {
+  if (typeof src !== 'string') return { ref: '', hash: null, width: null }
+  const [base, query] = src.split('?')
+  let width: number | null = null
+  if (query) {
+    const m = query.match(/w=(\d+)/)
+    if (m) width = parseInt(m[1], 10)
+  }
+  const hash = base.startsWith('attachment://') ? base.slice('attachment://'.length) : null
+  return { ref: base, hash, width }
+}
+
+// 把宽度写进 src（仅对 attachment:// 引用，base64/http 原样返回以免破坏）
+function setWidthInSrc(src: unknown, w: number): string {
+  const s = typeof src === 'string' ? src : ''
+  const base = s.split('?')[0]
+  return base.startsWith('attachment://') ? `${base}?w=${w}` : s
+}
+
 interface ImagePreviewProps {
   src: string
   onClose: () => void
@@ -118,21 +138,23 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
   const { src, alt, title, width } = node.attrs
   const isEditable = editor.isEditable
 
-  // 解析图片地址：attachment://<hash> 引用 → 运行时转本机 asset URL；data:/http 直接用
-  const [resolvedSrc, setResolvedSrc] = useState<string>(
-    typeof src === 'string' && src.startsWith('attachment://') ? '' : src
-  )
+  // 解析 src 的附件 hash 与尺寸；显示宽度优先用节点 width（缩放即时反馈），否则用 src 里的 ?w（加载时的持久值）
+  const parsed = parseImageSrc(src)
+  const displayWidth: number | null = width ?? parsed.width
+
+  // attachment://<hash> 引用 → 运行时转本机 asset URL；data:/http 直接用
+  const [resolvedSrc, setResolvedSrc] = useState<string>(parsed.hash ? '' : parsed.ref)
   useEffect(() => {
     let cancelled = false
-    if (typeof src === 'string' && src.startsWith('attachment://')) {
-      const hash = src.slice('attachment://'.length)
-      invoke<string | null>('get_attachment_path', { hash })
+    const p = parseImageSrc(src)
+    if (p.hash) {
+      invoke<string | null>('get_attachment_path', { hash: p.hash })
         .then((path) => {
           if (!cancelled && path) setResolvedSrc(convertFileSrc(path))
         })
         .catch(() => {})
     } else {
-      setResolvedSrc(src)
+      setResolvedSrc(p.ref)
     }
     return () => {
       cancelled = true
@@ -158,7 +180,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
         const diff = e.clientX - startXRef.current
         const maxWidth = getMaxWidth()
         const newWidth = Math.min(maxWidth, Math.max(100, startWidthRef.current + diff))
-        updateAttributes({ width: newWidth })
+        updateAttributes({ width: newWidth, src: setWidthInSrc(src, newWidth) })
       }
 
       const handleMouseUp = () => {
@@ -170,7 +192,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
     },
-    [updateAttributes, isEditable, getMaxWidth]
+    [updateAttributes, isEditable, getMaxWidth, src]
   )
 
   const handleImageClick = (e: React.MouseEvent) => {
@@ -190,7 +212,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
     <NodeViewWrapper className="relative my-4 flex justify-center">
       <div
         className={`relative inline-block group ${selected && isEditable ? 'ring-2 ring-[#5E6AD2] ring-offset-2 dark:ring-offset-gray-900 rounded-lg' : ''}`}
-        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%' }}
+        style={{ width: displayWidth ? `${displayWidth}px` : 'auto', maxWidth: '100%' }}
       >
         <img
           ref={imageRef}
@@ -199,7 +221,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
           title={title || ''}
           onClick={handleImageClick}
           className="block max-w-full h-auto rounded-lg shadow-sm dark:border dark:border-white/[0.06] cursor-zoom-in"
-          style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%' }}
+          style={{ width: displayWidth ? `${displayWidth}px` : 'auto', maxWidth: '100%' }}
           draggable={false}
         />
 
