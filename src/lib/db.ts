@@ -148,6 +148,7 @@ async function getDatabase(): Promise<Database> {
 export async function initDatabase(): Promise<void> {
   await getDatabase()
   await backfillUuids()
+  await migrateImagesToAttachments()
 }
 
 // 为没有 uuid 的历史笔记回填全局唯一 uuid（幂等，作为多设备同步身份）
@@ -165,6 +166,59 @@ async function backfillUuids(): Promise<void> {
     }
   } catch (e) {
     console.warn('回填 uuid 失败:', e)
+  }
+}
+
+// 把 content 里的 base64 内嵌图片抽成附件文件，返回替换为 attachment://<hash> 引用的 content。
+// 无内嵌图时原样快速返回（保存路径几乎零开销）。
+async function externalizeImages(content: string): Promise<string> {
+  if (!content.includes('data:image')) return content
+  const re = /!\[([^\]]*)\]\(data:image\/([a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+?)\)/g
+  let result = content
+  for (const m of [...content.matchAll(re)]) {
+    const [full, alt, mimeExt, base64] = m
+    try {
+      const ext = mimeExt === 'jpeg' ? 'jpg' : mimeExt === 'svg+xml' ? 'svg' : mimeExt
+      const hash = await invoke<string>('save_attachment_base64', {
+        base64Data: base64.replace(/\s/g, ''),
+        ext,
+      })
+      result = result.replace(full, `![${alt}](attachment://${hash})`)
+    } catch (e) {
+      console.warn('图片附件化失败:', e)
+    }
+  }
+  return result
+}
+
+// 存量迁移：把所有笔记的 base64 内嵌图迁成附件（content 与 synced_content 各自迁移以避免同步假冲突）。
+// 幂等（迁完不再含 data:image），迁移前自动备份数据库。
+async function migrateImagesToAttachments(): Promise<void> {
+  try {
+    const db = await getDatabase()
+    const rows = await db.select<{ id: number; content: string; synced_content: string | null }[]>(
+      "SELECT id, content, synced_content FROM notes WHERE content LIKE '%data:image%' OR synced_content LIKE '%data:image%'"
+    )
+    if (rows.length === 0) return
+    // 不可逆操作前先备份数据库
+    try {
+      const path = await invoke<string>('get_database_path')
+      await invoke('copy_database_to', { newPath: `${path}.pre-attachment-backup` })
+    } catch (e) {
+      console.warn('迁移前备份失败（仍继续）:', e)
+    }
+    for (const row of rows) {
+      const newContent = await externalizeImages(row.content)
+      const newSynced = row.synced_content ? await externalizeImages(row.synced_content) : null
+      await db.execute('UPDATE notes SET content = ?, synced_content = ? WHERE id = ?', [
+        newContent,
+        newSynced,
+        row.id,
+      ])
+    }
+    console.log(`已将 ${rows.length} 条笔记的内嵌图片迁移为附件`)
+  } catch (e) {
+    console.warn('图片附件迁移失败:', e)
   }
 }
 
@@ -312,7 +366,7 @@ export const noteOperations = {
     
     if (data.content !== undefined) {
       updates.push('content = ?')
-      params.push(data.content)
+      params.push(await externalizeImages(data.content))
     }
     
     params.push(id)
