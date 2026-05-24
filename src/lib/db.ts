@@ -222,6 +222,23 @@ async function migrateImagesToAttachments(): Promise<void> {
   }
 }
 
+// 把 content 里的 attachment://<hash> 引用还原成 base64 内嵌（导出自包含 JSON 用）
+async function internalizeImages(content: string): Promise<string> {
+  if (!content.includes('attachment://')) return content
+  const re = /!\[([^\]]*)\]\(attachment:\/\/([a-f0-9]+)\)/g
+  let result = content
+  for (const m of [...content.matchAll(re)]) {
+    const [full, alt, hash] = m
+    try {
+      const dataUrl = await invoke<string | null>('read_attachment_data_url', { hash })
+      if (dataUrl) result = result.replace(full, `![${alt}](${dataUrl})`)
+    } catch (e) {
+      console.warn('附件还原失败:', e)
+    }
+  }
+  return result
+}
+
 // 防止重复初始化的标志
 let isInitializing = false
 
@@ -807,14 +824,22 @@ export const dbOperations = {
     
     const notes = await db.select<NoteRow[]>('SELECT * FROM notes')
     const messages = await db.select<ChatMessageRow[]>('SELECT * FROM chat_messages')
-    
+
+    // 导出自包含：把 attachment:// 引用还原成 base64 内嵌，保证一个 JSON 文件带走全部图片
+    const exportedNotes = []
+    for (const row of notes) {
+      const note = rowToNote(row)
+      note.content = await internalizeImages(note.content)
+      exportedNotes.push(note)
+    }
+
     const exportData = {
       version: '1.0',
       exported_at: new Date().toISOString(),
-      notes: notes.map(rowToNote),
+      notes: exportedNotes,
       chat_messages: messages.map(rowToChatMessage),
     }
-    
+
     return JSON.stringify(exportData, null, 2)
   },
 
@@ -830,11 +855,12 @@ export const dbOperations = {
     if (data.notes && Array.isArray(data.notes)) {
       for (const note of data.notes) {
         await db.execute(
-          `INSERT INTO notes (title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_date, reminder_enabled)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_date, reminder_enabled)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
+            crypto.randomUUID(),
             note.title,
-            note.content,
+            await externalizeImages(note.content),
             JSON.stringify(note.tags || []),
             note.isFavorite || 0,
             note.isDeleted || 0,

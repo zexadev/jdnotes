@@ -295,6 +295,31 @@ pub async fn get_attachment_path(
     Ok(attachments::find_path(&app, &hash)?.map(|p| p.to_string_lossy().to_string()))
 }
 
+/// 把附件读成 base64 data URL（导出自包含 JSON 时把 attachment:// 还原成内嵌图片）
+#[tauri::command]
+pub async fn read_attachment_data_url(
+    app: tauri::AppHandle,
+    hash: String,
+) -> Result<Option<String>, String> {
+    use base64::Engine;
+    match attachments::read_bytes(&app, &hash)? {
+        Some(bytes) => {
+            let ext = attachments::find_ext(&app, &hash)?.unwrap_or_else(|| "png".to_string());
+            let mime = match ext.as_str() {
+                "jpg" | "jpeg" => "image/jpeg",
+                "svg" => "image/svg+xml",
+                "gif" => "image/gif",
+                "webp" => "image/webp",
+                "bmp" => "image/bmp",
+                _ => "image/png",
+            };
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            Ok(Some(format!("data:{};base64,{}", mime, b64)))
+        }
+        None => Ok(None),
+    }
+}
+
 // ============= 联网功能 =============
 
 /// 搜索网页（通过 DuckDuckGo HTML 搜索）
