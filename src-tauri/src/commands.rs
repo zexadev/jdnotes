@@ -1,5 +1,6 @@
 use crate::db;
 use crate::models::ExportData;
+use crate::sync;
 
 // ============= 架构说明 =============
 // JD Notes 使用 tauri-plugin-sql 插件在前端直接执行 SQL 操作
@@ -191,6 +192,65 @@ pub async fn save_ai_config(
 #[tauri::command]
 pub async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
     db::get_config_file_path(&app)
+}
+
+// ============= 多设备同步 =============
+
+/// 获取本机同步信息（局域网地址）并启动监听
+#[tauri::command]
+pub async fn sync_get_info(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::start_listener(app.clone(), db_path);
+    let ip = sync::local_ip();
+    Ok(serde_json::json!({
+        "ip": ip,
+        "port": sync::SYNC_PORT,
+        "address": format!("{}:{}", ip, sync::SYNC_PORT),
+    }))
+}
+
+/// 连接对端地址完成一次双向同步
+#[tauri::command]
+pub async fn sync_connect_lan(
+    app: tauri::AppHandle,
+    address: String,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::sync_connect(app.clone(), &db_path, &address).await
+}
+
+/// 导出同步包为 JSON 字符串（异地手动传输用）
+#[tauri::command]
+pub async fn sync_export_package(app: tauri::AppHandle) -> Result<String, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::export_package(&db_path).await
+}
+
+/// 导入同步包（合并入本地）
+#[tauri::command]
+pub async fn sync_import_package(
+    app: tauri::AppHandle,
+    json_data: String,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::import_package(app.clone(), &db_path, &json_data).await
+}
+
+/// 获取本机 iroh 设备 ID（跨网配对用），并启动 iroh endpoint
+#[tauri::command]
+pub async fn sync_iroh_get_id(app: tauri::AppHandle) -> Result<String, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::iroh_get_id(app.clone(), db_path).await
+}
+
+/// 通过对端 iroh 设备 ID 发起一次跨网双向同步
+#[tauri::command]
+pub async fn sync_iroh_connect(
+    app: tauri::AppHandle,
+    peer_id: String,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::iroh_sync_connect(app.clone(), &db_path, &peer_id).await
 }
 
 // ============= 联网功能 =============

@@ -36,7 +36,7 @@ dirs = "6"
 # MCP Server
 rmcp = { version = "1", features = ["server", "macros", "transport-streamable-http-server"] }
 axum = "0.8"
-tokio = { version = "1", features = ["net"] }
+tokio = { version = "1", features = ["net", "io-util", "sync"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 schemars = "1.0"
 tauri-plugin-single-instance = "2.4.0"
@@ -44,3 +44,7 @@ urlencoding = "2.1.3"
 reqwest = { version = "0.12", features = ["rustls-tls"] }
 scraper = "0.26.0"
 ego-tree = "0.11.0"
+# P2P 跨网同步
+iroh = "=1.0.0-rc.0"
+# 三路文本合并（git 式 diff3）
+diffy = "0.4"

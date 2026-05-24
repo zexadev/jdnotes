@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod mcp_server;
 mod models;
+mod sync;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -108,6 +109,18 @@ pub fn run() {
                     sql: include_str!("../migrations/003_remove_role_check.sql"),
                     kind: MigrationKind::Up,
                 },
+                Migration {
+                    version: 4,
+                    description: "add uuid for multi-device sync",
+                    sql: include_str!("../migrations/004_sync.sql"),
+                    kind: MigrationKind::Up,
+                },
+                Migration {
+                    version: 5,
+                    description: "add base snapshot and conflict flag for 3-way merge",
+                    sql: include_str!("../migrations/005_sync_merge.sql"),
+                    kind: MigrationKind::Up,
+                },
             ];
 
             // 注册 SQL 插件
@@ -146,6 +159,13 @@ pub fn run() {
             commands::web_search,
             commands::web_fetch,
             commands::get_location,
+            // 多设备同步
+            commands::sync_get_info,
+            commands::sync_connect_lan,
+            commands::sync_export_package,
+            commands::sync_import_package,
+            commands::sync_iroh_get_id,
+            commands::sync_iroh_connect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
