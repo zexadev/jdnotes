@@ -132,6 +132,13 @@ async function getDatabase(): Promise<Database> {
   // 获取数据库 URL
   const dbUrl = await invoke<string>('get_database_url')
   database = await Database.load(dbUrl)
+  // 开启 WAL 模式 + busy_timeout，保证前端与后端同步引擎并发写同一 db 文件时安全
+  try {
+    await database.execute('PRAGMA journal_mode=WAL;')
+    await database.execute('PRAGMA busy_timeout=5000;')
+  } catch (e) {
+    console.warn('设置 WAL 失败:', e)
+  }
   return database
 }
 
@@ -140,6 +147,25 @@ async function getDatabase(): Promise<Database> {
  */
 export async function initDatabase(): Promise<void> {
   await getDatabase()
+  await backfillUuids()
+}
+
+// 为没有 uuid 的历史笔记回填全局唯一 uuid（幂等，作为多设备同步身份）
+async function backfillUuids(): Promise<void> {
+  try {
+    const db = await getDatabase()
+    const rows = await db.select<{ id: number }[]>(
+      "SELECT id FROM notes WHERE uuid IS NULL OR uuid = ''"
+    )
+    for (const row of rows) {
+      await db.execute('UPDATE notes SET uuid = ? WHERE id = ?', [crypto.randomUUID(), row.id])
+    }
+    if (rows.length > 0) {
+      console.log(`已为 ${rows.length} 条笔记回填 uuid`)
+    }
+  } catch (e) {
+    console.warn('回填 uuid 失败:', e)
+  }
 }
 
 // 防止重复初始化的标志
@@ -163,9 +189,10 @@ export async function initializeDefaultNotes(): Promise<void> {
     
     // 插入欢迎笔记
     await db.execute(
-      `INSERT INTO notes (title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
-       VALUES (?, ?, ?, 0, 0, ?, ?, 0)`,
+      `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
+       VALUES (?, ?, ?, ?, 0, 0, ?, ?, 0)`,
       [
+        crypto.randomUUID(),
         '欢迎使用 JD Notes',
         `欢迎使用 JD Notes！这是一个简洁高效的本地笔记应用。
 
@@ -197,9 +224,10 @@ export async function initializeDefaultNotes(): Promise<void> {
 
     // 插入快捷键指南
     await db.execute(
-      `INSERT INTO notes (title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
-       VALUES (?, ?, ?, 0, 0, ?, ?, 0)`,
+      `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
+       VALUES (?, ?, ?, ?, 0, 0, ?, ?, 0)`,
       [
+        crypto.randomUUID(),
         '快捷键指南',
         `## 编辑器快捷键
 
@@ -258,9 +286,9 @@ export const noteOperations = {
     const now = new Date().toISOString()
     
     const result = await db.execute(
-      `INSERT INTO notes (title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
-       VALUES (?, ?, '[]', 0, 0, ?, ?, 0)`,
-      [title, content, now, now]
+      `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
+       VALUES (?, ?, ?, '[]', 0, 0, ?, ?, 0)`,
+      [crypto.randomUUID(), title, content, now, now]
     )
     
     return result.lastInsertId ?? 0

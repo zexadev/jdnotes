@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText } from 'lucide-react'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText, Smartphone, Copy } from 'lucide-react'
 import { useSettings, PROVIDER_PRESETS, OPENAI_COMPATIBLE_PRESETS } from '../../hooks/useSettings'
 import type { AIProvider } from '../../hooks/useSettings'
 import { Select } from '../common/Select'
@@ -15,6 +15,7 @@ const PROVIDER_OPTIONS: SelectOption<AIProvider>[] = [
   { value: 'ollama', label: 'Ollama 本地', description: '本地运行的 Ollama 服务' },
 ]
 import { dbOperations } from '../../lib/db'
+import { invoke } from '@tauri-apps/api/core'
 import {
   isPermissionGranted,
   requestPermission,
@@ -54,6 +55,18 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
   const [isLoading, setIsLoading] = useState(false)
   const [operationMessage, setOperationMessage] = useState<{ type: 'success' | 'error' | 'warning'; text: string } | null>(null)
 
+  // 设备同步状态
+  const [syncInfo, setSyncInfo] = useState<{ address: string } | null>(null)
+  const [peerAddress, setPeerAddress] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+
+  // 跨网同步 (iroh) 状态
+  const [irohId, setIrohId] = useState<string | null>(null)
+  const [irohPeerId, setIrohPeerId] = useState('')
+  const [irohSyncing, setIrohSyncing] = useState(false)
+  const [irohResult, setIrohResult] = useState<string | null>(null)
+
   // 检查通知权限状态
   useEffect(() => {
     const checkPermission = async () => {
@@ -71,6 +84,8 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
     if (open) {
       checkPermission()
       loadDatabaseInfo()
+      loadSyncInfo()
+      loadIrohId()
     }
   }, [open])
 
@@ -82,6 +97,105 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
     } catch (e) {
       console.warn('Failed to load database info:', e)
     }
+  }
+
+  // 加载本机同步信息（同时启动局域网监听）
+  const loadSyncInfo = async () => {
+    try {
+      const info = await invoke<{ address: string }>('sync_get_info')
+      setSyncInfo(info)
+    } catch (e) {
+      console.warn('获取同步信息失败:', e)
+    }
+  }
+
+  // 加载本机 iroh 设备 ID（同时启动 iroh endpoint，可能稍慢）
+  const loadIrohId = async () => {
+    try {
+      const id = await invoke<string>('sync_iroh_get_id')
+      setIrohId(id)
+    } catch (e) {
+      console.warn('获取 iroh 设备 ID 失败:', e)
+    }
+  }
+
+  // 通过对端 iroh 设备 ID 发起一次跨网同步
+  const handleIrohSync = async () => {
+    const peer = irohPeerId.trim()
+    if (!peer) return
+    setIrohSyncing(true)
+    setIrohResult(null)
+    try {
+      const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number }>(
+        'sync_iroh_connect',
+        { peerId: peer }
+      )
+      setIrohResult(`同步完成：新增 ${stats.inserted}，更新 ${stats.updated}` + (stats.conflicts > 0 ? `，⚠️ 冲突 ${stats.conflicts}（已存为"冲突副本"笔记，请打开核对）` : '，无冲突'))
+      onDataChange?.()
+    } catch (e) {
+      setIrohResult('同步失败：' + (e instanceof Error ? e.message : String(e)))
+    }
+    setIrohSyncing(false)
+  }
+
+  // 连接对端做一次双向同步
+  const handleSync = async () => {
+    const addr = peerAddress.trim()
+    if (!addr) return
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number }>(
+        'sync_connect_lan',
+        { address: addr }
+      )
+      setSyncResult(`同步完成：新增 ${stats.inserted}，更新 ${stats.updated}` + (stats.conflicts > 0 ? `，⚠️ 冲突 ${stats.conflicts}（已存为"冲突副本"笔记，请打开核对）` : '，无冲突'))
+      onDataChange?.()
+    } catch (e) {
+      setSyncResult('同步失败：' + (e instanceof Error ? e.message : String(e)))
+    }
+    setSyncing(false)
+  }
+
+  // 导出同步包到文件（异地手动传输）
+  const handleExportSync = async () => {
+    setIsLoading(true)
+    try {
+      const json = await invoke<string>('sync_export_package')
+      const filePath = await save({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        defaultPath: `jdnotes-sync-${new Date().toISOString().split('T')[0]}.json`,
+      })
+      if (filePath) {
+        await writeTextFile(filePath, json)
+        showMessage('success', '同步包导出成功！')
+      }
+    } catch (e) {
+      showMessage('error', '导出失败: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setIsLoading(false)
+  }
+
+  // 从文件导入同步包（合并）
+  const handleImportSync = async () => {
+    setIsLoading(true)
+    try {
+      const filePath = await openDialog({
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        multiple: false,
+      })
+      if (filePath && typeof filePath === 'string') {
+        const json = await readTextFile(filePath)
+        const stats = await invoke<{ inserted: number; updated: number; conflicts: number }>('sync_import_package', {
+          jsonData: json,
+        })
+        showMessage('success', `合并完成：新增 ${stats.inserted}，更新 ${stats.updated}` + (stats.conflicts > 0 ? `，冲突 ${stats.conflicts}（已存为冲突副本）` : ''))
+        onDataChange?.()
+      }
+    } catch (e) {
+      showMessage('error', '导入失败: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setIsLoading(false)
   }
 
   // 请求通知权限
@@ -455,6 +569,119 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
               >
                 <Upload className="h-4 w-4 text-gray-400" />
                 导入数据（JSON）
+              </button>
+            </div>
+          </div>
+
+          {/* 设备同步 */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
+              <Smartphone className="h-4 w-4" />
+              设备同步
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              两台设备在同一网络下同时打开 JD Notes，把下方“本机地址”告诉对方，或输入对方地址点击同步。异地可用“同步包”手动传输。
+            </p>
+
+            {/* 本机地址 */}
+            <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">本机地址（告诉对方）</div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-sm font-mono text-gray-800 dark:text-gray-200 truncate">
+                  {syncInfo?.address ?? '获取中…'}
+                </code>
+                {syncInfo && (
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(syncInfo.address); showMessage('success', '已复制本机地址') }}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                    title="复制"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 连接对端 */}
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={peerAddress}
+                onChange={(e) => setPeerAddress(e.target.value)}
+                placeholder="对方地址，如 192.168.1.20:38765"
+                className="flex-1 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all"
+              />
+              <button
+                onClick={handleSync}
+                disabled={syncing || !peerAddress.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                同步
+              </button>
+            </div>
+
+            {syncResult && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{syncResult}</p>
+            )}
+
+            {/* 跨网同步 (iroh) */}
+            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">跨网同步（不同网络，如公司↔家，通过加密 P2P 直连）</div>
+              <div className="mb-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">本机设备 ID（告诉对方）</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs font-mono text-gray-800 dark:text-gray-200 break-all">
+                    {irohId ?? '启动中…'}
+                  </code>
+                  {irohId && (
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(irohId); showMessage('success', '已复制设备 ID') }}
+                      className="shrink-0 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                      title="复制"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={irohPeerId}
+                  onChange={(e) => setIrohPeerId(e.target.value)}
+                  placeholder="对方设备 ID"
+                  className="flex-1 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all"
+                />
+                <button
+                  onClick={handleIrohSync}
+                  disabled={irohSyncing || !irohPeerId.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 shrink-0"
+                >
+                  {irohSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  跨网同步
+                </button>
+              </div>
+              {irohResult && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{irohResult}</p>
+              )}
+            </div>
+
+            {/* 同步包文件兜底 */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportSync}
+                disabled={isLoading}
+                className="flex-1 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" /> 导出同步包
+              </button>
+              <button
+                onClick={handleImportSync}
+                disabled={isLoading}
+                className="flex-1 px-3 py-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <Upload className="h-3.5 w-3.5" /> 导入同步包
               </button>
             </div>
           </div>
