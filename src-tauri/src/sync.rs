@@ -137,6 +137,29 @@ fn save_attachments(app: &AppHandle, atts: &[SyncAttachment]) {
     }
 }
 
+/// 清理无引用的图片附件（手动触发）：扫描所有笔记 content + synced_content 的引用，删除没人用的附件文件
+pub async fn gc_attachments(app: &AppHandle, db_path: &str) -> Result<(usize, u64), String> {
+    let pool = open_pool(db_path).await?;
+    let rows: Vec<(String, Option<String>)> =
+        sqlx::query_as("SELECT content, synced_content FROM notes")
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| format!("读取笔记失败: {}", e))?;
+    pool.close().await;
+    let mut referenced = std::collections::HashSet::new();
+    for (content, synced) in &rows {
+        for h in find_attachment_hashes(content) {
+            referenced.insert(h);
+        }
+        if let Some(s) = synced {
+            for h in find_attachment_hashes(s) {
+                referenced.insert(h);
+            }
+        }
+    }
+    crate::attachments::gc_unreferenced(app, &referenced)
+}
+
 /// 本地笔记的完整状态（含同步基准 synced_content = 共同祖先 base）
 #[derive(Debug, FromRow)]
 struct LocalNote {

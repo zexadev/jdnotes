@@ -172,6 +172,7 @@ pub fn run() {
             commands::save_attachment_from_path,
             commands::get_attachment_path,
             commands::read_attachment_data_url,
+            commands::sync_gc_attachments,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

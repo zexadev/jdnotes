@@ -70,3 +70,28 @@ pub fn find_ext(app: &tauri::AppHandle, hash: &str) -> Result<Option<String>, St
     Ok(find_path(app, hash)?
         .and_then(|p| p.extension().and_then(|e| e.to_str()).map(|s| s.to_string())))
 }
+
+/// 删除不在引用集合里的附件（垃圾回收），返回 (删除数量, 释放字节)
+pub fn gc_unreferenced(
+    app: &tauri::AppHandle,
+    referenced: &std::collections::HashSet<String>,
+) -> Result<(usize, u64), String> {
+    let dir = attachments_dir(app)?;
+    let mut count = 0usize;
+    let mut freed = 0u64;
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                if !referenced.contains(stem) {
+                    let size = fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
+                    if fs::remove_file(&p).is_ok() {
+                        count += 1;
+                        freed += size;
+                    }
+                }
+            }
+        }
+    }
+    Ok((count, freed))
+}

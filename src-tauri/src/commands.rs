@@ -320,6 +320,14 @@ pub async fn read_attachment_data_url(
     }
 }
 
+/// 清理无引用的图片附件（手动），返回删除数量与释放字节
+#[tauri::command]
+pub async fn sync_gc_attachments(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    let (removed, freed) = sync::gc_attachments(&app, &db_path).await?;
+    Ok(serde_json::json!({ "removed": removed, "freed": freed }))
+}
+
 // ============= 联网功能 =============
 
 /// 搜索网页（通过 DuckDuckGo HTML 搜索）

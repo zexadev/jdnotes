@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText, Smartphone, Copy } from 'lucide-react'
+import { X, Eye, EyeOff, Bell, Database, Download, Upload, FolderOpen, HardDrive, Settings2, RefreshCw, CheckCircle, AlertCircle, Loader2, FileOutput, FileText, Smartphone, Copy, Trash2 } from 'lucide-react'
 import { useSettings, PROVIDER_PRESETS, OPENAI_COMPATIBLE_PRESETS } from '../../hooks/useSettings'
 import type { AIProvider } from '../../hooks/useSettings'
 import { Select } from '../common/Select'
@@ -194,6 +194,19 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
       }
     } catch (e) {
       showMessage('error', '导入失败: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setIsLoading(false)
+  }
+
+  // 清理无引用的图片附件（删图/删笔记后残留的孤儿文件）
+  const handleGcAttachments = async () => {
+    setIsLoading(true)
+    try {
+      const r = await invoke<{ removed: number; freed: number }>('sync_gc_attachments')
+      const mb = (r.freed / 1024 / 1024).toFixed(1)
+      showMessage('success', r.removed > 0 ? `已清理 ${r.removed} 张无用图片，释放 ${mb} MB` : '没有可清理的图片')
+    } catch (e) {
+      showMessage('error', '清理失败: ' + (e instanceof Error ? e.message : String(e)))
     }
     setIsLoading(false)
   }
@@ -684,6 +697,14 @@ export function SettingsModal({ open, onClose, onDataChange }: SettingsModalProp
                 <Upload className="h-3.5 w-3.5" /> 导入同步包
               </button>
             </div>
+
+            <button
+              onClick={handleGcAttachments}
+              disabled={isLoading}
+              className="mt-2 w-full px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> 清理无用图片
+            </button>
           </div>
 
           {/* 提醒通知设置 */}
