@@ -9,7 +9,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 use sqlx::{FromRow, SqlitePool};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::OnceCell;
@@ -527,11 +527,33 @@ const IROH_ALPN: &[u8] = b"jdnotes-sync/0";
 /// 全局 iroh Endpoint（首次使用时初始化并启动接收循环）
 static IROH_EP: OnceCell<Endpoint> = OnceCell::const_new();
 
+/// 读取或创建持久化的 iroh 身份密钥，保证设备 ID 重启后不变（存于 app_data_dir，与数据位置无关）
+fn load_or_create_iroh_secret(app: &AppHandle) -> Result<iroh::SecretKey, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?;
+    let key_path = dir.join("iroh_identity.key");
+    if let Ok(bytes) = std::fs::read(&key_path) {
+        if bytes.len() == 32 {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            return Ok(iroh::SecretKey::from_bytes(&arr));
+        }
+    }
+    let key = iroh::SecretKey::generate();
+    std::fs::create_dir_all(&dir).ok();
+    std::fs::write(&key_path, key.to_bytes()).map_err(|e| format!("保存身份密钥失败: {}", e))?;
+    Ok(key)
+}
+
 /// 获取或初始化全局 iroh Endpoint（幂等），并启动接收循环
 async fn get_iroh_endpoint(app: AppHandle, db_path: String) -> Result<Endpoint, String> {
     let ep = IROH_EP
         .get_or_try_init(|| async {
+            let secret = load_or_create_iroh_secret(&app)?;
             let ep = Endpoint::builder(presets::N0)
+                .secret_key(secret)
                 .alpns(vec![IROH_ALPN.to_vec()])
                 .bind()
                 .await
@@ -582,6 +604,15 @@ async fn handle_iroh_conn(
         .read_to_end(MAX_MSG as usize)
         .await
         .map_err(|e| e.to_string())?;
+    // probe：对端只想确认连通并取回本机设备名，不传输笔记
+    if req == b"PROBE" {
+        send.write_all(local_device_name(&app).as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
+        send.finish().map_err(|e| e.to_string())?;
+        conn.closed().await;
+        return Ok(());
+    }
     let remote: SyncPackage =
         serde_json::from_slice(&req).map_err(|e| format!("解析对端数据失败: {}", e))?;
     let pool = open_pool(&db_path).await?;
@@ -604,6 +635,28 @@ async fn handle_iroh_conn(
 pub async fn iroh_get_id(app: AppHandle, db_path: String) -> Result<String, String> {
     let ep = get_iroh_endpoint(app, db_path).await?;
     Ok(ep.id().to_string())
+}
+
+/// 向对端 probe：验证连通性并取回对端的设备名（不传输笔记，用于"添加设备"）
+pub async fn iroh_probe(app: AppHandle, db_path: &str, peer_id: &str) -> Result<String, String> {
+    let peer: EndpointId = peer_id
+        .trim()
+        .parse()
+        .map_err(|e| format!("无效的设备 ID: {}", e))?;
+    let ep = get_iroh_endpoint(app.clone(), db_path.to_string()).await?;
+    let conn = ep
+        .connect(peer, IROH_ALPN)
+        .await
+        .map_err(|e| format!("连接对端失败: {}", e))?;
+    let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+    send.write_all(b"PROBE").await.map_err(|e| e.to_string())?;
+    send.finish().map_err(|e| e.to_string())?;
+    let resp = recv
+        .read_to_end(MAX_MSG as usize)
+        .await
+        .map_err(|e| e.to_string())?;
+    conn.close(0u8.into(), b"done");
+    String::from_utf8(resp).map_err(|e| format!("解析对端设备名失败: {}", e))
 }
 
 /// 发起方：通过对端 iroh 设备 ID 连接并完成一次双向同步

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Copy, RefreshCw, Loader2, Download, Upload, Trash2, CheckCircle, AlertCircle, Wifi, Globe } from 'lucide-react'
+import { Copy, RefreshCw, Loader2, Download, Upload, Trash2, CheckCircle, AlertCircle, Wifi, Globe, Plus } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { save, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
@@ -9,6 +9,17 @@ interface SyncSettingsProps {
 }
 
 type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number }
+
+// 已保存的跨网设备（iroh ID 持久不变，所以值得记住，避免每次重填）
+type SavedDevice = { id: string; name: string }
+const DEVICES_KEY = 'jdnotes_sync_devices'
+function loadDevices(): SavedDevice[] {
+  try {
+    return JSON.parse(localStorage.getItem(DEVICES_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
 
 // 把同步结果说成人话：突出「发出多少条给对方」(对方会据此更新) + 本机实际变化 + 方向，
 // 避免旧文案「新增 0 更新 0」那种纯本机视角造成的「白同步了」误解。
@@ -38,10 +49,12 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
 
-  // 跨网同步 (iroh)
+  // 跨网同步 (iroh)：本机 ID + 已保存设备列表
   const [irohId, setIrohId] = useState<string | null>(null)
-  const [irohPeerId, setIrohPeerId] = useState('')
-  const [irohSyncing, setIrohSyncing] = useState(false)
+  const [devices, setDevices] = useState<SavedDevice[]>(loadDevices)
+  const [newDeviceId, setNewDeviceId] = useState('')
+  const [addingDevice, setAddingDevice] = useState(false)
+  const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null)
   const [irohResult, setIrohResult] = useState<string | null>(null)
 
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => localStorage.getItem('jdnotes_last_sync'))
@@ -117,21 +130,50 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     setSyncing(false)
   }
 
-  // 跨网：通过对端 iroh 设备 ID 发起一次同步
-  const handleIrohSync = async () => {
-    const peer = irohPeerId.trim()
-    if (!peer) return
-    setIrohSyncing(true)
+  // 设备列表持久化
+  const persistDevices = (list: SavedDevice[]) => {
+    setDevices(list)
+    localStorage.setItem(DEVICES_KEY, JSON.stringify(list))
+  }
+
+  // 添加设备：先 probe 对端验证连通并取回它自己设的设备名（无需手动填名）
+  const addDevice = async () => {
+    const id = newDeviceId.trim()
+    if (!id) return
+    if (devices.some((d) => d.id === id)) {
+      showMessage('warning', '该设备已在列表中')
+      return
+    }
+    setAddingDevice(true)
+    try {
+      const name = await invoke<string>('sync_iroh_probe', { peerId: id })
+      const finalName = name.trim() || '未命名设备'
+      persistDevices([...devices, { id, name: finalName }])
+      setNewDeviceId('')
+      showMessage('success', `已连接并添加设备「${finalName}」`)
+    } catch (e) {
+      showMessage('error', '连接失败：' + (e instanceof Error ? e.message : String(e)) + '（请确认对方已打开应用、设备 ID 正确）')
+    }
+    setAddingDevice(false)
+  }
+
+  const removeDevice = (id: string) => {
+    persistDevices(devices.filter((d) => d.id !== id))
+  }
+
+  // 跨网：点设备旁的「同步」，用存好的 ID 发起一次双向同步
+  const syncDevice = async (device: SavedDevice) => {
+    setSyncingDeviceId(device.id)
     setIrohResult(null)
     try {
-      const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: peer })
-      setIrohResult(describeSync(stats))
+      const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
+      setIrohResult(`「${device.name}」 ${describeSync(stats)}`)
       onDataChange?.()
       markSynced()
     } catch (e) {
-      setIrohResult('同步失败：' + (e instanceof Error ? e.message : String(e)))
+      setIrohResult(`「${device.name}」同步失败：` + (e instanceof Error ? e.message : String(e)))
     }
-    setIrohSyncing(false)
+    setSyncingDeviceId(null)
   }
 
   // 导出同步包到文件（异地手动传输）
@@ -195,7 +237,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">设备同步</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          把两台设备的笔记互相同步。同一网络下用「局域网同步」，异地（如公司↔家）用「跨网同步」或「同步包」文件。
+          把两台设备的笔记互相同步。同一网络下用「局域网同步」，异地（如公司↔家）添加对方设备后一键「跨网同步」，或用「同步包」文件。
         </p>
       </div>
 
@@ -291,19 +333,19 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         {syncResult && <p className="text-xs text-gray-500 dark:text-gray-400">{syncResult}</p>}
       </div>
 
-      {/* 跨网同步 (iroh) */}
+      {/* 跨网同步 (iroh) —— 设备列表 */}
       <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4 text-gray-400" />
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">跨网同步</h3>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          不同网络（如公司↔家），通过加密 P2P 直连。把「本机设备 ID」告诉对方，或输入对方 ID 点击同步。
+          不同网络（如公司↔家），通过加密 P2P 直连。把「本机设备 ID」发给对方添加，对方也把你加为设备，之后点「同步」即可，无需每次重填。
         </p>
 
         {/* 本机设备 ID */}
         <div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">本机设备 ID（告诉对方）</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">本机设备 ID（发给对方添加）</div>
           <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
             <code className="flex-1 text-xs font-mono text-gray-800 dark:text-gray-200 break-all">
               {irohId ?? '启动中…'}
@@ -323,24 +365,64 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
           </div>
         </div>
 
-        {/* 对端设备 ID */}
+        {/* 已添加的设备 */}
+        <div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">已添加的设备</div>
+          {devices.length === 0 ? (
+            <p className="text-xs text-gray-400 dark:text-gray-500 px-3 py-2 bg-white dark:bg-gray-800 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+              还没有添加设备。把对方的设备 ID 填到下面「添加」。
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              {devices.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-800 dark:text-gray-200 truncate">{d.name}</div>
+                    <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate">{d.id.slice(0, 16)}…</div>
+                  </div>
+                  <button
+                    onClick={() => syncDevice(d)}
+                    disabled={syncingDeviceId !== null}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-md transition-colors flex items-center gap-1 disabled:opacity-50 shrink-0"
+                  >
+                    {syncingDeviceId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    同步
+                  </button>
+                  <button
+                    onClick={() => removeDevice(d.id)}
+                    title="删除设备"
+                    className="shrink-0 p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 添加设备：只填对方 ID，点添加时 probe 取回对方设备名 */}
         <div className="flex gap-2">
           <input
             type="text"
-            value={irohPeerId}
-            onChange={(e) => setIrohPeerId(e.target.value)}
-            placeholder="对方设备 ID"
+            value={newDeviceId}
+            onChange={(e) => setNewDeviceId(e.target.value)}
+            placeholder="粘贴对方的设备 ID，点添加自动获取名称"
             className={INPUT_CLASS}
           />
           <button
-            onClick={handleIrohSync}
-            disabled={irohSyncing || !irohPeerId.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 shrink-0"
+            onClick={addDevice}
+            disabled={addingDevice || !newDeviceId.trim()}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0"
           >
-            {irohSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            跨网同步
+            {addingDevice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {addingDevice ? '连接中…' : '添加'}
           </button>
         </div>
+
         {irohResult && <p className="text-xs text-gray-500 dark:text-gray-400">{irohResult}</p>}
       </div>
 
