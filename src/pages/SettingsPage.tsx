@@ -1,23 +1,25 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, Settings as SettingsIcon, Database, Bell, RefreshCw, Info, BookOpen } from 'lucide-react'
+import { X, Settings as SettingsIcon, Database, Bell, RefreshCw, Info, BookOpen, MonitorSmartphone } from 'lucide-react'
 import { AISettings } from './settings/AISettings'
 import { DataSettings } from './settings/DataSettings'
 import { NotificationSettings } from './settings/NotificationSettings'
 import { UpdateSettings } from './settings/UpdateSettings'
 import { AboutSettings } from './settings/AboutSettings'
 import { MarkdownGuide } from './settings/MarkdownGuide'
+import { SyncSettings } from './settings/SyncSettings'
 
 interface SettingsPageProps {
   onClose: () => void
   onDataChange?: () => void
 }
 
-type SettingsSection = 'ai' | 'data' | 'notifications' | 'update' | 'markdown' | 'about'
+type SettingsSection = 'ai' | 'data' | 'sync' | 'notifications' | 'update' | 'markdown' | 'about'
 
 const SECTIONS = [
   { id: 'ai' as const, label: 'AI 配置', icon: SettingsIcon },
   { id: 'data' as const, label: '数据管理', icon: Database },
+  { id: 'sync' as const, label: '设备同步', icon: MonitorSmartphone },
   { id: 'notifications' as const, label: '通知', icon: Bell },
   { id: 'update' as const, label: '更新', icon: RefreshCw },
   { id: 'markdown' as const, label: 'Markdown 指南', icon: BookOpen },
@@ -83,6 +85,7 @@ export function SettingsPage({ onClose, onDataChange }: SettingsPageProps) {
           >
             {activeSection === 'ai' && <AISettings />}
             {activeSection === 'data' && <DataSettings onDataChange={onDataChange} />}
+            {activeSection === 'sync' && <SyncSettings onDataChange={onDataChange} />}
             {activeSection === 'notifications' && <NotificationSettings />}
             {activeSection === 'update' && <UpdateSettings />}
             {activeSection === 'markdown' && <MarkdownGuide />}

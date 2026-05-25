@@ -449,15 +449,31 @@ pub fn start_listener(app: AppHandle, db_path: String) {
 
 /// 获取本机局域网出口 IP（不实际发包，仅用于显示给用户）
 pub fn local_ip() -> String {
-    use std::net::UdpSocket;
-    if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
-        if socket.connect("8.8.8.8:80").is_ok() {
-            if let Ok(addr) = socket.local_addr() {
-                return addr.ip().to_string();
+    use std::net::Ipv4Addr;
+    // VPN(如 sing-box TUN)、Docker、WSL 会抢占默认路由或建虚拟网卡，
+    // 所以不能信 get_default_interface。改为枚举所有网卡，按"像家用局域网"打分：
+    // 192.168.x 最优、10.x 次之、172.16~31.x（Docker/VPN 高发）垫底；非私有段忽略。
+    let mut best: Option<(u8, Ipv4Addr)> = None;
+    for iface in netdev::get_interfaces() {
+        for net in iface.ipv4 {
+            let ip = net.addr();
+            if ip.is_loopback() || ip.is_link_local() {
+                continue;
+            }
+            let o = ip.octets();
+            let score: u8 = match (o[0], o[1]) {
+                (192, 168) => 0,
+                (10, _) => 1,
+                (172, b) if (16..=31).contains(&b) => 3,
+                _ => continue, // 非私有网段，不是局域网地址
+            };
+            if best.as_ref().map_or(true, |(s, _)| score < *s) {
+                best = Some((score, ip));
             }
         }
     }
-    "127.0.0.1".to_string()
+    best.map(|(_, ip)| ip.to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string())
 }
 
 /// 本设备名称（空则给个默认，发送同步包时带上）

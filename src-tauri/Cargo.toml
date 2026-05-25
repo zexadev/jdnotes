@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.9.1"
+version = "1.10.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -51,3 +51,5 @@ diffy = "0.4"
 # 图片附件：内容寻址（sha256）+ base64 编解码
 sha2 = "0.10"
 base64 = "0.22"
+# 选真实局域网网卡 IP（避开 Docker/WSL 虚拟网卡），与 iroh 共用同版本
+netdev = "0.43"
