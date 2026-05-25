@@ -15,7 +15,7 @@
 - **名称**：JD Notes — 简洁高效的本地笔记应用
 - **技术栈**：Tauri v2 (tauri 2.9.5, tauri-build 2.5.3) + Vite + React + TypeScript
 - **包管理器**：pnpm
-- **版本**：1.8.0
+- **版本**：1.10.1
 - **标识符**：com.jdnotes.app
 - **窗口**：1200x800，无边框 (decorations: false)
 - **前端开发端口**：5173
@@ -43,6 +43,11 @@
 | `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
 | `src-tauri/src/commands.rs` | Tauri 后端命令 |
 | `src-tauri/src/lib.rs` | 插件注册、命令注册 |
+| `src-tauri/src/sync.rs` | 多设备同步内核（局域网/iroh 跨网/同步包、三路合并、设备 ID 持久化、probe） |
+| `src-tauri/src/attachments.rs` | 图片附件内容寻址存储（sha256） |
+| `src-tauri/migrations/004_sync.sql`·`005_sync_merge.sql` | 同步 uuid + 三路合并基准/冲突标记 |
+| `src/pages/SettingsPage.tsx` | 设置页左侧导航容器（应用实际使用的设置 UI） |
+| `src/pages/settings/SyncSettings.tsx` | 设置「设备同步」页（局域网/设备列表/同步包/清理图片） |
 | `src/hooks/useSettings.ts` | AI 多来源配置 Hook（useAIConfig / useSettings） |
 | `src/components/modals/ChangelogModal.tsx` | 应用内更新日志（CHANGELOG_DATA 数组） |
 | `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
@@ -176,7 +181,7 @@
 
 ### 图片
 - 插入方式：工具栏按钮、粘贴、Tauri 原生拖拽（`onDragDropEvent`）
-- 存储方式：base64 内嵌
+- 存储方式：内容寻址附件（`attachments/<sha256>`，正文存 `attachment://<hash>` 引用；导出 JSON 时还原 base64 自包含）。旧的 base64 内嵌笔记启动时自动迁移
 - 显示：居中、最大宽度不超过编辑器容器、圆角 0.5rem
 - 交互：拖拽缩放（有最大宽度限制）、点击预览大图、hover 显示删除按钮
 - 组件：`ResizableImage.tsx`（NodeView）

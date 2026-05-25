@@ -27,7 +27,7 @@
 
 ## 2. 数据模型
 
-`notes` 表新增 `uuid TEXT`（全局同步身份，唯一索引），**不动整数主键 id 和外键**。migration `004_sync.sql`。历史笔记启动时前端幂等回填 uuid（`crypto.randomUUID()`），新建笔记直接带 uuid。
+`notes` 表新增 `uuid TEXT`（全局同步身份，唯一索引），**不动整数主键 id 和外键**。migration `004_sync.sql`；`005_sync_merge.sql` 再加 `synced_content`（三路合并基准）+ `has_conflict`。历史笔记启动时前端幂等回填 uuid（`crypto.randomUUID()`），新建笔记直接带 uuid。**uuid 双保险**：① `initDatabase()`（内含 `backfillUuids`）必须在 App 启动序列调用（曾漏调 → uuid 全空 → 同步导出被 `WHERE uuid IS NOT NULL` 过滤为空 → "新增 0"假象）；② 后端 `read_local_notes` 导出前再兜底补 uuid（`hex(randomblob(16))`），不依赖前端时序。默认笔记（欢迎/快捷键）用**固定 uuid**，避免多设备各留一份。
 
 同步传输单元 `SyncNote`：uuid / title / content / tags / is_favorite / is_deleted / created_at / updated_at / reminder_date / reminder_enabled。`is_deleted` 作为墓碑同步删除。
 
@@ -59,6 +59,14 @@
 - 逻辑：仅一方改→取那方(不再误覆盖未改方)；两方改不同段落→自动合并都保留；改同一处→生成「原标题(冲突副本)」新笔记,两版都留；删除 vs 编辑→保留编辑不静默删；首次无 base 且内容不同→冲突副本兜底。**绝不静默丢数据。**
 - `SyncStats` 加 `conflicts`,前端同步结果提示冲突数(`merge_notes` 是唯一合并点,5 条同步路径全受益)。
 - 后续：图片附件化(让 base 快照不翻倍 + 正文 diff3 更有效)、元数据字段级合并(标签并集等)、可视化冲突解决 UI / 可选 git 标记开关。
+
+### 跨网体验完善 ✅ 已完成（本轮，编译通过待真机测）
+- **iroh 设备 ID 持久化**：首次生成 `SecretKey` 存 `app_data_dir/iroh_identity.key`，以后读它喂 `Endpoint::builder().secret_key()` → 设备 ID 重启不变（之前每次随机，跨网配对一重启就失效）。用 `SecretKey::generate/from_bytes/to_bytes`（iroh-base）。
+- **设备列表**（前端 localStorage `jdnotes_sync_devices`）：跨网设备添加一次（对方 ID）即记住，点「同步」直接用，不再每次重填 ID；换页/重启都在。
+- **probe 自动取名**（命令 `sync_iroh_probe` + `handle_iroh_conn` 识别 `"PROBE"` 标记）：添加设备时先轻量握手验证连通、取回对端在「本设备名称」设的名字，无需手动填名。**注意**：对端须同为含 probe 的新版；旧版收到 `"PROBE"` 会当 JSON 解析失败而断开（表现为 `connection lost`）。
+- **本机地址选网卡**：`local_ip()` 改为枚举网卡按家用私网段打分（192.168 > 10 > 172.16~31），避开 VPN(sing-tun)/Docker/WSL 虚拟网卡（曾误选 `172.18.0.1`，对端连不上）。依赖 `netdev`（与 iroh 共用同版本）。
+- **同步结果文案**：`describeSync` 改双向人话——「已发出 N 条给对方 + 本机变化 + 方向」，消除旧文案「新增 0」的纯本机视角误导。
+- **UI 位置修正**：同步面板原误加在废弃的 `SettingsModal`（无打开入口的死代码），已迁到实际在用的 `src/pages/settings/SyncSettings.tsx`（`SettingsPage` 左侧导航「设备同步」），并删除整个 `SettingsModal`。
 
 ### 阶段三 📋 规划
 - 冲突保留双份（替代纯 LWW）：版本向量 + 检测并发编辑，败方存"(冲突副本)"笔记。
@@ -113,10 +121,13 @@
 | 文件 | 说明 |
 |------|------|
 | `src-tauri/migrations/004_sync.sql` | notes 加 uuid 列 + 唯一索引 |
-| `src-tauri/src/sync.rs` | 同步内核：序列化 + LWW 合并 + 局域网 TCP + 文件 + (阶段二) iroh |
-| `src-tauri/src/commands.rs` | 同步命令（sync_* 区块） |
-| `src-tauri/src/lib.rs` | migration 注册（version 4）+ 命令注册 |
-| `src/lib/db.ts` | WAL 设置、uuid 回填、新建笔记带 uuid |
-| `src/components/modals/SettingsModal.tsx` | 设置 → 设备同步面板 |
+| `src-tauri/migrations/005_sync_merge.sql` | notes 加 synced_content(三路合并基准) + has_conflict |
+| `src-tauri/src/sync.rs` | 同步内核：序列化 + 三路合并(diffy) + 局域网 TCP + 同步包文件 + iroh 跨网 + 设备 ID 持久化 + probe |
+| `src-tauri/src/attachments.rs` | 图片附件：内容寻址(sha256)存储、读取、GC |
+| `src-tauri/src/commands.rs` | 同步与附件命令（sync_* / *_attachment_*） |
+| `src-tauri/src/lib.rs` | migration 注册（version 4、5）+ 命令注册 |
+| `src/lib/db.ts` | WAL、uuid 回填(backfillUuids)、图片附件化迁移、initDatabase、默认笔记固定 uuid |
+| `src/pages/settings/SyncSettings.tsx` | 设置 → 「设备同步」页（局域网 / 设备列表 / 同步包 / 清理图片）；旧 `SettingsModal` 已删 |
+| `src/pages/SettingsPage.tsx` | 设置页左侧导航容器（应用实际使用的设置 UI） |
 
 分支：`feature/p2p-sync`。
