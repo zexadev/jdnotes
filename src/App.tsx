@@ -7,7 +7,6 @@ import { CommandMenu } from './components/modals/CommandMenu'
 import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
 import type { SidebarState } from './components/layout/Sidebar'
 import { ThemeProvider } from './contexts/ThemeContext'
-import { SettingsModal } from './components/modals/SettingsModal'
 import { TemplateModal } from './components/modals/TemplateModal'
 import type { NoteTemplate } from './components/modals/TemplateModal'
 import { UpdateAvailableModal } from './components/modals/UpdateAvailableModal'
@@ -35,7 +34,6 @@ function App() {
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
-  const [showSettings, setShowSettings] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
@@ -431,13 +429,6 @@ function App() {
         notes={notes}
         onSelectNote={handleCommandSelectNote}
         onCreateNote={handleShowTemplateModal}
-      />
-
-      {/* 设置模态框 */}
-      <SettingsModal
-        open={showSettings}
-        onClose={() => setShowSettings(false)}
-        onDataChange={refreshNotes}
       />
 
       {/* 模板选择弹窗 */}
