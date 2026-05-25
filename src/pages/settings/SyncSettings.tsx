@@ -63,6 +63,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [newDeviceId, setNewDeviceId] = useState('')
   const [addingDevice, setAddingDevice] = useState(false)
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null)
+  const [deviceStatus, setDeviceStatus] = useState<Record<string, 'checking' | 'online' | 'offline'>>({})
 
   // 局域网
   const [peerAddress, setPeerAddress] = useState('')
@@ -75,7 +76,25 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     invoke<string>('get_device_name').then(setDeviceName).catch(() => {})
     invoke<string>('sync_iroh_get_id').then(setIrohId).catch(() => {})
     invoke<{ address: string }>('sync_get_info').then(setSyncInfo).catch(() => {})
+    // 进页面探测各设备在线状态
+    devices.forEach((d) => checkDevice(d.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 探测设备是否在线：复用 probe，8s 没连上算离线
+  const checkDevice = async (id: string) => {
+    setDeviceStatus((s) => ({ ...s, [id]: 'checking' }))
+    try {
+      await Promise.race([
+        invoke('sync_iroh_probe', { peerId: id }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ])
+      setDeviceStatus((s) => ({ ...s, [id]: 'online' }))
+    } catch {
+      setDeviceStatus((s) => ({ ...s, [id]: 'offline' }))
+    }
+  }
+  const checkAllDevices = () => devices.forEach((d) => checkDevice(d.id))
 
   const markSynced = () => {
     const now = new Date().toISOString()
@@ -264,6 +283,15 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4 text-[#5E6AD2]" />
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">跨网设备</h3>
+          {devices.length > 0 && (
+            <button
+              onClick={checkAllDevices}
+              className="ml-auto text-xs text-gray-400 hover:text-[#5E6AD2] flex items-center gap-1 transition-colors"
+              title="刷新在线状态"
+            >
+              <RefreshCw className="h-3 w-3" /> 刷新状态
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
           不同网络（公司↔家）通过加密 P2P 直连。粘贴对方的设备 ID 添加一次即记住，之后一键同步。
@@ -285,8 +313,20 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                   <MonitorSmartphone className="h-4 w-4 text-[#5E6AD2]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{d.name}</div>
-                  <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate">{d.id.slice(0, 20)}…</div>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`h-2 w-2 rounded-full shrink-0 ${
+                        deviceStatus[d.id] === 'online'
+                          ? 'bg-green-500'
+                          : deviceStatus[d.id] === 'checking'
+                          ? 'bg-amber-400 animate-pulse'
+                          : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                      title={deviceStatus[d.id] === 'online' ? '在线' : deviceStatus[d.id] === 'checking' ? '检测中' : '离线'}
+                    />
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{d.name}</div>
+                  </div>
+                  <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate pl-3.5">{d.id.slice(0, 20)}…</div>
                 </div>
                 <button
                   onClick={() => syncDevice(d)}
