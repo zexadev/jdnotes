@@ -245,6 +245,10 @@ let isInitializing = false
 /**
  * 初始化默认数据（仅在数据库为空时）
  */
+// 默认笔记用固定 uuid：保证不同设备的内置笔记被视为「同一条」，同步时不会各留一份
+const WELCOME_NOTE_UUID = '00000000-0000-4000-8000-000000000001'
+const SHORTCUTS_NOTE_UUID = '00000000-0000-4000-8000-000000000002'
+
 export async function initializeDefaultNotes(): Promise<void> {
   if (isInitializing) return
   isInitializing = true
@@ -263,7 +267,7 @@ export async function initializeDefaultNotes(): Promise<void> {
       `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
        VALUES (?, ?, ?, ?, 0, 0, ?, ?, 0)`,
       [
-        crypto.randomUUID(),
+        WELCOME_NOTE_UUID,
         '欢迎使用 JD Notes',
         `欢迎使用 JD Notes！这是一个简洁高效的本地笔记应用。
 
@@ -298,7 +302,7 @@ export async function initializeDefaultNotes(): Promise<void> {
       `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_enabled)
        VALUES (?, ?, ?, ?, 0, 0, ?, ?, 0)`,
       [
-        crypto.randomUUID(),
+        SHORTCUTS_NOTE_UUID,
         '快捷键指南',
         `## 编辑器快捷键
 

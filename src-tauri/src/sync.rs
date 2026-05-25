@@ -82,6 +82,12 @@ async fn open_pool(db_path: &str) -> Result<SqlitePool, String> {
 
 /// 读取本地全部笔记（仅含已回填 uuid 的）
 async fn read_local_notes(pool: &SqlitePool) -> Result<Vec<SyncNote>, String> {
+    // 兜底：给没有 uuid 的笔记现场补一个，确保同步一定带上所有笔记
+    // （即使前端 backfill 因任何原因没跑，同步引擎也自保）
+    sqlx::query("UPDATE notes SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL OR uuid = ''")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("回填 uuid 失败: {}", e))?;
     sqlx::query_as::<_, SyncNote>(
         "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
          FROM notes WHERE uuid IS NOT NULL AND uuid != ''",

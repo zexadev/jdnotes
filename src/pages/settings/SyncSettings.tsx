@@ -10,6 +10,24 @@ interface SyncSettingsProps {
 
 type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number }
 
+// 把同步结果说成人话：突出「发出多少条给对方」(对方会据此更新) + 本机实际变化 + 方向，
+// 避免旧文案「新增 0 更新 0」那种纯本机视角造成的「白同步了」误解。
+function describeSync(stats: SyncStats): string {
+  let local: string
+  if (stats.inserted > 0 || stats.updated > 0) {
+    local = `本机新增 ${stats.inserted}、更新 ${stats.updated}`
+  } else if (stats.received > 0) {
+    local = '本机已是最新，无变化'
+  } else {
+    local = '未收到对方数据（对方可能是旧版本，或暂无更新）'
+  }
+  let msg = `✓ 同步完成 ｜ 已发出 ${stats.sent} 条给对方，对方会更新；${local}`
+  if (stats.conflicts > 0) {
+    msg += `；⚠️ ${stats.conflicts} 处冲突已存为「冲突副本」笔记，请打开核对`
+  }
+  return msg
+}
+
 const INPUT_CLASS =
   'w-full px-3 py-2 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-gray-900 dark:focus:ring-white focus:border-transparent outline-none transition-all'
 
@@ -90,10 +108,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     setSyncResult(null)
     try {
       const stats = await invoke<SyncStats>('sync_connect_lan', { address: addr })
-      setSyncResult(
-        `同步完成：新增 ${stats.inserted}，更新 ${stats.updated}` +
-          (stats.conflicts > 0 ? `，⚠️ 冲突 ${stats.conflicts}（已存为"冲突副本"笔记，请打开核对）` : '，无冲突')
-      )
+      setSyncResult(describeSync(stats))
       onDataChange?.()
       markSynced()
     } catch (e) {
@@ -110,10 +125,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     setIrohResult(null)
     try {
       const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: peer })
-      setIrohResult(
-        `同步完成：新增 ${stats.inserted}，更新 ${stats.updated}` +
-          (stats.conflicts > 0 ? `，⚠️ 冲突 ${stats.conflicts}（已存为"冲突副本"笔记，请打开核对）` : '，无冲突')
-      )
+      setIrohResult(describeSync(stats))
       onDataChange?.()
       markSynced()
     } catch (e) {
@@ -153,8 +165,8 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         })
         showMessage(
           'success',
-          `合并完成：新增 ${stats.inserted}，更新 ${stats.updated}` +
-            (stats.conflicts > 0 ? `，冲突 ${stats.conflicts}（已存为冲突副本）` : '')
+          `✓ 已合并同步包 ｜ 本机新增 ${stats.inserted}、更新 ${stats.updated}` +
+            (stats.conflicts > 0 ? `；${stats.conflicts} 处冲突已存为「冲突副本」笔记，请核对` : '')
         )
         onDataChange?.()
         markSynced()

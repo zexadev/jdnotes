@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { initializeDefaultNotes, noteOperations, type Note } from './lib/db'
+import { initializeDefaultNotes, initDatabase, noteOperations, type Note } from './lib/db'
 import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks'
 import { listen } from '@tauri-apps/api/event'
 import { CommandMenu } from './components/modals/CommandMenu'
@@ -214,6 +214,8 @@ function App() {
     const initialize = async () => {
       try {
         await initializeDefaultNotes()
+        // 回填多设备同步所需的 uuid（历史笔记），并迁移存量内嵌图片为附件
+        await initDatabase()
         // 恢复可能因意外关闭而丢失的数据
         await recoverPendingSaves()
         // 初始化后刷新笔记列表
