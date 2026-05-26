@@ -53,3 +53,5 @@ sha2 = "0.10"
 base64 = "0.22"
 # 选真实局域网网卡 IP（避开 Docker/WSL 虚拟网卡），与 iroh 共用同版本
 netdev = "0.43"
+# 局域网设备自动发现：mDNS / DNS-SD 广播 + 浏览
+mdns-sd = "0.13"

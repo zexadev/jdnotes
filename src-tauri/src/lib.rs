@@ -172,6 +172,8 @@ pub fn run() {
             commands::sync_iroh_probe,
             commands::sync_iroh_push_note,
             commands::sync_lan_push_note,
+            commands::sync_lan_push_notes,
+            commands::sync_lan_discover,
             // 图片附件
             commands::save_attachment_base64,
             commands::save_attachment_from_path,

@@ -731,6 +731,161 @@ pub async fn iroh_push_note(
     })
 }
 
+/// 局域网多条推送：从选择列表勾选若干笔记，一次推给某地址
+/// 与 lan_push_note 共用 TCP 帧 + merge 内核，区别仅 SELECT 的 IN 子句
+pub async fn lan_push_notes(
+    app: AppHandle,
+    db_path: &str,
+    addr: &str,
+    note_ids: Vec<i64>,
+) -> Result<SyncStats, String> {
+    if note_ids.is_empty() {
+        return Err("未选择任何笔记".to_string());
+    }
+    let pool = open_pool(db_path).await?;
+    sqlx::query("UPDATE notes SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL OR uuid = ''")
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("回填 uuid 失败: {}", e))?;
+
+    // 动态 IN(?,?,...)
+    let placeholders = note_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
+         FROM notes WHERE id IN ({})",
+        placeholders
+    );
+    let mut q = sqlx::query_as::<_, SyncNote>(&sql);
+    for id in &note_ids {
+        q = q.bind(id);
+    }
+    let local: Vec<SyncNote> = q
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("读取笔记失败: {}", e))?;
+
+    if local.is_empty() {
+        pool.close().await;
+        return Err("找不到选中的笔记".to_string());
+    }
+    let sent = local.len();
+    let attachments = collect_attachments(&app, &local);
+    let pkg = SyncPackage {
+        version: 1,
+        notes: local,
+        attachments,
+        device_name: local_device_name(&app),
+    };
+    let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
+
+    let mut stream = TcpStream::connect(addr)
+        .await
+        .map_err(|e| format!("连接 {} 失败: {}", addr, e))?;
+    write_msg(&mut stream, &bytes).await?;
+    let resp = read_msg(&mut stream).await?;
+    let remote: SyncPackage =
+        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    save_attachments(&app, &remote.attachments);
+    let received = remote.notes.len();
+    let (inserted, updated, conflicts) =
+        merge_notes(&pool, &remote.notes, &remote.device_name).await?;
+    pool.close().await;
+
+    if inserted > 0 || updated > 0 || conflicts > 0 {
+        let _ = app.emit("db:changed", ());
+    }
+    Ok(SyncStats {
+        sent,
+        received,
+        inserted,
+        updated,
+        conflicts,
+    })
+}
+
+// ==================== 局域网设备发现（mDNS / DNS-SD）====================
+const MDNS_SERVICE: &str = "_jdnotes._tcp.local.";
+static MDNS_DAEMON: OnceCell<mdns_sd::ServiceDaemon> = OnceCell::const_new();
+
+#[derive(serde::Serialize, Clone)]
+pub struct DiscoveredDevice {
+    pub address: String,
+    pub device_name: String,
+}
+
+/// 首次调用时启动 mDNS daemon 并注册本机服务（之后复用，幂等）
+async fn ensure_mdns_started(app: &AppHandle) -> Result<&'static mdns_sd::ServiceDaemon, String> {
+    MDNS_DAEMON
+        .get_or_try_init(|| async {
+            let daemon = mdns_sd::ServiceDaemon::new()
+                .map_err(|e| format!("mDNS daemon 启动失败: {}", e))?;
+            let local = local_ip();
+            let device = local_device_name(app);
+            let instance = format!("jdnotes-{}", uuid::Uuid::new_v4().simple());
+            let host_name = format!("{}.local.", instance);
+            let mut txt = std::collections::HashMap::new();
+            txt.insert("device".to_string(), device);
+            let info = mdns_sd::ServiceInfo::new(
+                MDNS_SERVICE,
+                &instance,
+                &host_name,
+                local.as_str(),
+                SYNC_PORT,
+                txt,
+            )
+            .map_err(|e| format!("构造 mDNS 服务信息失败: {}", e))?;
+            daemon
+                .register(info)
+                .map_err(|e| format!("mDNS 注册失败: {}", e))?;
+            log::info!("mDNS 服务已注册: {} @ {}:{}", MDNS_SERVICE, local, SYNC_PORT);
+            Ok::<mdns_sd::ServiceDaemon, String>(daemon)
+        })
+        .await
+}
+
+/// 浏览同网段的 jdnotes 服务，约 1.5s 后返回发现的设备列表
+pub async fn lan_discover(app: AppHandle) -> Result<Vec<DiscoveredDevice>, String> {
+    let daemon = ensure_mdns_started(&app).await?.clone();
+    tokio::task::spawn_blocking(move || -> Result<Vec<DiscoveredDevice>, String> {
+        let receiver = daemon
+            .browse(MDNS_SERVICE)
+            .map_err(|e| format!("mDNS 浏览失败: {}", e))?;
+        let mut devices: Vec<DiscoveredDevice> = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(1500);
+        loop {
+            let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now())
+            else {
+                break;
+            };
+            match receiver.recv_timeout(remaining) {
+                Ok(mdns_sd::ServiceEvent::ServiceResolved(info)) => {
+                    let port = info.get_port();
+                    let device = info
+                        .get_property_val_str("device")
+                        .unwrap_or("")
+                        .to_string();
+                    for ip in info.get_addresses_v4() {
+                        let addr = format!("{}:{}", ip, port);
+                        if seen.insert(addr.clone()) {
+                            devices.push(DiscoveredDevice {
+                                address: addr,
+                                device_name: device.clone(),
+                            });
+                        }
+                    }
+                }
+                Ok(_) => continue,
+                Err(_) => break,
+            }
+        }
+        let _ = daemon.stop_browse(MDNS_SERVICE);
+        Ok(devices)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// 局域网版的单条推送：TCP 直连对方地址，只发指定那一条笔记（仍双向：本机也收对端的并 merge）
 pub async fn lan_push_note(
     app: AppHandle,

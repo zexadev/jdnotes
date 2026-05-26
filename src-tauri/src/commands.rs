@@ -295,6 +295,25 @@ pub async fn sync_lan_push_note(
     sync::lan_push_note(app.clone(), &db_path, &address, note_id).await
 }
 
+/// 局域网多条推送（笔记选择列表用）
+#[tauri::command]
+pub async fn sync_lan_push_notes(
+    app: tauri::AppHandle,
+    address: String,
+    note_ids: Vec<i64>,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::lan_push_notes(app.clone(), &db_path, &address, note_ids).await
+}
+
+/// 局域网设备发现（mDNS）
+#[tauri::command]
+pub async fn sync_lan_discover(
+    app: tauri::AppHandle,
+) -> Result<Vec<sync::DiscoveredDevice>, String> {
+    sync::lan_discover(app).await
+}
+
 // ============= 图片附件 =============
 
 /// 保存 base64 图片为附件，返回内容 hash（前端粘贴/选文件用）
