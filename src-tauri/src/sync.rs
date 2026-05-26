@@ -811,7 +811,15 @@ static MDNS_DAEMON: OnceCell<mdns_sd::ServiceDaemon> = OnceCell::const_new();
 pub struct DiscoveredDevice {
     pub address: String,
     pub device_name: String,
+    /// 持久设备指纹：公钥派生（base32 前 16 字符，约 80 bits 熵），重启稳定不变
+    /// 与跨网设备 ID（完整 PublicKey）同一身份源——一份身份两种传输共用
+    pub fingerprint: String,
+    /// 协议版本（TXT proto 字段），不兼容时前端可灰显
+    pub protocol: String,
 }
+
+/// 本机 fingerprint 缓存，lan_discover 用来过滤"自己发现自己"
+static LOCAL_FINGERPRINT: OnceCell<String> = OnceCell::const_new();
 
 /// 首次调用时启动 mDNS daemon 并注册本机服务（之后复用，幂等）
 async fn ensure_mdns_started(app: &AppHandle) -> Result<&'static mdns_sd::ServiceDaemon, String> {
@@ -821,10 +829,19 @@ async fn ensure_mdns_started(app: &AppHandle) -> Result<&'static mdns_sd::Servic
                 .map_err(|e| format!("mDNS daemon 启动失败: {}", e))?;
             let local = local_ip();
             let device = local_device_name(app);
-            let instance = format!("jdnotes-{}", uuid::Uuid::new_v4().simple());
+            // 持久 fingerprint：复用 iroh SecretKey 派生（base32 前 16 字符）
+            // 重启稳定 + 不暴露私钥；UI 上局域网设备能跟跨网设备认成同一台
+            let secret = load_or_create_iroh_secret(app)
+                .map_err(|e| format!("读取设备身份失败: {}", e))?;
+            let fingerprint: String = secret.public().to_string().chars().take(16).collect();
+            let _ = LOCAL_FINGERPRINT.set(fingerprint.clone());
+            // 实例名也用 fingerprint，不再每次随机——重启同台机在对方眼里就是同一设备
+            let instance = format!("jdnotes-{}", fingerprint);
             let host_name = format!("{}.local.", instance);
             let mut txt = std::collections::HashMap::new();
             txt.insert("device".to_string(), device);
+            txt.insert("fp".to_string(), fingerprint.clone());
+            txt.insert("proto".to_string(), "1".to_string());
             let info = mdns_sd::ServiceInfo::new(
                 MDNS_SERVICE,
                 &instance,
@@ -837,7 +854,13 @@ async fn ensure_mdns_started(app: &AppHandle) -> Result<&'static mdns_sd::Servic
             daemon
                 .register(info)
                 .map_err(|e| format!("mDNS 注册失败: {}", e))?;
-            log::info!("mDNS 服务已注册: {} @ {}:{}", MDNS_SERVICE, local, SYNC_PORT);
+            log::info!(
+                "mDNS 服务已注册: {} @ {}:{} (fp={}, proto=1)",
+                MDNS_SERVICE,
+                local,
+                SYNC_PORT,
+                fingerprint
+            );
             Ok::<mdns_sd::ServiceDaemon, String>(daemon)
         })
         .await
@@ -865,12 +888,28 @@ pub async fn lan_discover(app: AppHandle) -> Result<Vec<DiscoveredDevice>, Strin
                         .get_property_val_str("device")
                         .unwrap_or("")
                         .to_string();
+                    let fp = info
+                        .get_property_val_str("fp")
+                        .unwrap_or("")
+                        .to_string();
+                    let proto = info
+                        .get_property_val_str("proto")
+                        .unwrap_or("1")
+                        .to_string();
+                    // 过滤"自己发现自己"：fingerprint 一致即跳过
+                    if !fp.is_empty()
+                        && LOCAL_FINGERPRINT.get().map(|s| s.as_str()) == Some(fp.as_str())
+                    {
+                        continue;
+                    }
                     for ip in info.get_addresses_v4() {
                         let addr = format!("{}:{}", ip, port);
                         if seen.insert(addr.clone()) {
                             devices.push(DiscoveredDevice {
                                 address: addr,
                                 device_name: device.clone(),
+                                fingerprint: fp.clone(),
+                                protocol: proto.clone(),
                             });
                         }
                     }
