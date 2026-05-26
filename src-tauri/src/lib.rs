@@ -170,6 +170,7 @@ pub fn run() {
             commands::sync_iroh_get_id,
             commands::sync_iroh_connect,
             commands::sync_iroh_probe,
+            commands::sync_iroh_push_note,
             // 图片附件
             commands::save_attachment_base64,
             commands::save_attachment_from_path,

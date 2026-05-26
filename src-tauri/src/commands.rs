@@ -273,6 +273,17 @@ pub async fn sync_iroh_probe(app: tauri::AppHandle, peer_id: String) -> Result<S
     sync::iroh_probe(app.clone(), &db_path, &peer_id).await
 }
 
+/// 主动推送单条笔记给对端（编辑器旁单条同步用）
+#[tauri::command]
+pub async fn sync_iroh_push_note(
+    app: tauri::AppHandle,
+    peer_id: String,
+    note_id: i64,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::iroh_push_note(app.clone(), &db_path, &peer_id, note_id).await
+}
+
 // ============= 图片附件 =============
 
 /// 保存 base64 图片为附件，返回内容 hash（前端粘贴/选文件用）

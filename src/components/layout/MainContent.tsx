@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Bell, X } from 'lucide-react'
+import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2 } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
 import { WritingStats } from '../editor/WritingStats'
 import { formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
+import { invoke } from '@tauri-apps/api/core'
 import { formatTimeRemaining } from '../calendar/ReminderNotification'
 import type { Note } from '../../lib/db'
 import type { Editor as TiptapEditor } from '@tiptap/react'
@@ -51,6 +52,13 @@ export function MainContent({
   const reminderPopupRef = useRef<HTMLDivElement>(null)
   const [editorInstance, setEditorInstance] = useState<TiptapEditor | null>(null)
 
+  // 单条同步推送（编辑器旁直接把当前笔记推给某台已配对设备）
+  const [showPushPicker, setShowPushPicker] = useState(false)
+  const pushButtonRef = useRef<HTMLButtonElement>(null)
+  const pushPopupRef = useRef<HTMLDivElement>(null)
+  const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null)
+  const [devices, setDevices] = useState<{ id: string; name: string }[]>([])
+
   const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
     setEditorInstance(editor)
   }, [])
@@ -71,6 +79,51 @@ export function MainContent({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showReminderPicker])
+
+  // 单条同步 popover：打开时刷新设备列表 + 点击外部关闭
+  useEffect(() => {
+    if (showPushPicker) {
+      try {
+        setDevices(JSON.parse(localStorage.getItem('jdnotes_sync_devices') || '[]'))
+      } catch {
+        setDevices([])
+      }
+    }
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        showPushPicker &&
+        pushPopupRef.current &&
+        !pushPopupRef.current.contains(event.target as Node) &&
+        pushButtonRef.current &&
+        !pushButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowPushPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showPushPicker])
+
+  // 推送当前笔记给某台设备
+  const handlePushTo = async (device: { id: string; name: string }) => {
+    if (!activeNoteId) return
+    setPushingDeviceId(device.id)
+    try {
+      const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number }>(
+        'sync_iroh_push_note',
+        { peerId: device.id, noteId: activeNoteId }
+      )
+      if (stats.conflicts > 0) {
+        toast.warning(`已推送给「${device.name}」｜⚠️ 对端有 ${stats.conflicts} 处冲突需核对`, { duration: 7000 })
+      } else {
+        toast.success(`已推送给「${device.name}」`)
+      }
+      setShowPushPicker(false)
+    } catch (e) {
+      toast.error(`推送到「${device.name}」失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
+    }
+    setPushingDeviceId(null)
+  }
 
   const hasReminder = activeNote?.reminderEnabled === 1 && activeNote?.reminderDate
 
@@ -157,6 +210,54 @@ export function MainContent({
                         }}
                         onClose={() => setShowReminderPicker(false)}
                       />
+                    </div>
+                  )}
+                </div>
+                {/* 单条同步推送按钮 */}
+                <div className="relative">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    ref={pushButtonRef}
+                    onClick={() => setShowPushPicker(!showPushPicker)}
+                    className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                      showPushPicker
+                        ? 'text-[#5E6AD2] bg-[#5E6AD2]/10'
+                        : 'text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+                    }`}
+                    title="推送到设备"
+                  >
+                    <Send className="h-4 w-4" strokeWidth={1.5} />
+                  </motion.button>
+                  {showPushPicker && (
+                    <div
+                      ref={pushPopupRef}
+                      className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-black/[0.06] dark:border-white/[0.06] p-3 z-50"
+                    >
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 px-1">推送当前笔记到</div>
+                      {devices.length === 0 ? (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 py-4 text-center leading-relaxed">
+                          还没有配对设备<br />
+                          去「设置 → 设备同步」添加
+                        </p>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {devices.map((d) => (
+                            <button
+                              key={d.id}
+                              onClick={() => handlePushTo(d)}
+                              disabled={pushingDeviceId !== null}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg text-left disabled:opacity-50 transition-colors"
+                            >
+                              <div className="h-7 w-7 rounded-md bg-[#5E6AD2]/10 flex items-center justify-center shrink-0">
+                                <MonitorSmartphone className="h-3.5 w-3.5 text-[#5E6AD2]" />
+                              </div>
+                              <span className="flex-1 truncate">{d.name}</span>
+                              {pushingDeviceId === d.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5E6AD2]" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

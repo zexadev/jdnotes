@@ -659,6 +659,78 @@ pub async fn iroh_probe(app: AppHandle, db_path: &str, peer_id: &str) -> Result<
     String::from_utf8(resp).map_err(|e| format!("解析对端设备名失败: {}", e))
 }
 
+/// 主动推送单条笔记给对端（仍走双向 sync 协议：发自己这一条 + 收对端的全部并 merge）
+/// 用于"编辑器旁单条同步"——改完就推，不必等定时也不必传无关笔记
+pub async fn iroh_push_note(
+    app: AppHandle,
+    db_path: &str,
+    peer_id: &str,
+    note_id: i64,
+) -> Result<SyncStats, String> {
+    let peer: EndpointId = peer_id
+        .trim()
+        .parse()
+        .map_err(|e| format!("无效的设备 ID: {}", e))?;
+    let ep = get_iroh_endpoint(app.clone(), db_path.to_string()).await?;
+    let conn = ep
+        .connect(peer, IROH_ALPN)
+        .await
+        .map_err(|e| format!("连接对端失败: {}", e))?;
+    let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+    let pool = open_pool(db_path).await?;
+    // 兜底补 uuid（同 read_local_notes 那道防线）
+    sqlx::query("UPDATE notes SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL OR uuid = ''")
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("回填 uuid 失败: {}", e))?;
+    // 只取这一条
+    let local: Vec<SyncNote> = sqlx::query_as(
+        "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
+         FROM notes WHERE id = ?",
+    )
+    .bind(note_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| format!("读取笔记失败: {}", e))?;
+    if local.is_empty() {
+        pool.close().await;
+        return Err(format!("找不到 id={} 的笔记", note_id));
+    }
+    let sent = local.len();
+    let attachments = collect_attachments(&app, &local);
+    let bytes = serde_json::to_vec(&SyncPackage {
+        version: 1,
+        notes: local,
+        attachments,
+        device_name: local_device_name(&app),
+    })
+    .map_err(|e| e.to_string())?;
+    send.write_all(&bytes).await.map_err(|e| e.to_string())?;
+    send.finish().map_err(|e| e.to_string())?;
+    let resp = recv
+        .read_to_end(MAX_MSG as usize)
+        .await
+        .map_err(|e| e.to_string())?;
+    let remote: SyncPackage =
+        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    save_attachments(&app, &remote.attachments);
+    let received = remote.notes.len();
+    let (inserted, updated, conflicts) =
+        merge_notes(&pool, &remote.notes, &remote.device_name).await?;
+    pool.close().await;
+    conn.close(0u8.into(), b"done");
+    if inserted > 0 || updated > 0 || conflicts > 0 {
+        let _ = app.emit("db:changed", ());
+    }
+    Ok(SyncStats {
+        sent,
+        received,
+        inserted,
+        updated,
+        conflicts,
+    })
+}
+
 /// 发起方：通过对端 iroh 设备 ID 连接并完成一次双向同步
 pub async fn iroh_sync_connect(
     app: AppHandle,
