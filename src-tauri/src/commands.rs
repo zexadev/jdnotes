@@ -284,6 +284,17 @@ pub async fn sync_iroh_push_note(
     sync::iroh_push_note(app.clone(), &db_path, &peer_id, note_id).await
 }
 
+/// 局域网版的单条推送：TCP 直连地址，只发指定那一条
+#[tauri::command]
+pub async fn sync_lan_push_note(
+    app: tauri::AppHandle,
+    address: String,
+    note_id: i64,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::lan_push_note(app.clone(), &db_path, &address, note_id).await
+}
+
 // ============= 图片附件 =============
 
 /// 保存 base64 图片为附件，返回内容 hash（前端粘贴/选文件用）

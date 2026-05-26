@@ -58,6 +58,8 @@ export function MainContent({
   const pushPopupRef = useRef<HTMLDivElement>(null)
   const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null)
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([])
+  const [lanPushAddress, setLanPushAddress] = useState('')
+  const [pushingLan, setPushingLan] = useState(false)
 
   const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
     setEditorInstance(editor)
@@ -123,6 +125,30 @@ export function MainContent({
       toast.error(`推送到「${device.name}」失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
     }
     setPushingDeviceId(null)
+  }
+
+  // 推送当前笔记到局域网地址（一次性输入，不存设备列表，因为 IP 会变）
+  const handlePushToLan = async () => {
+    if (!activeNoteId) return
+    const addr = lanPushAddress.trim()
+    if (!addr) return
+    setPushingLan(true)
+    try {
+      const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number }>(
+        'sync_lan_push_note',
+        { address: addr, noteId: activeNoteId }
+      )
+      if (stats.conflicts > 0) {
+        toast.warning(`已推送到 ${addr}｜⚠️ 对端有 ${stats.conflicts} 处冲突需核对`, { duration: 7000 })
+      } else {
+        toast.success(`已推送到 ${addr}`)
+      }
+      setShowPushPicker(false)
+      setLanPushAddress('')
+    } catch (e) {
+      toast.error(`推送到 ${addr} 失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
+    }
+    setPushingLan(false)
   }
 
   const hasReminder = activeNote?.reminderEnabled === 1 && activeNote?.reminderDate
@@ -258,6 +284,27 @@ export function MainContent({
                           ))}
                         </div>
                       )}
+                      {/* 局域网一次性推送（IP 会变，不存设备列表） */}
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2.5 mt-2.5">
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 px-1">或推到局域网地址</div>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={lanPushAddress}
+                            onChange={(e) => setLanPushAddress(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handlePushToLan()}
+                            placeholder="192.168.1.20:38765"
+                            className="flex-1 px-2.5 py-1.5 text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded outline-none focus:border-[#5E6AD2] focus:ring-1 focus:ring-[#5E6AD2]/30"
+                          />
+                          <button
+                            onClick={handlePushToLan}
+                            disabled={pushingLan || !lanPushAddress.trim()}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded transition-colors disabled:opacity-40 shrink-0 flex items-center justify-center min-w-[36px]"
+                          >
+                            {pushingLan ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '推'}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

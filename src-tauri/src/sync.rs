@@ -731,6 +731,65 @@ pub async fn iroh_push_note(
     })
 }
 
+/// 局域网版的单条推送：TCP 直连对方地址，只发指定那一条笔记（仍双向：本机也收对端的并 merge）
+pub async fn lan_push_note(
+    app: AppHandle,
+    db_path: &str,
+    addr: &str,
+    note_id: i64,
+) -> Result<SyncStats, String> {
+    let pool = open_pool(db_path).await?;
+    sqlx::query("UPDATE notes SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL OR uuid = ''")
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("回填 uuid 失败: {}", e))?;
+    let local: Vec<SyncNote> = sqlx::query_as(
+        "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
+         FROM notes WHERE id = ?",
+    )
+    .bind(note_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| format!("读取笔记失败: {}", e))?;
+    if local.is_empty() {
+        pool.close().await;
+        return Err(format!("找不到 id={} 的笔记", note_id));
+    }
+    let sent = local.len();
+    let attachments = collect_attachments(&app, &local);
+    let pkg = SyncPackage {
+        version: 1,
+        notes: local,
+        attachments,
+        device_name: local_device_name(&app),
+    };
+    let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
+
+    let mut stream = TcpStream::connect(addr)
+        .await
+        .map_err(|e| format!("连接 {} 失败: {}", addr, e))?;
+    write_msg(&mut stream, &bytes).await?;
+    let resp = read_msg(&mut stream).await?;
+    let remote: SyncPackage =
+        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    save_attachments(&app, &remote.attachments);
+    let received = remote.notes.len();
+    let (inserted, updated, conflicts) =
+        merge_notes(&pool, &remote.notes, &remote.device_name).await?;
+    pool.close().await;
+
+    if inserted > 0 || updated > 0 || conflicts > 0 {
+        let _ = app.emit("db:changed", ());
+    }
+    Ok(SyncStats {
+        sent,
+        received,
+        inserted,
+        updated,
+        conflicts,
+    })
+}
+
 /// 发起方：通过对端 iroh 设备 ID 连接并完成一次双向同步
 pub async fn iroh_sync_connect(
     app: AppHandle,
