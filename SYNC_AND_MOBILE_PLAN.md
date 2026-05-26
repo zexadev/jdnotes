@@ -71,6 +71,21 @@
 - **真机验证**：局域网 + iroh 跨网 + 设备列表 + probe 取名均已两台实测通过；跨网经 relay 引路、**NAT 打洞成功后走 P2P 直连**传数据（日志见 `PathId` 直连 Available、relay 降为 Backup）。
 - **设备在线/离线状态**：设备列表复用 `sync_iroh_probe` 探活（8s 超时算离线），进设置页自动探测、卡片显示在线(绿)/检测中(黄)/离线(灰)圆点 + 「刷新状态」按钮。
 
+### 局域网完整化 ✅ 已完成（本会话，编译通过待真机测）
+- **mDNS 自动发现**：`_jdnotes._tcp.local.` 服务，应用启动即注册（不再 lazy 到首次进同步页），1.5s browse 拿邻居列表；TXT 携带 `device`/`fp`/`proto`。
+- **持久 fingerprint**：复用 iroh `SecretKey` 派生（公钥 base32 前 16 字符），实例名 + TXT.fp 用同一身份源 → 重启同设备在对方眼里仍是同一台 + 一份身份两种传输共用（mDNS/iroh）。**学 Localsend**；不学 HTTP REST 和 HTTPS 自签证书（双向同步不适用 + LAN 信任假设；E2E 列长期项）。
+- **协议版本字段** TXT.proto=1，发现阶段即可判断兼容。
+- **多网卡同设备只列一条**：`lan_discover` 按 fp 去重；fp 为空（对端老版本无 TXT.fp）走 IP 兼容路径。
+- **过滤"自己发现自己"**：fp == 本机 fp 即跳过。
+- **设备名变更立即生效**：`set_device_name` 命令成功后调 `mdns_reregister_device_name`（unregister 旧 fullname → register 新 TXT），对方刷新即看到新名字，不等 TTL 几分钟。
+- **退出发 goodbye**：tray「quit」调 `daemon.shutdown()`，对方设备列表立即清除本机。
+- **笔记多选同步 modal**（`NoteSelectModal.tsx`）：借鉴 `ExportModal` 多选样式（搜索/全选/计数/卡片勾选），点「选笔记」→ 勾选 → `sync_lan_push_notes(address, note_ids)` 一次推过去。**解的是"不是所有笔记都给对方"核心诉求**——选择性同步取代全量。
+- **编辑器旁单条同步**（`MainContent.tsx` 头部 `Send` 按钮 + popover）：iroh 已配对设备列表 + 局域网地址输入，一个 popover 两条路径覆盖。后端 `iroh_push_note(peer_id, note_id)` / `lan_push_note(address, note_id)`。
+- **接收方提示**：`handle_conn` / `handle_iroh_conn` merge 完后 emit `sync:received` 含 from/received/inserted/updated/conflicts，前端 `App.tsx` 顶层 listen 弹 toast，解掉「A 推过来 B 静默无感」的体验缺失。
+
+### 后续延伸（局域网层面）
+- **首次配对码确认**：双方 fp XOR 哈希取 6 位数字（各自算、不靠网络协商防中间人），首次「选笔记」前双方都看到同一个码 + 都点「我看到对面也是 123456」才进白名单（之后免确认）。咖啡店/宾馆 WiFi 等陌生网络下的隐私收口，列为下一节点。
+
 ### 阶段三 📋 规划
 - 冲突保留双份（替代纯 LWW）：版本向量 + 检测并发编辑，败方存"(冲突副本)"笔记。
 - **图片存储优化 ✅ 已实现（编译通过，待真机测试）**：base64 内嵌 → `attachments/` 文件夹（文件名 = 内容 sha256，内容寻址去重）+ 正文存 `attachment://<hash>` 短引用。存文件不存 DB BLOB（对标 Obsidian/思源/Logseq，数据主权+可迁移）。
