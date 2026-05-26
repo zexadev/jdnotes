@@ -410,6 +410,17 @@ async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> 
     write_msg(&mut stream, &bytes).await?;
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
+    // 接收方提示：让用户知道刚被对方推送了多少
+    let _ = app.emit(
+        "sync:received",
+        serde_json::json!({
+            "from": &remote.device_name,
+            "received": remote.notes.len(),
+            "inserted": inserted,
+            "updated": updated,
+            "conflicts": conflicts,
+        }),
+    );
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
     }
@@ -625,6 +636,17 @@ async fn handle_iroh_conn(
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
     conn.closed().await;
+    // 接收方提示：跨网推过来时同样告诉本机用户
+    let _ = app.emit(
+        "sync:received",
+        serde_json::json!({
+            "from": &remote.device_name,
+            "received": remote.notes.len(),
+            "inserted": inserted,
+            "updated": updated,
+            "conflicts": conflicts,
+        }),
+    );
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
     }
@@ -923,6 +945,52 @@ pub async fn lan_discover(app: AppHandle) -> Result<Vec<DiscoveredDevice>, Strin
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// 重新注册 mDNS 服务（用户改设备名后调，使对方能立即看到新名字）
+/// 实例名 = `jdnotes-<fp>` 一直不变，只换 TXT 里的 device。
+pub async fn mdns_reregister_device_name(app: &AppHandle) -> Result<(), String> {
+    let Some(daemon) = MDNS_DAEMON.get() else {
+        // mDNS 还没启动，首次启动时会自然用上最新 device_name，啥也不用做
+        return Ok(());
+    };
+    let Some(fingerprint) = LOCAL_FINGERPRINT.get().cloned() else {
+        return Ok(());
+    };
+    let local = local_ip();
+    let device = local_device_name(app);
+    let instance = format!("jdnotes-{}", fingerprint);
+    let fullname = format!("{}.{}", instance, MDNS_SERVICE);
+    let host_name = format!("{}.local.", instance);
+    // 撤销旧的（同 fullname 直接 register 不会换 TXT，必须先 unregister）
+    let _ = daemon.unregister(&fullname);
+    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+    let mut txt = std::collections::HashMap::new();
+    txt.insert("device".to_string(), device);
+    txt.insert("fp".to_string(), fingerprint);
+    txt.insert("proto".to_string(), "1".to_string());
+    let info = mdns_sd::ServiceInfo::new(
+        MDNS_SERVICE,
+        &instance,
+        &host_name,
+        local.as_str(),
+        SYNC_PORT,
+        txt,
+    )
+    .map_err(|e| format!("构造 mDNS 服务信息失败: {}", e))?;
+    daemon
+        .register(info)
+        .map_err(|e| format!("mDNS 重注册失败: {}", e))?;
+    log::info!("mDNS 已重注册（设备名变更）");
+    Ok(())
+}
+
+/// 应用启动入口：拉起 TCP 监听 + mDNS 注册（让用户即使没打开同步页也能被对方发现）
+pub async fn init_lan_sync(app: AppHandle, db_path: String) {
+    start_listener(app.clone(), db_path);
+    if let Err(e) = ensure_mdns_started(&app).await {
+        log::warn!("mDNS 启动失败，局域网自动发现不可用: {}", e);
+    }
 }
 
 /// 局域网版的单条推送：TCP 直连对方地址，只发指定那一条笔记（仍双向：本机也收对端的并 merge）

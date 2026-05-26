@@ -138,7 +138,19 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 mcp_server::start_mcp_server(db_path_for_mcp, app_handle_for_mcp).await;
             });
-            
+
+            // 启动局域网同步基础设施（TCP 监听 + mDNS 服务注册）
+            // 提前到 setup，让用户即使没打开「设备同步」页也能被对端发现
+            let db_path_for_lan = db_path.clone();
+            let app_handle_for_lan = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                sync::init_lan_sync(
+                    app_handle_for_lan,
+                    db_path_for_lan.to_string_lossy().to_string(),
+                )
+                .await;
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

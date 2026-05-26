@@ -204,7 +204,12 @@ pub async fn get_device_name(app: tauri::AppHandle) -> Result<String, String> {
 /// 设置本设备名称
 #[tauri::command]
 pub async fn set_device_name(app: tauri::AppHandle, name: String) -> Result<(), String> {
-    db::set_device_name(&app, name)
+    db::set_device_name(&app, name)?;
+    // 设备名变更后立即重注册 mDNS，对方下次刷新就能看到新名字（不必等 TTL 过期）
+    if let Err(e) = sync::mdns_reregister_device_name(&app).await {
+        log::warn!("mDNS 重注册失败: {}", e);
+    }
+    Ok(())
 }
 
 // ============= 多设备同步 =============

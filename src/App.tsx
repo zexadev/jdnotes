@@ -209,6 +209,34 @@ function App() {
     }
   }, [])
 
+  // 接收方提示：对端推过来时弹 toast，告诉用户"刚收到了什么"
+  // 解的是之前"A 选笔记同步给 B，B 这边静默无感"的体验缺失
+  useEffect(() => {
+    type SyncReceivedEvent = {
+      from: string
+      received: number
+      inserted: number
+      updated: number
+      conflicts: number
+    }
+    const unlistenPromise = listen<SyncReceivedEvent>('sync:received', (e) => {
+      const { from, received, inserted, updated, conflicts } = e.payload
+      const fromName = from?.trim() || '另一台设备'
+      const local =
+        inserted > 0 || updated > 0
+          ? `本机新增 ${inserted}、更新 ${updated}`
+          : '都已是最新（已忽略重复）'
+      const base = `收到「${fromName}」推来 ${received} 条；${local}`
+      const full =
+        conflicts > 0 ? `${base}；${conflicts} 处冲突已存为「冲突副本」笔记` : base
+      if (conflicts > 0) toast.warning(full, { duration: 8000 })
+      else toast.success(full, { duration: 6000 })
+    })
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten())
+    }
+  }, [])
+
   // 初始化默认数据并恢复未保存的数据
   useEffect(() => {
     const initialize = async () => {
