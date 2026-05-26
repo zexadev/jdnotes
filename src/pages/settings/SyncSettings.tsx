@@ -69,7 +69,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   // 局域网
   const [peerAddress, setPeerAddress] = useState('')
   // mDNS 发现的同网段设备
-  const [discovered, setDiscovered] = useState<{ address: string; device_name: string }[]>([])
+  const [discovered, setDiscovered] = useState<{ address: string; device_name: string; fingerprint?: string; protocol?: string }[]>([])
   const [discovering, setDiscovering] = useState(false)
   // 选笔记同步弹窗目标（null 表示未打开）
   const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string } | null>(null)
@@ -171,7 +171,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const handleDiscoverLan = async () => {
     setDiscovering(true)
     try {
-      const list = await invoke<{ address: string; device_name: string }[]>('sync_lan_discover')
+      const list = await invoke<{ address: string; device_name: string; fingerprint?: string; protocol?: string }[]>('sync_lan_discover')
       setDiscovered(list)
     } catch (e) {
       toast.error('搜索局域网失败：' + (e instanceof Error ? e.message : String(e)))
@@ -417,7 +417,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
             <Wifi className="h-6 w-6 text-gray-300 dark:text-gray-600" />
             <p className="text-xs text-gray-400">同网段暂未发现其它设备</p>
             <p className="text-[11px] text-gray-400 px-4">
-              确认对方已打开 JD Notes（≥1.10.2）；若被防火墙挡住，用下方手动输入地址兜底
+              确认对方已打开 JD Notes 新版本；若被防火墙挡住，用下方手动输入地址兜底
             </p>
           </div>
         ) : (

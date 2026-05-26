@@ -48,6 +48,8 @@ pub fn run() {
                         }
                     }
                     "quit" => {
+                        // 发 mDNS goodbye 让对方立即从设备列表清除本机
+                        sync::shutdown_mdns();
                         app.exit(0);
                     }
                     _ => {}

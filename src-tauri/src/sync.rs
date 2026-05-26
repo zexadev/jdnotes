@@ -924,15 +924,30 @@ pub async fn lan_discover(app: AppHandle) -> Result<Vec<DiscoveredDevice>, Strin
                     {
                         continue;
                     }
-                    for ip in info.get_addresses_v4() {
-                        let addr = format!("{}:{}", ip, port);
-                        if seen.insert(addr.clone()) {
-                            devices.push(DiscoveredDevice {
-                                address: addr,
-                                device_name: device.clone(),
-                                fingerprint: fp.clone(),
-                                protocol: proto.clone(),
-                            });
+                    if !fp.is_empty() {
+                        // fp 非空：一台机只列一条（按 fp 去重），多网卡取第一个 IP
+                        if seen.insert(fp.clone()) {
+                            if let Some(ip) = info.get_addresses_v4().into_iter().next() {
+                                devices.push(DiscoveredDevice {
+                                    address: format!("{}:{}", ip, port),
+                                    device_name: device.clone(),
+                                    fingerprint: fp.clone(),
+                                    protocol: proto.clone(),
+                                });
+                            }
+                        }
+                    } else {
+                        // fp 空（对端老版本无 TXT.fp）：兼容路径，每个 IP 各列一条
+                        for ip in info.get_addresses_v4() {
+                            let addr = format!("{}:{}", ip, port);
+                            if seen.insert(addr.clone()) {
+                                devices.push(DiscoveredDevice {
+                                    address: addr,
+                                    device_name: device.clone(),
+                                    fingerprint: fp.clone(),
+                                    protocol: proto.clone(),
+                                });
+                            }
                         }
                     }
                 }
@@ -990,6 +1005,16 @@ pub async fn init_lan_sync(app: AppHandle, db_path: String) {
     start_listener(app.clone(), db_path);
     if let Err(e) = ensure_mdns_started(&app).await {
         log::warn!("mDNS 启动失败，局域网自动发现不可用: {}", e);
+    }
+}
+
+/// 应用退出前调用：发送 mDNS goodbye 包，对端列表立即清除本机
+/// 不调的话对方要等几分钟 TTL 才看到我们离线，体验略差
+pub fn shutdown_mdns() {
+    if let Some(daemon) = MDNS_DAEMON.get() {
+        // shutdown 非阻塞，返回的 Receiver 我们不等——goodbye 包发出即可
+        let _ = daemon.shutdown();
+        log::info!("mDNS 已 shutdown（goodbye 包发送中）");
     }
 }
 
