@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Copy, RefreshCw, Loader2, Download, Upload, Trash2, Wifi, Globe, Plus, MonitorSmartphone } from 'lucide-react'
+import { Copy, RefreshCw, Loader2, Download, Upload, Trash2, Wifi, Globe, Plus, MonitorSmartphone, Send } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { save, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from '../../lib/toast'
+import { NoteSelectModal } from '../../components/modals/NoteSelectModal'
 
 interface SyncSettingsProps {
   onDataChange?: () => void
@@ -67,7 +68,11 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
 
   // 局域网
   const [peerAddress, setPeerAddress] = useState('')
-  const [syncing, setSyncing] = useState(false)
+  // mDNS 发现的同网段设备
+  const [discovered, setDiscovered] = useState<{ address: string; device_name: string }[]>([])
+  const [discovering, setDiscovering] = useState(false)
+  // 选笔记同步弹窗目标（null 表示未打开）
+  const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string } | null>(null)
 
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => localStorage.getItem('jdnotes_last_sync'))
   const [busy, setBusy] = useState(false)
@@ -78,6 +83,8 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     invoke<{ address: string }>('sync_get_info').then(setSyncInfo).catch(() => {})
     // 进页面探测各设备在线状态
     devices.forEach((d) => checkDevice(d.id))
+    // 进页面自动搜索局域网邻居（mDNS，约 1.5s）
+    handleDiscoverLan()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -160,20 +167,21 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     setSyncingDeviceId(null)
   }
 
-  // 局域网：连接对端做一次双向同步
-  const handleLanSync = async () => {
-    const addr = peerAddress.trim()
-    if (!addr) return
-    setSyncing(true)
+  // 局域网：mDNS 搜索同网段的其它 jdnotes 设备
+  const handleDiscoverLan = async () => {
+    setDiscovering(true)
     try {
-      const stats = await invoke<SyncStats>('sync_connect_lan', { address: addr })
-      toastSyncResult('', stats)
-      onDataChange?.()
-      markSynced()
+      const list = await invoke<{ address: string; device_name: string }[]>('sync_lan_discover')
+      setDiscovered(list)
     } catch (e) {
-      toast.error('同步失败：' + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
+      toast.error('搜索局域网失败：' + (e instanceof Error ? e.message : String(e)))
     }
-    setSyncing(false)
+    setDiscovering(false)
+  }
+
+  // 打开「选笔记同步」弹窗，目标可以来自 mDNS 发现或手动输入
+  const openNoteSelect = (address: string, deviceName: string) => {
+    setNoteSelectTarget({ address, deviceName })
   }
 
   const handleExportSync = async () => {
@@ -364,16 +372,26 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         </div>
       </section>
 
-      {/* ③ 局域网快速同步 */}
+      {/* ③ 同一网络（mDNS 自动发现 + 笔记多选） */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <Wifi className="h-4 w-4 text-[#5E6AD2]" />
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">同一网络快速同步</h3>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">同一网络</h3>
+          <button
+            onClick={handleDiscoverLan}
+            disabled={discovering}
+            className="ml-auto text-xs text-gray-400 hover:text-[#5E6AD2] flex items-center gap-1 transition-colors disabled:opacity-40"
+            title="重新搜索"
+          >
+            {discovering ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            {discovering ? '搜索中' : '刷新'}
+          </button>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
-          两台在同一 WiFi/网络下，把「本机地址」告诉对方，或输入对方地址直接同步（无需添加设备）。
+          自动发现同一 WiFi/网络下打开了 JD Notes 的其它设备，点「选笔记」勾选要同步给对方的条目（可全选/单选）。
         </p>
 
+        {/* 本机地址 */}
         <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
           <span className="text-xs text-gray-400 shrink-0">本机地址</span>
           <code className="flex-1 text-sm font-mono text-gray-700 dark:text-gray-300 truncate">{syncInfo?.address ?? '获取中…'}</code>
@@ -388,20 +406,78 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
           )}
         </div>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={peerAddress}
-            onChange={(e) => setPeerAddress(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleLanSync()}
-            placeholder="对方地址，如 192.168.1.20:38765"
-            className={INPUT_CLASS}
-          />
-          <button onClick={handleLanSync} disabled={syncing || !peerAddress.trim()} className={PRIMARY_BTN}>
-            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            同步
-          </button>
-        </div>
+        {/* 发现的设备 */}
+        {discovering && discovered.length === 0 ? (
+          <div className="flex items-center justify-center gap-2 py-7 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs text-gray-400">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            搜索同网段设备…
+          </div>
+        ) : discovered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-1.5 py-7 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-center">
+            <Wifi className="h-6 w-6 text-gray-300 dark:text-gray-600" />
+            <p className="text-xs text-gray-400">同网段暂未发现其它设备</p>
+            <p className="text-[11px] text-gray-400 px-4">
+              确认对方已打开 JD Notes（≥1.10.2）；若被防火墙挡住，用下方手动输入地址兜底
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {discovered.map((d) => (
+              <div
+                key={d.address}
+                className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/40 hover:border-[#5E6AD2]/40 hover:shadow-sm transition-all"
+              >
+                <div className="h-9 w-9 rounded-lg bg-[#5E6AD2]/10 flex items-center justify-center shrink-0">
+                  <MonitorSmartphone className="h-4 w-4 text-[#5E6AD2]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                    {d.device_name || '未命名设备'}
+                  </div>
+                  <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate">{d.address}</div>
+                </div>
+                <button
+                  onClick={() => openNoteSelect(d.address, d.device_name || '未命名设备')}
+                  className="px-3 py-1.5 text-xs font-medium text-[#5E6AD2] bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/20 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  选笔记
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 兜底：手动输入对方地址 */}
+        <details className="group">
+          <summary className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer select-none flex items-center gap-1 py-1">
+            <span className="group-open:rotate-90 transition-transform inline-block">▸</span>
+            手动输入对方地址（防火墙挡了 mDNS 时用）
+          </summary>
+          <div className="flex gap-2 mt-2">
+            <input
+              type="text"
+              value={peerAddress}
+              onChange={(e) => setPeerAddress(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === 'Enter' &&
+                peerAddress.trim() &&
+                openNoteSelect(peerAddress.trim(), peerAddress.trim())
+              }
+              placeholder="对方地址，如 192.168.1.20:38765"
+              className={INPUT_CLASS}
+            />
+            <button
+              onClick={() =>
+                peerAddress.trim() && openNoteSelect(peerAddress.trim(), peerAddress.trim())
+              }
+              disabled={!peerAddress.trim()}
+              className={PRIMARY_BTN}
+            >
+              <Send className="h-4 w-4" /> 选笔记
+            </button>
+          </div>
+        </details>
       </section>
 
       {/* ④ 其它方式 */}
@@ -431,6 +507,18 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
           <Trash2 className="h-3.5 w-3.5" /> 清理无用图片
         </button>
       </section>
+
+      {/* 选笔记同步弹窗 */}
+      <NoteSelectModal
+        open={noteSelectTarget !== null}
+        onClose={() => setNoteSelectTarget(null)}
+        deviceName={noteSelectTarget?.deviceName ?? ''}
+        address={noteSelectTarget?.address ?? ''}
+        onSynced={() => {
+          onDataChange?.()
+          markSynced()
+        }}
+      />
     </div>
   )
 }
