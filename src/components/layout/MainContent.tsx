@@ -7,6 +7,8 @@ import { EditorToolbar } from '../editor/EditorToolbar'
 import { WritingStats } from '../editor/WritingStats'
 import { formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
+import { isPaired } from '../../lib/pairing'
+import { PairingCodeModal } from '../modals/PairingCodeModal'
 import { invoke } from '@tauri-apps/api/core'
 import { formatTimeRemaining } from '../calendar/ReminderNotification'
 import type { Note } from '../../lib/db'
@@ -60,6 +62,8 @@ export function MainContent({
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([])
   const [lanPushAddress, setLanPushAddress] = useState('')
   const [pushingLan, setPushingLan] = useState(false)
+  // 首次配对码确认（仅 iroh push 用，局域网手输地址默认信任）
+  const [pairingTarget, setPairingTarget] = useState<{ device: { id: string; name: string }; fingerprint: string } | null>(null)
 
   const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
     setEditorInstance(editor)
@@ -106,8 +110,20 @@ export function MainContent({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showPushPicker])
 
-  // 推送当前笔记给某台设备
+  // 推送当前笔记给某台 iroh 设备（首次配对要确认 6 位码）
   const handlePushTo = async (device: { id: string; name: string }) => {
+    if (!activeNoteId) return
+    // iroh device.id 前 16 字符即 fingerprint（与本机 mDNS 派生口径一致）
+    const fp = device.id.slice(0, 16)
+    if (fp && !isPaired(fp)) {
+      setPairingTarget({ device, fingerprint: fp })
+      return
+    }
+    await pushToDevice(device)
+  }
+
+  // 配对码确认后实际触发的推送（绕过 isPaired）
+  const pushToDevice = async (device: { id: string; name: string }) => {
     if (!activeNoteId) return
     setPushingDeviceId(device.id)
     try {
@@ -374,6 +390,21 @@ export function MainContent({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 首次配对码弹窗（编辑器旁单条同步触发） */}
+      <PairingCodeModal
+        open={pairingTarget !== null}
+        onClose={() => setPairingTarget(null)}
+        deviceName={pairingTarget?.device.name ?? ''}
+        remoteFingerprint={pairingTarget?.fingerprint ?? ''}
+        onConfirmed={() => {
+          if (pairingTarget) {
+            const target = pairingTarget.device
+            // markPaired 已在 modal 内执行
+            void pushToDevice(target)
+          }
+        }}
+      />
     </main>
   )
 }

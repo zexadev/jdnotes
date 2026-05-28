@@ -4,7 +4,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { save, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from '../../lib/toast'
+import { isPaired } from '../../lib/pairing'
 import { NoteSelectModal } from '../../components/modals/NoteSelectModal'
+import { PairingCodeModal } from '../../components/modals/PairingCodeModal'
 
 interface SyncSettingsProps {
   onDataChange?: () => void
@@ -73,6 +75,12 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [discovering, setDiscovering] = useState(false)
   // 选笔记同步弹窗目标（null 表示未打开）
   const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string } | null>(null)
+  // 首次配对码弹窗目标（null 表示未打开）；确认后转交给 noteSelectTarget 或 syncDevice
+  const [pairingTarget, setPairingTarget] = useState<
+    | { kind: 'lan'; address: string; deviceName: string; fingerprint: string }
+    | { kind: 'iroh'; device: SavedDevice; fingerprint: string }
+    | null
+  >(null)
 
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => localStorage.getItem('jdnotes_last_sync'))
   const [busy, setBusy] = useState(false)
@@ -155,6 +163,26 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
 
   // 跨网：点设备旁的「同步」，用存好的 ID 发起一次双向同步
   const syncDevice = async (device: SavedDevice) => {
+    // 首次配对码确认：iroh 的 device.id 前 16 字符即 fp（与本机 mDNS 派生口径一致）
+    const fp = device.id.slice(0, 16)
+    if (fp && !isPaired(fp)) {
+      setPairingTarget({ kind: 'iroh', device, fingerprint: fp })
+      return
+    }
+    setSyncingDeviceId(device.id)
+    try {
+      const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
+      toastSyncResult(`「${device.name}」`, stats)
+      onDataChange?.()
+      markSynced()
+    } catch (e) {
+      toast.error(`「${device.name}」同步失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
+    }
+    setSyncingDeviceId(null)
+  }
+
+  // 配对码确认后实际触发的 iroh 同步（绕过 isPaired 检查）
+  const syncDeviceConfirmed = async (device: SavedDevice) => {
     setSyncingDeviceId(device.id)
     try {
       const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
@@ -180,7 +208,12 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   }
 
   // 打开「选笔记同步」弹窗，目标可以来自 mDNS 发现或手动输入
-  const openNoteSelect = (address: string, deviceName: string) => {
+  // mDNS 发现的会带 fingerprint，未配对先弹配对码；手输地址无 fp 直接进（用户主动信任）
+  const openNoteSelect = (address: string, deviceName: string, fingerprint?: string) => {
+    if (fingerprint && !isPaired(fingerprint)) {
+      setPairingTarget({ kind: 'lan', address, deviceName, fingerprint })
+      return
+    }
     setNoteSelectTarget({ address, deviceName })
   }
 
@@ -437,7 +470,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                   <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate">{d.address}</div>
                 </div>
                 <button
-                  onClick={() => openNoteSelect(d.address, d.device_name || '未命名设备')}
+                  onClick={() => openNoteSelect(d.address, d.device_name || '未命名设备', d.fingerprint)}
                   className="px-3 py-1.5 text-xs font-medium text-[#5E6AD2] bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/20 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
                 >
                   <Send className="h-3.5 w-3.5" />
@@ -517,6 +550,22 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         onSynced={() => {
           onDataChange?.()
           markSynced()
+        }}
+      />
+
+      {/* 首次配对码弹窗 */}
+      <PairingCodeModal
+        open={pairingTarget !== null}
+        onClose={() => setPairingTarget(null)}
+        deviceName={pairingTarget?.kind === 'iroh' ? pairingTarget.device.name : pairingTarget?.deviceName ?? ''}
+        remoteFingerprint={pairingTarget?.fingerprint ?? ''}
+        onConfirmed={() => {
+          // markPaired 已在 modal 内执行，这里负责"接着做"
+          if (pairingTarget?.kind === 'lan') {
+            setNoteSelectTarget({ address: pairingTarget.address, deviceName: pairingTarget.deviceName })
+          } else if (pairingTarget?.kind === 'iroh') {
+            syncDeviceConfirmed(pairingTarget.device)
+          }
         }}
       />
     </div>
