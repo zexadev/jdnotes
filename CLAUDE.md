@@ -15,7 +15,7 @@
 - **名称**：JD Notes — 简洁高效的本地笔记应用
 - **技术栈**：Tauri v2 (tauri 2.9.5, tauri-build 2.5.3) + Vite + React + TypeScript
 - **包管理器**：pnpm
-- **版本**：1.11.0
+- **版本**：2.0.0
 - **标识符**：com.jdnotes.app
 - **窗口**：1200x800，无边框 (decorations: false)
 - **前端开发端口**：5173
@@ -45,10 +45,12 @@
 | `src-tauri/src/lib.rs` | 插件注册、命令注册 |
 | `src-tauri/src/sync.rs` | 多设备同步内核（局域网 TCP + iroh 跨网 + 同步包文件、三路合并、设备 ID 持久化、probe、mDNS 自动发现、持久 fingerprint） |
 | `src-tauri/src/attachments.rs` | 图片附件内容寻址存储（sha256） |
-| `src-tauri/migrations/004_sync.sql`·`005_sync_merge.sql` | 同步 uuid + 三路合并基准/冲突标记 |
+| `src-tauri/migrations/004_sync.sql`·`005_sync_merge.sql`·`006_private.sql` | 同步 uuid + 三路合并基准/冲突标记 + 私有笔记标记 |
 | `src/pages/SettingsPage.tsx` | 设置页左侧导航容器（应用实际使用的设置 UI） |
 | `src/pages/settings/SyncSettings.tsx` | 设置「设备同步」页（mDNS 自动发现 / 跨网设备列表 / 同步包 / 清理图片） |
-| `src/components/modals/NoteSelectModal.tsx` | 局域网笔记多选同步弹窗（搜索/全选/单选/卡片勾选） |
+| `src/components/modals/NoteSelectModal.tsx` | 局域网笔记多选同步弹窗（搜索/全选/单选/卡片勾选，自动排除私有笔记） |
+| `src/components/modals/PairingCodeModal.tsx` | 首次配对码弹窗（双方各算 6 位数字防中间人） |
+| `src/lib/pairing.ts` | 配对码工具（SHA256 派生 + localStorage 白名单） |
 | `src/hooks/useSettings.ts` | AI 多来源配置 Hook（useAIConfig / useSettings） |
 | `src/components/modals/ChangelogModal.tsx` | 应用内更新日志（CHANGELOG_DATA 数组） |
 | `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
