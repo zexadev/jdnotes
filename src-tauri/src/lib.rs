@@ -124,6 +124,12 @@ pub fn run() {
                     sql: include_str!("../migrations/005_sync_merge.sql"),
                     kind: MigrationKind::Up,
                 },
+                Migration {
+                    version: 6,
+                    description: "add is_private flag to exclude notes from sync",
+                    sql: include_str!("../migrations/006_private.sql"),
+                    kind: MigrationKind::Up,
+                },
             ];
 
             // 注册 SQL 插件

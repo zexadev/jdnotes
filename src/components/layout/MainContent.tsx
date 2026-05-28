@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2 } from 'lucide-react'
+import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2, Lock } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
@@ -25,6 +25,7 @@ interface MainContentProps {
   onContentChange: (content: string) => void
   onTagsChange: (tags: string[]) => void
   onToggleFavorite: (id: number) => void
+  onTogglePrivate?: (id: number) => void
   onToggleChat: () => void
   onCreateNote: () => void
   onContentInserted: () => void
@@ -43,6 +44,7 @@ export function MainContent({
   onContentChange,
   onTagsChange,
   onToggleFavorite,
+  onTogglePrivate,
   onToggleChat,
   onCreateNote,
   onContentInserted,
@@ -213,6 +215,26 @@ export function MainContent({
                     strokeWidth={1.5}
                   />
                 </motion.button>
+                {/* 私有按钮（开启后此笔记不参与同步） */}
+                {onTogglePrivate && (
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => activeNoteId && onTogglePrivate(activeNoteId)}
+                    className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                      activeNote?.isPrivate === 1
+                        ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                        : 'text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-black/[0.03] dark:hover:bg-white/[0.06]'
+                    }`}
+                    title={
+                      activeNote?.isPrivate === 1
+                        ? '私有笔记：此笔记不会同步给任何设备（点击取消）'
+                        : '设为私有：此笔记将不参与同步'
+                    }
+                  >
+                    <Lock className="h-4 w-4" strokeWidth={1.5} />
+                  </motion.button>
+                )}
                 {/* 提醒按钮 */}
                 <div className="relative">
                   <motion.button

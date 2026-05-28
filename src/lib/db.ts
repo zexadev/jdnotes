@@ -16,6 +16,7 @@ export interface Note {
   tags: string[] // 标签数组
   isFavorite: number // 0 或 1
   isDeleted: number // 0 或 1
+  isPrivate: number // 0 或 1，1 = 不参与同步（不会发给任何对端）
   createdAt: Date
   updatedAt: Date
   // 日历提醒相关字段
@@ -31,6 +32,7 @@ interface NoteRow {
   tags: string // JSON 字符串
   is_favorite: number
   is_deleted: number
+  is_private: number
   created_at: string
   updated_at: string
   reminder_date: string | null
@@ -88,6 +90,7 @@ function rowToNote(row: NoteRow): Note {
     tags: JSON.parse(row.tags || '[]'),
     isFavorite: row.is_favorite,
     isDeleted: row.is_deleted,
+    isPrivate: row.is_private ?? 0,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     reminderDate: row.reminder_date ? new Date(row.reminder_date) : undefined,
@@ -401,9 +404,19 @@ export const noteOperations = {
   // 切换收藏状态（不更新 updatedAt，因为收藏是元数据操作，不是内容修改）
   async toggleFavorite(id: number): Promise<void> {
     const db = await getDatabase()
-    
+
     await db.execute(
       `UPDATE notes SET is_favorite = 1 - is_favorite WHERE id = ?`,
+      [id]
+    )
+  },
+
+  // 切换私有状态：1 = 不参与同步（同步层 read_local_notes 会过滤掉）
+  // 不更新 updatedAt：仅本机偏好，没改内容
+  async togglePrivate(id: number): Promise<void> {
+    const db = await getDatabase()
+    await db.execute(
+      `UPDATE notes SET is_private = 1 - is_private WHERE id = ?`,
       [id]
     )
   },

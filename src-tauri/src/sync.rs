@@ -90,7 +90,7 @@ async fn read_local_notes(pool: &SqlitePool) -> Result<Vec<SyncNote>, String> {
         .map_err(|e| format!("回填 uuid 失败: {}", e))?;
     sqlx::query_as::<_, SyncNote>(
         "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
-         FROM notes WHERE uuid IS NOT NULL AND uuid != ''",
+         FROM notes WHERE uuid IS NOT NULL AND uuid != '' AND COALESCE(is_private, 0) = 0",
     )
     .fetch_all(pool)
     .await
@@ -708,7 +708,7 @@ pub async fn iroh_push_note(
     // 只取这一条
     let local: Vec<SyncNote> = sqlx::query_as(
         "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
-         FROM notes WHERE id = ?",
+         FROM notes WHERE id = ? AND COALESCE(is_private, 0) = 0",
     )
     .bind(note_id)
     .fetch_all(&pool)
@@ -716,7 +716,7 @@ pub async fn iroh_push_note(
     .map_err(|e| format!("读取笔记失败: {}", e))?;
     if local.is_empty() {
         pool.close().await;
-        return Err(format!("找不到 id={} 的笔记", note_id));
+        return Err(format!("找不到 id={} 的笔记（或已标记为私有，不参与同步）", note_id));
     }
     let sent = local.len();
     let attachments = collect_attachments(&app, &local);
@@ -774,7 +774,7 @@ pub async fn lan_push_notes(
     let placeholders = note_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!(
         "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
-         FROM notes WHERE id IN ({})",
+         FROM notes WHERE id IN ({}) AND COALESCE(is_private, 0) = 0",
         placeholders
     );
     let mut q = sqlx::query_as::<_, SyncNote>(&sql);
@@ -1032,7 +1032,7 @@ pub async fn lan_push_note(
         .map_err(|e| format!("回填 uuid 失败: {}", e))?;
     let local: Vec<SyncNote> = sqlx::query_as(
         "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
-         FROM notes WHERE id = ?",
+         FROM notes WHERE id = ? AND COALESCE(is_private, 0) = 0",
     )
     .bind(note_id)
     .fetch_all(&pool)
@@ -1040,7 +1040,7 @@ pub async fn lan_push_note(
     .map_err(|e| format!("读取笔记失败: {}", e))?;
     if local.is_empty() {
         pool.close().await;
-        return Err(format!("找不到 id={} 的笔记", note_id));
+        return Err(format!("找不到 id={} 的笔记（或已标记为私有，不参与同步）", note_id));
     }
     let sent = local.len();
     let attachments = collect_attachments(&app, &local);

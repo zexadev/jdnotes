@@ -382,6 +382,12 @@ function App() {
     await toggleFavorite(id)
   }
 
+  // 切换私有状态：设为私有的笔记不会通过同步发给任何对端
+  const handleTogglePrivate = async (id: number) => {
+    await noteOperations.togglePrivate(id)
+    await refreshNotes()
+  }
+
   // 恢复笔记
   const handleRestoreNote = async (id: number) => {
     await restoreNote(id)
@@ -579,6 +585,7 @@ function App() {
                     onContentChange={handleContentChange}
                     onTagsChange={handleTagsChange}
                     onToggleFavorite={handleToggleFavorite}
+                    onTogglePrivate={handleTogglePrivate}
                     onToggleChat={toggleChat}
                     onCreateNote={handleCreateNote}
                     onContentInserted={handleContentInserted}

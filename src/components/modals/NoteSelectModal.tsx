@@ -37,7 +37,12 @@ export function NoteSelectModal({ open, onClose, deviceName, address, onSynced }
       noteOperations
         .getAll()
         .then((all) =>
-          setNotes(all.filter((n) => n.isDeleted === 0).sort((a, b) => +b.updatedAt - +a.updatedAt))
+          // 私有笔记不会同步，直接从可选列表里排除（避免误勾然后被后端拒绝的体验）
+          setNotes(
+            all
+              .filter((n) => n.isDeleted === 0 && (n.isPrivate ?? 0) === 0)
+              .sort((a, b) => +b.updatedAt - +a.updatedAt)
+          )
         )
         .catch(() => toast.error('加载笔记失败'))
         .finally(() => setIsLoading(false))
