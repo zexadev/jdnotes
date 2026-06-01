@@ -188,6 +188,9 @@ struct LocalNote {
     #[allow(dead_code)]
     reminder_enabled: i64,
     synced_content: Option<String>,
+    /// 本地私有标记：1 = 该笔记被用户标为私有，入站同步绝不覆盖/复活它
+    #[sqlx(default)]
+    is_private: i64,
 }
 
 /// 当前时间，ISO8601（与前端 toISOString 一致，便于字典序比较）
@@ -241,13 +244,21 @@ async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote], peer_name: &str) ->
             continue;
         }
         let local: Option<LocalNote> = sqlx::query_as::<_, LocalNote>(
-            "SELECT content,title,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled,synced_content \
+            "SELECT content,title,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled,synced_content,COALESCE(is_private,0) AS is_private \
              FROM notes WHERE uuid = ?",
         )
         .bind(&n.uuid)
         .fetch_optional(pool)
         .await
         .map_err(|e| format!("查询失败: {}", e))?;
+
+        // 私有保护：本地已存在且被标为私有 → 入站数据绝不触碰它
+        // （不覆盖内容、不复活已删、不生成冲突副本——私有笔记对同步完全不可见）
+        if let Some(ref l) = local {
+            if l.is_private == 1 {
+                continue;
+            }
+        }
 
         // 本地不存在 → 直接插入，基准设为对端内容
         let l = match local {
@@ -359,13 +370,27 @@ async fn write_msg(stream: &mut TcpStream, bytes: &[u8]) -> Result<(), String> {
 }
 
 /// 读一条长度前缀消息
+/// 安全：不按对端自报长度一次性预分配（防 256MB×N 连接内存放大 DoS），
+/// 而是分块累积、读到多少分配多少；超 MAX_MSG 立即中断。
 async fn read_msg(stream: &mut TcpStream) -> Result<Vec<u8>, String> {
     let len = stream.read_u32().await.map_err(|e| e.to_string())?;
     if len > MAX_MSG {
         return Err(format!("同步包过大: {} 字节", len));
     }
-    let mut buf = vec![0u8; len as usize];
-    stream.read_exact(&mut buf).await.map_err(|e| e.to_string())?;
+    let len = len as usize;
+    let mut buf: Vec<u8> = Vec::new();
+    let mut chunk = vec![0u8; 64 * 1024];
+    while buf.len() < len {
+        let want = (len - buf.len()).min(chunk.len());
+        let n = stream
+            .read(&mut chunk[..want])
+            .await
+            .map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Err("连接在读取完成前关闭".to_string());
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
     Ok(buf)
 }
 
@@ -444,13 +469,24 @@ pub fn start_listener(app: AppHandle, db_path: String) {
             }
         };
         log::info!("同步监听已启动: 0.0.0.0:{}", SYNC_PORT);
+        // 并发上限：最多同时处理 8 个入站同步连接，防恶意/故障端无限 spawn 耗尽资源
+        let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(8));
         loop {
             match listener.accept().await {
                 Ok((stream, peer)) => {
+                    let permit = match sem.clone().try_acquire_owned() {
+                        Ok(p) => p,
+                        Err(_) => {
+                            log::warn!("入站同步连接过多，拒绝来自 {} 的连接", peer);
+                            drop(stream);
+                            continue;
+                        }
+                    };
                     log::info!("收到同步连接: {}", peer);
                     let app2 = app.clone();
                     let db2 = db_path.clone();
                     tauri::async_runtime::spawn(async move {
+                        let _permit = permit; // 持有到处理结束
                         if let Err(e) = handle_conn(app2, db2, stream).await {
                             log::error!("处理同步连接失败: {}", e);
                         }
