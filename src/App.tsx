@@ -10,6 +10,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { TemplateModal } from './components/modals/TemplateModal'
 import type { NoteTemplate } from './components/modals/TemplateModal'
 import { UpdateAvailableModal } from './components/modals/UpdateAvailableModal'
+import { PairingCodeModal } from './components/modals/PairingCodeModal'
 import { AIChatSidebar } from './components/ai/AIChatSidebar'
 import { CalendarView, ReminderNotification } from './components/calendar'
 import { ToastContainer } from './components/common/Toast'
@@ -231,6 +232,20 @@ function App() {
         conflicts > 0 ? `${base}；${conflicts} 处冲突已存为「冲突副本」笔记` : base
       if (conflicts > 0) toast.warning(full, { duration: 8000 })
       else toast.success(full, { duration: 6000 })
+    })
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten())
+    }
+  }, [])
+
+  // 接收方配对请求：对端首次连来同步时，本机弹配对码确认（与对端屏幕对数字）
+  const [incomingPairing, setIncomingPairing] = useState<{ fingerprint: string; deviceName: string } | null>(null)
+  useEffect(() => {
+    type PairingReq = { fingerprint: string; deviceName: string; transport: string }
+    const unlistenPromise = listen<PairingReq>('sync:pairing-request', (e) => {
+      const { fingerprint, deviceName } = e.payload
+      if (!fingerprint) return
+      setIncomingPairing({ fingerprint, deviceName: deviceName || '未知设备' })
     })
     return () => {
       unlistenPromise.then((unlisten) => unlisten())
@@ -618,6 +633,17 @@ function App() {
 
       {/* 全局 Toast 容器 */}
       <ToastContainer toasts={toasts} removeToast={toast.remove} />
+
+      {/* 接收方配对码确认（对端首次连来同步时弹出，与对端屏幕对数字） */}
+      <PairingCodeModal
+        open={incomingPairing !== null}
+        onClose={() => setIncomingPairing(null)}
+        deviceName={incomingPairing?.deviceName ?? ''}
+        remoteFingerprint={incomingPairing?.fingerprint ?? ''}
+        onConfirmed={() => {
+          toast.success(`已与「${incomingPairing?.deviceName ?? '设备'}」建立信任，请让对方重新发起同步`)
+        }}
+      />
     </>
   )
 }

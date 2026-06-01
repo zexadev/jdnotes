@@ -110,8 +110,14 @@ export function PairingCodeModal({
             取消
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
+              // 双写：前端 localStorage（UI 用）+ 后端权威白名单（接收端握手校验用）
               markPaired(remoteFingerprint)
+              try {
+                await invoke('sync_accept_pairing', { fingerprint: remoteFingerprint })
+              } catch (e) {
+                console.warn('写入后端配对白名单失败:', e)
+              }
               onConfirmed()
               onClose()
             }}

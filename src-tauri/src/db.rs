@@ -59,6 +59,10 @@ pub struct AppConfig {
     /// 本设备名称（同步时随包发送，用于在对端的冲突副本里标注来源）
     #[serde(default)]
     pub device_name: String,
+    /// 已配对设备的指纹白名单（fingerprint = 公钥前 16 字符）
+    /// 接收端在合并前校验对端 fp 在册才放行；这是后端权威白名单，前端 localStorage 仅做 UI 展示
+    #[serde(default)]
+    pub paired_fingerprints: Vec<String>,
 }
 
 fn default_ai_sources() -> Vec<AISource> {
@@ -424,6 +428,36 @@ pub fn get_device_name(app: &tauri::AppHandle) -> Result<String, String> {
 pub fn set_device_name(app: &tauri::AppHandle, name: String) -> Result<(), String> {
     let mut config = load_config(app)?;
     config.device_name = name;
+    save_config(app, &config)
+}
+
+/// 对端指纹是否已在配对白名单（接收端权威校验用）
+pub fn is_paired(app: &tauri::AppHandle, fingerprint: &str) -> bool {
+    if fingerprint.is_empty() {
+        return false;
+    }
+    load_config(app)
+        .map(|c| c.paired_fingerprints.iter().any(|fp| fp == fingerprint))
+        .unwrap_or(false)
+}
+
+/// 把对端指纹加入配对白名单（幂等）
+pub fn add_paired(app: &tauri::AppHandle, fingerprint: &str) -> Result<(), String> {
+    if fingerprint.is_empty() {
+        return Err("空指纹".to_string());
+    }
+    let mut config = load_config(app)?;
+    if !config.paired_fingerprints.iter().any(|fp| fp == fingerprint) {
+        config.paired_fingerprints.push(fingerprint.to_string());
+        save_config(app, &config)?;
+    }
+    Ok(())
+}
+
+/// 从配对白名单移除对端指纹
+pub fn remove_paired(app: &tauri::AppHandle, fingerprint: &str) -> Result<(), String> {
+    let mut config = load_config(app)?;
+    config.paired_fingerprints.retain(|fp| fp != fingerprint);
     save_config(app, &config)
 }
 

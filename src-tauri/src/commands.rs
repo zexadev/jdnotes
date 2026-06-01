@@ -261,6 +261,24 @@ pub async fn sync_iroh_get_id(app: tauri::AppHandle) -> Result<String, String> {
     sync::iroh_get_id(app.clone(), db_path).await
 }
 
+/// 接受配对：把对端 fingerprint 加入后端权威白名单（接收端校验用）
+#[tauri::command]
+pub async fn sync_accept_pairing(app: tauri::AppHandle, fingerprint: String) -> Result<(), String> {
+    db::add_paired(&app, &fingerprint)
+}
+
+/// 撤销配对：从白名单移除对端 fingerprint
+#[tauri::command]
+pub async fn sync_revoke_pairing(app: tauri::AppHandle, fingerprint: String) -> Result<(), String> {
+    db::remove_paired(&app, &fingerprint)
+}
+
+/// 查询某对端 fingerprint 是否已配对
+#[tauri::command]
+pub async fn sync_is_paired(app: tauri::AppHandle, fingerprint: String) -> Result<bool, String> {
+    Ok(db::is_paired(&app, &fingerprint))
+}
+
 /// 通过对端 iroh 设备 ID 发起一次跨网双向同步
 #[tauri::command]
 pub async fn sync_iroh_connect(
