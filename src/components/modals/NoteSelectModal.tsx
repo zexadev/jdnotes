@@ -205,7 +205,7 @@ export function NoteSelectModal({ open, onClose, deviceName, address, onSynced }
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-sm text-gray-500 dark:text-gray-400">
-              {searchQuery ? '没有匹配的笔记' : '暂无笔记'}
+              {searchQuery ? '没有匹配的笔记' : '没有可同步的笔记（私有笔记已排除）'}
             </div>
           ) : (
             <div className="space-y-2">

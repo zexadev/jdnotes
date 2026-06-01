@@ -1,4 +1,4 @@
-import { Star, Trash2, RotateCcw, X } from 'lucide-react'
+import { Star, Trash2, RotateCcw, X, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { Note } from '../../lib/db'
 import { formatDate, extractPreview } from '../../lib/utils'
@@ -43,6 +43,9 @@ export function NoteCard({
       <div className="flex items-center gap-1.5 pr-12">
         {note.isFavorite === 1 && (
           <Star className="h-3 w-3 text-[#5E6AD2] fill-[#5E6AD2] flex-shrink-0" />
+        )}
+        {note.isPrivate === 1 && (
+          <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400 flex-shrink-0" />
         )}
         <h3 className="text-[13px] font-semibold text-slate-900 dark:text-slate-100 truncate flex-shrink min-w-0 tracking-tight">
           {note.title || '无标题'}
