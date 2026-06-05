@@ -1247,6 +1247,7 @@ pub async fn lan_push_note(
     db_path: &str,
     addr: &str,
     note_id: i64,
+    expected_fp: Option<&str>,
 ) -> Result<SyncStats, String> {
     let pool = open_pool(db_path).await?;
     sqlx::query("UPDATE notes SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL OR uuid = ''")
@@ -1275,8 +1276,8 @@ pub async fn lan_push_note(
     };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
-    // 编辑器旁单条推送为手输地址，无预期指纹（用户主动信任）：仅验签不绑身份
-    let mut stream = lan_connect_authed(&app, addr, None).await?;
+    // mDNS 发现的设备带预期指纹（校验应答方身份防 ARP 冒名）；手输地址为 None（仅验签不绑身份）
+    let mut stream = lan_connect_authed(&app, addr, expected_fp).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
     let remote: SyncPackage =

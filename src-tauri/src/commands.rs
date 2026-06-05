@@ -308,14 +308,16 @@ pub async fn sync_iroh_push_note(
 }
 
 /// 局域网版的单条推送：TCP 直连地址，只发指定那一条
+/// fingerprint：来自 mDNS 发现的设备会带上，用于校验应答方身份防 ARP 冒名；手输地址为 None
 #[tauri::command]
 pub async fn sync_lan_push_note(
     app: tauri::AppHandle,
     address: String,
     note_id: i64,
+    fingerprint: Option<String>,
 ) -> Result<sync::SyncStats, String> {
     let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
-    sync::lan_push_note(app.clone(), &db_path, &address, note_id).await
+    sync::lan_push_note(app.clone(), &db_path, &address, note_id, fingerprint.as_deref()).await
 }
 
 /// 局域网多条推送（笔记选择列表用）

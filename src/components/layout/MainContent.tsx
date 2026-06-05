@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2, Lock } from 'lucide-react'
+import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2, Lock, Wifi } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
@@ -62,10 +62,18 @@ export function MainContent({
   const pushPopupRef = useRef<HTMLDivElement>(null)
   const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null)
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([])
+  // mDNS 发现的同网段设备（打开 popover 时拉一次，和「设置 → 选笔记」一致）
+  const [discovered, setDiscovered] = useState<{ address: string; device_name: string; fingerprint?: string }[]>([])
+  const [discovering, setDiscovering] = useState(false)
   const [lanPushAddress, setLanPushAddress] = useState('')
-  const [pushingLan, setPushingLan] = useState(false)
-  // 首次配对码确认（仅 iroh push 用，局域网手输地址默认信任）
-  const [pairingTarget, setPairingTarget] = useState<{ device: { id: string; name: string }; fingerprint: string } | null>(null)
+  // 正在推送的局域网地址（手输与发现的设备共用，用来定位 spinner / 禁用按钮）
+  const [pushingLanAddr, setPushingLanAddr] = useState<string | null>(null)
+  // 首次配对码确认：iroh 用 device.id，局域网发现设备用 address + fingerprint
+  const [pairingTarget, setPairingTarget] = useState<
+    | { kind: 'iroh'; device: { id: string; name: string }; fingerprint: string }
+    | { kind: 'lan'; address: string; deviceName: string; fingerprint: string }
+    | null
+  >(null)
 
   const handleEditorReady = useCallback((editor: TiptapEditor | null) => {
     setEditorInstance(editor)
@@ -96,6 +104,12 @@ export function MainContent({
       } catch {
         setDevices([])
       }
+      // 局域网自动发现同网段设备（与「设置 → 选笔记」一致，约 1.5s 返回）
+      setDiscovering(true)
+      invoke<{ address: string; device_name: string; fingerprint?: string }[]>('sync_lan_discover')
+        .then((list) => setDiscovered(list))
+        .catch(() => setDiscovered([]))
+        .finally(() => setDiscovering(false))
     }
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -118,7 +132,7 @@ export function MainContent({
     // iroh device.id 前 16 字符即 fingerprint（与本机 mDNS 派生口径一致）
     const fp = device.id.slice(0, 16)
     if (fp && !isPaired(fp)) {
-      setPairingTarget({ device, fingerprint: fp })
+      setPairingTarget({ kind: 'iroh', device, fingerprint: fp })
       return
     }
     await pushToDevice(device)
@@ -145,28 +159,45 @@ export function MainContent({
     setPushingDeviceId(null)
   }
 
-  // 推送当前笔记到局域网地址（一次性输入，不存设备列表，因为 IP 会变）
-  const handlePushToLan = async () => {
-    if (!activeNoteId) return
-    const addr = lanPushAddress.trim()
-    if (!addr) return
-    setPushingLan(true)
+  // 推送当前笔记到局域网地址（手输地址与 mDNS 发现的设备共用）。
+  // fingerprint 来自发现的设备，传给后端校验应答方身份防 ARP 冒名；手输地址为 undefined。
+  const pushToLanAddress = async (addr: string, fingerprint?: string, label?: string) => {
+    if (!activeNoteId || !addr) return
+    const name = label || addr
+    setPushingLanAddr(addr)
     try {
       const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number }>(
         'sync_lan_push_note',
-        { address: addr, noteId: activeNoteId }
+        { address: addr, noteId: activeNoteId, fingerprint }
       )
       if (stats.conflicts > 0) {
-        toast.warning(`已推送到 ${addr}｜⚠️ 对端有 ${stats.conflicts} 处冲突需核对`, { duration: 7000 })
+        toast.warning(`已推送到「${name}」｜⚠️ 对端有 ${stats.conflicts} 处冲突需核对`, { duration: 7000 })
       } else {
-        toast.success(`已推送到 ${addr}`)
+        toast.success(`已推送到「${name}」`)
       }
       setShowPushPicker(false)
       setLanPushAddress('')
     } catch (e) {
-      toast.error(`推送到 ${addr} 失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
+      toast.error(`推送到「${name}」失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
     }
-    setPushingLan(false)
+    setPushingLanAddr(null)
+  }
+
+  // 手输局域网地址推送（一次性，不存设备列表，因为 IP 会变；无预期指纹）
+  const handlePushToLan = () => {
+    const addr = lanPushAddress.trim()
+    if (addr) void pushToLanAddress(addr)
+  }
+
+  // 推送给 mDNS 发现的局域网设备：未配对先弹配对码确认，带 fingerprint 绑身份
+  const handlePushToLanDevice = (d: { address: string; device_name: string; fingerprint?: string }) => {
+    if (!activeNoteId) return
+    const name = d.device_name || '未命名设备'
+    if (d.fingerprint && !isPaired(d.fingerprint)) {
+      setPairingTarget({ kind: 'lan', address: d.address, deviceName: name, fingerprint: d.fingerprint })
+      return
+    }
+    void pushToLanAddress(d.address, d.fingerprint, name)
   }
 
   const hasReminder = activeNote?.reminderEnabled === 1 && activeNote?.reminderDate
@@ -322,9 +353,34 @@ export function MainContent({
                           ))}
                         </div>
                       )}
+                      {/* mDNS 发现的同网段设备：点一下直接把当前笔记推过去 */}
+                      {(discovering || discovered.length > 0) && (
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-2.5 mt-2.5">
+                          <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 px-1 flex items-center gap-1.5">
+                            同网段设备
+                            {discovering && <Loader2 className="h-3 w-3 animate-spin" />}
+                          </div>
+                          <div className="space-y-0.5">
+                            {discovered.map((d) => (
+                              <button
+                                key={d.address}
+                                onClick={() => handlePushToLanDevice(d)}
+                                disabled={pushingLanAddr !== null}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] rounded-lg text-left disabled:opacity-50 transition-colors"
+                              >
+                                <div className="h-7 w-7 rounded-md bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                  <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+                                </div>
+                                <span className="flex-1 truncate">{d.device_name || '未命名设备'}</span>
+                                {pushingLanAddr === d.address && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5E6AD2]" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {/* 局域网一次性推送（IP 会变，不存设备列表） */}
                       <div className="border-t border-gray-200 dark:border-gray-700 pt-2.5 mt-2.5">
-                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 px-1">或推到局域网地址</div>
+                        <div className="text-[11px] text-gray-400 dark:text-gray-500 mb-1.5 px-1">或手动输入局域网地址</div>
                         <div className="flex gap-1.5">
                           <input
                             type="text"
@@ -336,10 +392,10 @@ export function MainContent({
                           />
                           <button
                             onClick={handlePushToLan}
-                            disabled={pushingLan || !lanPushAddress.trim()}
+                            disabled={pushingLanAddr !== null || !lanPushAddress.trim()}
                             className="px-3 py-1.5 text-xs font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded transition-colors disabled:opacity-40 shrink-0 flex items-center justify-center min-w-[36px]"
                           >
-                            {pushingLan ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '推'}
+                            {pushingLanAddr === lanPushAddress.trim() ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '推'}
                           </button>
                         </div>
                       </div>
@@ -417,13 +473,14 @@ export function MainContent({
       <PairingCodeModal
         open={pairingTarget !== null}
         onClose={() => setPairingTarget(null)}
-        deviceName={pairingTarget?.device.name ?? ''}
+        deviceName={pairingTarget?.kind === 'iroh' ? pairingTarget.device.name : pairingTarget?.deviceName ?? ''}
         remoteFingerprint={pairingTarget?.fingerprint ?? ''}
         onConfirmed={() => {
-          if (pairingTarget) {
-            const target = pairingTarget.device
-            // markPaired 已在 modal 内执行
-            void pushToDevice(target)
+          // markPaired 已在 modal 内执行，这里负责"接着推"
+          if (pairingTarget?.kind === 'iroh') {
+            void pushToDevice(pairingTarget.device)
+          } else if (pairingTarget?.kind === 'lan') {
+            void pushToLanAddress(pairingTarget.address, pairingTarget.fingerprint, pairingTarget.deviceName)
           }
         }}
       />

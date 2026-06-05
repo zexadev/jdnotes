@@ -92,6 +92,17 @@
   - 局域网手输地址路径**不弹**配对码（用户主动信任 + 没有 fp 派生源）
 - **私有笔记标记 `is_private`**：用户在编辑器头部点 Lock 图标切换。被标记的笔记**绝不参与同步**——同步层 `read_local_notes` + 三种 push 命令都加 `COALESCE(is_private, 0) = 0` 过滤；多选弹窗里也直接看不到。导出/导入功能不受影响（属于本机数据迁移，不算"同步给对端"）。
 
+### 2.0 收口（第二轮：安全审计后补强）✅ 已完成（编译通过待真机测）
+经多 agent 安全审计 + 对抗性核验，补掉「零认证 blocker 修复后」残留的真缺口（commit `安全收口 (4/4)` + 单条分享局域网发现增强）：
+- **接收端认证是后端权威**：配对白名单从纯 localStorage 升级为后端 config 文件 `paired_fingerprints`（`db::is_paired`）。LAN 用「随机 challenge + ed25519 签名验签」把 fingerprint 与私钥绑定，iroh 用 TLS 已验证的 `remote_id`，两者均在 merge 前校验、未配对回 `PAIRING_REQUIRED`。绕过前端 localStorage 直连无效。localStorage 自此仅作 UI 镜像，后端 config 为权威源。
+- **出站方向也鉴权**（堵「只防别人推进来、不防自己推给错对象」的方向性盲区）：
+  - iroh：`iroh_push_note` / `iroh_sync_connect` 在 connect 前校验 `is_paired(peer_id[..16])`；`iroh_probe` 不加此门（配对前取名需要）。
+  - LAN：`lan_connect_authed` 升级**双向握手**——应答方也签发起方 challenge 回证身份（杀「冒名只回 OK」的被动接管/ARP 劫持）。新增 `expected_fp`：mDNS 发现并配对的设备要求应答方指纹**完全一致**；手输地址无预期指纹（用户主动信任）仅验签不绑身份。
+- **DoS 上限**：`handle_conn` 握手 10s 超时杀 slowloris；`iroh_accept_loop` 加 `Semaphore(8)` 并发上限；iroh 鉴权前置——未配对对端只读 64 字节（仅够 PROBE），绝不反序列化最大 256MB 的同步包（防解析放大 + 内存占用）。
+- **配对状态一致性**：`PairingCodeModal` 先 await 后端 `sync_accept_pairing` 成功才镜像 localStorage + 继续，失败中止——根除「前端以为已配对、后端却没有」导致的「配过却同步不了」。
+- **单条分享补齐局域网自动发现**：编辑器 Send popover 打开即 `sync_lan_discover` 列出同网段设备一点直推（之前只有 iroh 设备列表 + 手输地址）；未配对先弹配对码（与设置页「选笔记」一致）；`sync_lan_push_note` 加 `fingerprint` 参数走指纹绑定，与 `sync_lan_push_notes` 对称。
+- **PROBE 设备名**：未配对 PROBE 仍返回真设备名（支持「添加设备自动取名」，设备名属半公开低危信息）——审计后明确保留，非遗漏。
+
 ### 阶段三 📋 规划
 - 冲突保留双份（替代纯 LWW）：版本向量 + 检测并发编辑，败方存"(冲突副本)"笔记。
 - **图片存储优化 ✅ 已实现（编译通过，待真机测试）**：base64 内嵌 → `attachments/` 文件夹（文件名 = 内容 sha256，内容寻址去重）+ 正文存 `attachment://<hash>` 短引用。存文件不存 DB BLOB（对标 Obsidian/思源/Logseq，数据主权+可迁移）。
