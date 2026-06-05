@@ -74,7 +74,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [discovered, setDiscovered] = useState<{ address: string; device_name: string; fingerprint?: string; protocol?: string }[]>([])
   const [discovering, setDiscovering] = useState(false)
   // 选笔记同步弹窗目标（null 表示未打开）
-  const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string } | null>(null)
+  const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string; fingerprint?: string } | null>(null)
   // 首次配对码弹窗目标（null 表示未打开）；确认后转交给 noteSelectTarget 或 syncDevice
   const [pairingTarget, setPairingTarget] = useState<
     | { kind: 'lan'; address: string; deviceName: string; fingerprint: string }
@@ -214,7 +214,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       setPairingTarget({ kind: 'lan', address, deviceName, fingerprint })
       return
     }
-    setNoteSelectTarget({ address, deviceName })
+    setNoteSelectTarget({ address, deviceName, fingerprint })
   }
 
   const handleExportSync = async () => {
@@ -547,6 +547,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         onClose={() => setNoteSelectTarget(null)}
         deviceName={noteSelectTarget?.deviceName ?? ''}
         address={noteSelectTarget?.address ?? ''}
+        fingerprint={noteSelectTarget?.fingerprint}
         onSynced={() => {
           onDataChange?.()
           markSynced()
@@ -562,7 +563,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         onConfirmed={() => {
           // markPaired 已在 modal 内执行，这里负责"接着做"
           if (pairingTarget?.kind === 'lan') {
-            setNoteSelectTarget({ address: pairingTarget.address, deviceName: pairingTarget.deviceName })
+            setNoteSelectTarget({ address: pairingTarget.address, deviceName: pairingTarget.deviceName, fingerprint: pairingTarget.fingerprint })
           } else if (pairingTarget?.kind === 'iroh') {
             syncDeviceConfirmed(pairingTarget.device)
           }

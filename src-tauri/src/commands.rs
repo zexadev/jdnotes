@@ -319,14 +319,16 @@ pub async fn sync_lan_push_note(
 }
 
 /// 局域网多条推送（笔记选择列表用）
+/// fingerprint：来自 mDNS 发现的设备会带上，用于校验应答方身份防 ARP 冒名；手输地址为 None
 #[tauri::command]
 pub async fn sync_lan_push_notes(
     app: tauri::AppHandle,
     address: String,
     note_ids: Vec<i64>,
+    fingerprint: Option<String>,
 ) -> Result<sync::SyncStats, String> {
     let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
-    sync::lan_push_notes(app.clone(), &db_path, &address, note_ids).await
+    sync::lan_push_notes(app.clone(), &db_path, &address, note_ids, fingerprint.as_deref()).await
 }
 
 /// 局域网设备发现（mDNS）

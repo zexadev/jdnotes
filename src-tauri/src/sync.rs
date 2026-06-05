@@ -399,10 +399,36 @@ async fn read_msg(stream: &mut TcpStream) -> Result<Vec<u8>, String> {
 /// 证明自己持有声称的公钥（防 mDNS TXT 里 fp 被伪造）。
 #[derive(Serialize, Deserialize)]
 struct LanAuth {
-    /// 发起方公钥字符串（z-base-32，前 16 字符即 fingerprint）
+    /// 公钥字符串（z-base-32，前 16 字符即 fingerprint）
     public_key: String,
-    /// 对 challenge 的 ed25519 签名（64 字节）
+    /// 对收到的 challenge 的 ed25519 签名（64 字节）
     signature: Vec<u8>,
+    /// 反向认证：发起方对应答方下的 challenge（仅发起方填，应答方回包时为空）
+    #[serde(default)]
+    challenge: Vec<u8>,
+}
+
+/// 生成 32 字节一次性随机 challenge（两个 v4 UUID 拼接，各 122bit CSPRNG 熵）
+fn gen_challenge() -> [u8; 32] {
+    let mut c = [0u8; 32];
+    c[..16].copy_from_slice(Uuid::new_v4().as_bytes());
+    c[16..].copy_from_slice(Uuid::new_v4().as_bytes());
+    c
+}
+
+/// 验证一条 LanAuth：对 challenge 验签，返回已验证的 (完整公钥串, fingerprint)
+fn verify_lan_auth(auth: &LanAuth, challenge: &[u8]) -> Result<(String, String), String> {
+    let pk = PublicKey::from_str(&auth.public_key).map_err(|e| format!("无效公钥: {}", e))?;
+    if auth.signature.len() != 64 {
+        return Err("签名长度错误".to_string());
+    }
+    let mut sig_arr = [0u8; 64];
+    sig_arr.copy_from_slice(&auth.signature);
+    let sig = iroh::Signature::from_bytes(&sig_arr);
+    pk.verify(challenge, &sig)
+        .map_err(|_| "签名验证失败：对端未持有声称的私钥".to_string())?;
+    let fp: String = auth.public_key.chars().take(16).collect();
+    Ok((auth.public_key.clone(), fp))
 }
 
 /// 本机 fingerprint（iroh 公钥前 16 字符），用于配对码与白名单
@@ -412,61 +438,66 @@ pub async fn local_fingerprint(app: &AppHandle, db_path: &str) -> Result<String,
     Ok(ep.id().to_string().chars().take(16).collect())
 }
 
-/// 接收端握手：发 challenge → 收签名 → 验签 → 返回已验证的对端 fingerprint。
-/// 验签失败或 IO 错误返回 Err；成功返回 (对端完整公钥串, fingerprint)。
-async fn lan_recv_handshake(stream: &mut TcpStream) -> Result<(String, String), String> {
-    // 32 字节一次性随机 challenge：两个 v4 UUID 拼接（各 122bit CSPRNG 熵），无需额外 rand 依赖
-    let mut challenge = [0u8; 32];
-    challenge[..16].copy_from_slice(Uuid::new_v4().as_bytes());
-    challenge[16..].copy_from_slice(Uuid::new_v4().as_bytes());
+/// 接收端握手：发 challenge → 收发起方签名 → 验签。
+/// 成功返回 (发起方完整公钥串, fingerprint, 发起方对本机下的 challenge)。
+/// 最后一项供本机签名回证身份给发起方（双向认证）。
+async fn lan_recv_handshake(stream: &mut TcpStream) -> Result<(String, String, Vec<u8>), String> {
+    let challenge = gen_challenge();
     write_msg(stream, &challenge).await?;
     let auth_bytes = read_msg(stream).await?;
     let auth: LanAuth =
         serde_json::from_slice(&auth_bytes).map_err(|e| format!("解析认证帧失败: {}", e))?;
-    let pk = PublicKey::from_str(&auth.public_key).map_err(|e| format!("无效公钥: {}", e))?;
-    if auth.signature.len() != 64 {
-        return Err("签名长度错误".to_string());
-    }
-    let mut sig_arr = [0u8; 64];
-    sig_arr.copy_from_slice(&auth.signature);
-    let sig = iroh::Signature::from_bytes(&sig_arr);
-    pk.verify(&challenge, &sig)
-        .map_err(|_| "签名验证失败：对端未持有声称的私钥".to_string())?;
-    let fp: String = auth.public_key.chars().take(16).collect();
-    Ok((auth.public_key, fp))
+    let (pk, fp) = verify_lan_auth(&auth, &challenge)?;
+    Ok((pk, fp, auth.challenge))
 }
 
-/// 发起端握手：收 challenge → 用本机 iroh 私钥签名 → 发回认证帧。
+/// 发起端握手：收 challenge → 用本机私钥签名 + 附带本机对应答方的 challenge → 发认证帧。
+/// 返回本机下发的 challenge，供随后验证应答方回证。
 async fn lan_send_handshake(
     stream: &mut TcpStream,
     app: &AppHandle,
-) -> Result<(), String> {
+) -> Result<Vec<u8>, String> {
     let secret = load_or_create_iroh_secret(app)?;
-    let challenge = read_msg(stream).await?;
-    let sig = secret.sign(&challenge);
+    let challenge_r = read_msg(stream).await?;
+    let sig = secret.sign(&challenge_r);
+    let challenge_i = gen_challenge();
     let auth = LanAuth {
         public_key: secret.public().to_string(),
         signature: sig.to_bytes().to_vec(),
+        challenge: challenge_i.to_vec(),
     };
     let bytes = serde_json::to_vec(&auth).map_err(|e| e.to_string())?;
     write_msg(stream, &bytes).await?;
-    Ok(())
+    Ok(challenge_i.to_vec())
 }
 
-/// 发起端：连接地址 + 完成握手认证，返回已认证的 stream。
-/// 若对端要求配对（PAIRING_REQUIRED）或验证失败，返回带提示的 Err。
-async fn lan_connect_authed(app: &AppHandle, addr: &str) -> Result<TcpStream, String> {
+/// 发起端：连接地址 + 完成双向握手认证，返回已认证的 stream。
+/// 不仅向应答方证明自己，还要求应答方回证身份（验签）——杀掉「冒名只回个 OK」的被动接管。
+/// `expected_fp`：调用方已知目标设备指纹时（mDNS 发现并配对），要求应答方身份完全一致，
+/// 防同网段 ARP 冒名顶替；手输地址无预期指纹（用户主动信任），仅验签不绑身份。
+async fn lan_connect_authed(
+    app: &AppHandle,
+    addr: &str,
+    expected_fp: Option<&str>,
+) -> Result<TcpStream, String> {
     let mut stream = TcpStream::connect(addr)
         .await
         .map_err(|e| format!("连接 {} 失败: {}", addr, e))?;
-    lan_send_handshake(&mut stream, app).await?;
-    // 接收端回 OK 才放行；PAIRING_REQUIRED 表示对方需要先确认配对
+    let challenge_i = lan_send_handshake(&mut stream, app).await?;
     let resp = read_msg(&mut stream).await?;
+    // PAIRING_REQUIRED 表示对方需要先确认配对
     if resp == b"PAIRING_REQUIRED" {
         return Err("对方尚未确认配对：请在对方设备上接受配对请求后重试".to_string());
     }
-    if resp != b"OK" {
-        return Err("握手未通过".to_string());
+    // 反向认证：解析应答方回证帧并验签（证明应答方确实持有其声称的私钥）
+    let auth: LanAuth = serde_json::from_slice(&resp)
+        .map_err(|_| "握手响应无效（对方可能为旧版或非 jdnotes 设备）".to_string())?;
+    let (_resp_pk, resp_fp) = verify_lan_auth(&auth, &challenge_i)
+        .map_err(|_| "对方身份验证失败（应答方未持有声称的私钥）".to_string())?;
+    if let Some(exp) = expected_fp {
+        if resp_fp != exp {
+            return Err("对方身份与所选设备不符（可能被同网段设备冒名顶替）".to_string());
+        }
     }
     Ok(stream)
 }
@@ -480,7 +511,8 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     let pkg = SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
-    let mut stream = lan_connect_authed(&app, addr).await?;
+    // 手输地址，无预期指纹（用户主动信任）：仅验签不绑身份
+    let mut stream = lan_connect_authed(&app, addr, None).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
     let remote: SyncPackage =
@@ -498,8 +530,12 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
 
 /// 接收方：处理一个进来的同步连接（先握手认证，再收对端，后发本地，再合并）
 async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> Result<(), String> {
-    // 认证握手：发 challenge → 验签 → 得到不可伪造的对端 fingerprint
-    let (_remote_pk, remote_fp) = lan_recv_handshake(&mut stream).await?;
+    // 认证握手：发 challenge → 验签 → 得到不可伪造的对端 fingerprint。
+    // 10s 超时：未配对/慢速端不能迟迟不发签名而长期占用并发槽位（防 slowloris）。
+    let (_remote_pk, remote_fp, challenge_i) =
+        tokio::time::timeout(Duration::from_secs(10), lan_recv_handshake(&mut stream))
+            .await
+            .map_err(|_| "握手超时".to_string())??;
     if !crate::db::is_paired(&app, &remote_fp) {
         // 未配对：请求前端弹配对确认，本次拒绝合并
         let _ = app.emit(
@@ -513,7 +549,15 @@ async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> 
         let _ = write_msg(&mut stream, b"PAIRING_REQUIRED").await;
         return Err(format!("对端 {} 未配对，已请求用户确认", remote_fp));
     }
-    let _ = write_msg(&mut stream, b"OK").await;
+    // 回证：对发起方下的 challenge 签名，让发起方也能验证本机身份在其白名单（双向认证）
+    let secret = load_or_create_iroh_secret(&app)?;
+    let resp = LanAuth {
+        public_key: secret.public().to_string(),
+        signature: secret.sign(&challenge_i).to_bytes().to_vec(),
+        challenge: Vec::new(),
+    };
+    let resp_bytes = serde_json::to_vec(&resp).map_err(|e| e.to_string())?;
+    write_msg(&mut stream, &resp_bytes).await?;
 
     let req = read_msg(&mut stream).await?;
     let remote: SyncPackage =
@@ -712,12 +756,23 @@ async fn get_iroh_endpoint(app: AppHandle, db_path: String) -> Result<Endpoint, 
 
 /// 接收循环：接受对端连接，作为接收方完成一次同步
 async fn iroh_accept_loop(ep: Endpoint, app: AppHandle, db_path: String) {
+    // 并发上限：最多同时处理 8 个跨网入站连接，防恶意/故障端无限连接耗尽资源
+    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(8));
     loop {
         match ep.accept().await {
             Some(incoming) => {
+                let permit = match sem.clone().try_acquire_owned() {
+                    Ok(p) => p,
+                    Err(_) => {
+                        log::warn!("iroh 入站连接过多，拒绝新连接");
+                        drop(incoming);
+                        continue;
+                    }
+                };
                 let app2 = app.clone();
                 let db2 = db_path.clone();
                 tauri::async_runtime::spawn(async move {
+                    let _permit = permit; // 持有到处理结束
                     if let Err(e) = handle_iroh_conn(incoming, app2, db2).await {
                         log::error!("iroh 同步连接处理失败: {}", e);
                     }
@@ -738,7 +793,41 @@ async fn handle_iroh_conn(
     db_path: String,
 ) -> Result<(), String> {
     let conn = incoming.await.map_err(|e| format!("接受连接失败: {}", e))?;
+    // 认证前置：iroh 的 remote_id 是 TLS 已验证的对端公钥，不可伪造。
+    // 取其前 16 字符作 fingerprint，连接一建立即判白名单——未配对者绝不读取/解析其负载。
+    let remote_fp: String = conn.remote_id().to_string().chars().take(16).collect();
+    let paired = crate::db::is_paired(&app, &remote_fp);
     let (mut send, mut recv) = conn.accept_bi().await.map_err(|e| e.to_string())?;
+
+    if !paired {
+        // 未配对：只允许读取至多 64 字节（仅够一个 PROBE），绝不读取/反序列化大同步包
+        // （防对端可控 JSON 的解析放大 + 256MB 内存占用）
+        let req = recv.read_to_end(64).await.unwrap_or_default();
+        if req == b"PROBE" {
+            // probe：返回本机设备名（支持「添加设备自动取名」，设备名属低危半公开信息）
+            send.write_all(local_device_name(&app).as_bytes())
+                .await
+                .map_err(|e| e.to_string())?;
+            send.finish().map_err(|e| e.to_string())?;
+            conn.closed().await;
+            return Ok(());
+        }
+        // 非 PROBE 且未配对 → 请求前端弹配对确认，拒绝合并
+        let _ = app.emit(
+            "sync:pairing-request",
+            serde_json::json!({
+                "fingerprint": remote_fp,
+                "deviceName": "",
+                "transport": "iroh",
+            }),
+        );
+        let _ = send.write_all(b"PAIRING_REQUIRED").await;
+        let _ = send.finish();
+        conn.closed().await;
+        return Err(format!("对端 {} 未配对，已请求用户确认", remote_fp));
+    }
+
+    // 已配对：可信对端，正常收包
     let req = recv
         .read_to_end(MAX_MSG as usize)
         .await
@@ -754,25 +843,6 @@ async fn handle_iroh_conn(
     }
     let remote: SyncPackage =
         serde_json::from_slice(&req).map_err(|e| format!("解析对端数据失败: {}", e))?;
-
-    // 认证：iroh 的 remote_id 是 TLS 已验证的对端公钥，不可伪造。
-    // 取其前 16 字符作 fingerprint，校验是否在配对白名单。
-    let remote_fp: String = conn.remote_id().to_string().chars().take(16).collect();
-    if !crate::db::is_paired(&app, &remote_fp) {
-        // 未配对：通知前端弹配对确认（用户接受后会写入白名单），本次拒绝合并
-        let _ = app.emit(
-            "sync:pairing-request",
-            serde_json::json!({
-                "fingerprint": remote_fp,
-                "deviceName": remote.device_name,
-                "transport": "iroh",
-            }),
-        );
-        let _ = send.write_all(b"PAIRING_REQUIRED").await;
-        let _ = send.finish();
-        conn.closed().await;
-        return Err(format!("对端 {} 未配对，已请求用户确认", remote_fp));
-    }
 
     let pool = open_pool(&db_path).await?;
     save_attachments(&app, &remote.attachments);
@@ -841,6 +911,11 @@ pub async fn iroh_push_note(
         .trim()
         .parse()
         .map_err(|e| format!("无效的设备 ID: {}", e))?;
+    // 出站鉴权：只向已配对设备推送（peer_id 即 TLS 验证的公钥，前 16 字符为 fingerprint）
+    let peer_fp: String = peer.to_string().chars().take(16).collect();
+    if !crate::db::is_paired(&app, &peer_fp) {
+        return Err("目标设备未在本机配对白名单，请先完成配对再同步".to_string());
+    }
     let ep = get_iroh_endpoint(app.clone(), db_path.to_string()).await?;
     let conn = ep
         .connect(peer, IROH_ALPN)
@@ -908,6 +983,7 @@ pub async fn lan_push_notes(
     db_path: &str,
     addr: &str,
     note_ids: Vec<i64>,
+    expected_fp: Option<&str>,
 ) -> Result<SyncStats, String> {
     if note_ids.is_empty() {
         return Err("未选择任何笔记".to_string());
@@ -948,7 +1024,8 @@ pub async fn lan_push_notes(
     };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
-    let mut stream = lan_connect_authed(&app, addr).await?;
+    // 来自 mDNS 发现并已配对的设备会带预期指纹，校验应答方身份一致防 ARP 冒名
+    let mut stream = lan_connect_authed(&app, addr, expected_fp).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
     let remote: SyncPackage =
@@ -1198,7 +1275,8 @@ pub async fn lan_push_note(
     };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
-    let mut stream = lan_connect_authed(&app, addr).await?;
+    // 编辑器旁单条推送为手输地址，无预期指纹（用户主动信任）：仅验签不绑身份
+    let mut stream = lan_connect_authed(&app, addr, None).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
     let remote: SyncPackage =
@@ -1231,6 +1309,11 @@ pub async fn iroh_sync_connect(
         .trim()
         .parse()
         .map_err(|e| format!("无效的设备 ID: {}", e))?;
+    // 出站鉴权：只向已配对设备发起同步（peer_id 即 TLS 验证的公钥，前 16 字符为 fingerprint）
+    let peer_fp: String = peer.to_string().chars().take(16).collect();
+    if !crate::db::is_paired(&app, &peer_fp) {
+        return Err("目标设备未在本机配对白名单，请先完成配对再同步".to_string());
+    }
     let ep = get_iroh_endpoint(app.clone(), db_path.to_string()).await?;
     let conn = ep
         .connect(peer, IROH_ALPN)

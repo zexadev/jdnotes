@@ -111,13 +111,15 @@ export function PairingCodeModal({
           </button>
           <button
             onClick={async () => {
-              // 双写：前端 localStorage（UI 用）+ 后端权威白名单（接收端握手校验用）
-              markPaired(remoteFingerprint)
+              // 先写后端权威白名单（接收端/出站鉴权都以它为准），成功后才镜像到前端
+              // localStorage 并继续；失败则提示中止，杜绝「前端以为已配对、后端却没有」的分叉
               try {
                 await invoke('sync_accept_pairing', { fingerprint: remoteFingerprint })
               } catch (e) {
-                console.warn('写入后端配对白名单失败:', e)
+                setError(`建立信任失败：${e instanceof Error ? e.message : String(e)}`)
+                return
               }
+              markPaired(remoteFingerprint)
               onConfirmed()
               onClose()
             }}
