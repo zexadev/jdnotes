@@ -1,4 +1,4 @@
-import { Star, Trash2, RotateCcw, X, Lock } from 'lucide-react'
+import { Star, Trash2, RotateCcw, X, Lock, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { Note } from '../../lib/db'
 import { formatDate, extractPreview } from '../../lib/utils'
@@ -11,6 +11,9 @@ interface NoteCardProps {
   onRestore?: () => void
   onPermanentDelete?: () => void
   isTrashView?: boolean
+  selectionMode?: boolean
+  selected?: boolean
+  onToggleSelect?: () => void
 }
 
 export function NoteCard({
@@ -21,6 +24,9 @@ export function NoteCard({
   onRestore,
   onPermanentDelete,
   isTrashView = false,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
 }: NoteCardProps) {
   const preview = extractPreview(note.content)
 
@@ -38,8 +44,19 @@ export function NoteCard({
           ? 'note-card-active'
           : 'hover:bg-white/50 dark:hover:bg-white/[0.02]'
       }`}
-      onClick={onClick}
+      onClick={selectionMode ? onToggleSelect : onClick}
     >
+      <div className="flex items-start gap-2.5">
+        {selectionMode && (
+          <span
+            className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+              selected ? 'bg-[#5E6AD2] border-[#5E6AD2]' : 'border-slate-300 dark:border-slate-600'
+            }`}
+          >
+            {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+          </span>
+        )}
+        <div className="flex-1 min-w-0">
       <div className="flex items-center gap-1.5 pr-12">
         {note.isFavorite === 1 && (
           <Star className="h-3 w-3 text-[#5E6AD2] fill-[#5E6AD2] flex-shrink-0" />
@@ -74,8 +91,11 @@ export function NoteCard({
       <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 block">
         {formatDate(note.updatedAt)}
       </span>
+        </div>
+      </div>
 
-      {/* 操作按钮 */}
+      {/* 操作按钮（多选模式下隐藏） */}
+      {!selectionMode && (
       <div className="absolute top-3 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
         {isTrashView ? (
           <>
@@ -116,6 +136,7 @@ export function NoteCard({
           </button>
         )}
       </div>
+      )}
     </motion.div>
   )
 }

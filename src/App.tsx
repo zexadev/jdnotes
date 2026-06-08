@@ -91,6 +91,9 @@ function App() {
     deleteNote,
     restoreNote,
     permanentDeleteNote,
+    deleteNotes,
+    restoreNotes,
+    permanentDeleteNotes,
     toggleFavorite,
     updateTags,
     refreshNotes,
@@ -416,6 +419,23 @@ function App() {
     }
   }
 
+  // 批量软删除（移到废纸篓）
+  const handleDeleteNotes = async (ids: number[]) => {
+    await deleteNotes(ids)
+    if (activeNoteId !== null && ids.includes(activeNoteId)) setActiveNoteId(null)
+  }
+
+  // 批量恢复
+  const handleRestoreNotes = async (ids: number[]) => {
+    await restoreNotes(ids)
+  }
+
+  // 批量彻底删除
+  const handlePermanentDeleteNotes = async (ids: number[]) => {
+    await permanentDeleteNotes(ids)
+    if (activeNoteId !== null && ids.includes(activeNoteId)) setActiveNoteId(null)
+  }
+
   // 更新本地标题
   const handleTitleChange = (title: string) => {
     setLocalTitle(title)
@@ -585,6 +605,9 @@ function App() {
                   onDeleteNote={handleDeleteNote}
                   onRestoreNote={handleRestoreNote}
                   onPermanentDelete={handlePermanentDelete}
+                  onBatchDelete={handleDeleteNotes}
+                  onBatchRestore={handleRestoreNotes}
+                  onBatchPermanentDelete={handlePermanentDeleteNotes}
                 />
 
                 {/* 右侧编辑器 + AI 侧栏 */}

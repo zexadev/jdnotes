@@ -141,6 +141,45 @@ export function useNotes(searchQuery: string, currentView: string) {
     }
   }, [])
 
+  // 批量软删除（移到废纸篓，可在废纸篓恢复）
+  const deleteNotes = useCallback(async (ids: number[]) => {
+    if (ids.length === 0) return
+    try {
+      await noteOperations.softDeleteMany(ids)
+      setRefreshKey((k) => k + 1)
+      toast.success(`已移 ${ids.length} 条到废纸篓`)
+    } catch (e) {
+      console.error('Failed to batch delete notes:', e)
+      toast.error('批量删除失败')
+    }
+  }, [])
+
+  // 批量恢复
+  const restoreNotes = useCallback(async (ids: number[]) => {
+    if (ids.length === 0) return
+    try {
+      await noteOperations.restoreMany(ids)
+      setRefreshKey((k) => k + 1)
+      toast.success(`已恢复 ${ids.length} 条`)
+    } catch (e) {
+      console.error('Failed to batch restore notes:', e)
+      toast.error('批量恢复失败')
+    }
+  }, [])
+
+  // 批量彻底删除（不可逆）
+  const permanentDeleteNotes = useCallback(async (ids: number[]) => {
+    if (ids.length === 0) return
+    try {
+      await noteOperations.permanentDeleteMany(ids)
+      setRefreshKey((k) => k + 1)
+      toast.success(`已永久删除 ${ids.length} 条`)
+    } catch (e) {
+      console.error('Failed to batch permanently delete notes:', e)
+      toast.error('批量删除失败')
+    }
+  }, [])
+
   const toggleFavorite = useCallback(async (id: number) => {
     try {
       await noteOperations.toggleFavorite(id)
@@ -170,6 +209,9 @@ export function useNotes(searchQuery: string, currentView: string) {
     deleteNote,
     restoreNote,
     permanentDeleteNote,
+    deleteNotes,
+    restoreNotes,
+    permanentDeleteNotes,
     toggleFavorite,
     updateTags,
     refreshNotes, // 导出刷新方法供外部使用

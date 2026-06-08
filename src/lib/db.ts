@@ -453,6 +453,39 @@ export const noteOperations = {
     await db.execute('DELETE FROM notes WHERE id = ?', [id])
   },
 
+  // 批量软删除（移到废纸篓）：刷新 updated_at → 作为墓碑同步删除到其它设备
+  async softDeleteMany(ids: number[]): Promise<void> {
+    if (ids.length === 0) return
+    const db = await getDatabase()
+    const now = new Date().toISOString()
+    const placeholders = ids.map(() => '?').join(',')
+    await db.execute(
+      `UPDATE notes SET is_deleted = 1, updated_at = ? WHERE id IN (${placeholders})`,
+      [now, ...ids]
+    )
+  },
+
+  // 批量恢复
+  async restoreMany(ids: number[]): Promise<void> {
+    if (ids.length === 0) return
+    const db = await getDatabase()
+    const now = new Date().toISOString()
+    const placeholders = ids.map(() => '?').join(',')
+    await db.execute(
+      `UPDATE notes SET is_deleted = 0, updated_at = ? WHERE id IN (${placeholders})`,
+      [now, ...ids]
+    )
+  },
+
+  // 批量彻底删除（不可逆，连带聊天消息）
+  async permanentDeleteMany(ids: number[]): Promise<void> {
+    if (ids.length === 0) return
+    const db = await getDatabase()
+    const placeholders = ids.map(() => '?').join(',')
+    await db.execute(`DELETE FROM chat_messages WHERE note_id IN (${placeholders})`, [...ids])
+    await db.execute(`DELETE FROM notes WHERE id IN (${placeholders})`, [...ids])
+  },
+
   // 获取单个笔记
   async get(id: number): Promise<Note | undefined> {
     const db = await getDatabase()
