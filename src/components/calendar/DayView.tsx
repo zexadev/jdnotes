@@ -370,7 +370,7 @@ function ReminderPicker({ noteId, onSetReminder }: ReminderPickerProps) {
 
       <button
         onClick={() => setShowPicker(false)}
-        className="w-full py-1.5 text-[12px] text-slate-400 hover:text-slate-600"
+        className="w-full py-1.5 text-[12px] font-medium text-slate-600 dark:text-slate-300 bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] rounded-lg transition-colors"
       >
         取消
       </button>

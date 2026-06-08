@@ -250,7 +250,7 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
           {((messages && messages.length > 0) || pendingUserMessage) && (
             <button
               onClick={handleClear}
-              className="px-2 py-1 text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] rounded-md transition-colors"
+              className="px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] rounded-md transition-colors"
             >
               清空
             </button>

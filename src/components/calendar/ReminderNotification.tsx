@@ -143,7 +143,7 @@ export function ReminderNotification({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleDismissAll}
-            className="text-[12px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 mb-1 ml-auto block"
+            className="text-[12px] font-medium text-slate-600 dark:text-slate-300 bg-black/[0.04] dark:bg-white/[0.08] hover:bg-black/[0.08] dark:hover:bg-white/[0.12] px-2.5 py-1 rounded-md mb-1 ml-auto block transition-colors"
           >
             关闭所有 ({visibleReminders.length})
           </motion.button>

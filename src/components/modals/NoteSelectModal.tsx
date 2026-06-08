@@ -278,7 +278,7 @@ export function NoteSelectModal({ open, onClose, deviceName, address, fingerprin
             <button
               onClick={onClose}
               disabled={isSyncing}
-              className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors disabled:opacity-40"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-40"
             >
               取消
             </button>
