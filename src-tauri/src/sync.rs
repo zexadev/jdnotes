@@ -976,6 +976,91 @@ pub async fn iroh_push_note(
     })
 }
 
+/// 跨网多条推送：iroh 直连对端，只发选中的若干笔记（仍双向：也收对端的并 merge）
+/// 用于「分享对象」类设备——只发选中的，不像「我的设备」全量镜像
+pub async fn iroh_push_notes(
+    app: AppHandle,
+    db_path: &str,
+    peer_id: &str,
+    note_ids: Vec<i64>,
+) -> Result<SyncStats, String> {
+    if note_ids.is_empty() {
+        return Err("未选择任何笔记".to_string());
+    }
+    let peer: EndpointId = peer_id
+        .trim()
+        .parse()
+        .map_err(|e| format!("无效的设备 ID: {}", e))?;
+    // 出站鉴权：只向已配对设备推送（peer_id 即 TLS 验证的公钥，前 16 字符为 fingerprint）
+    let peer_fp: String = peer.to_string().chars().take(16).collect();
+    if !crate::db::is_paired(&app, &peer_fp) {
+        return Err("目标设备未在本机配对白名单，请先完成配对再同步".to_string());
+    }
+    let ep = get_iroh_endpoint(app.clone(), db_path.to_string()).await?;
+    let conn = ep
+        .connect(peer, IROH_ALPN)
+        .await
+        .map_err(|e| format!("连接对端失败: {}", e))?;
+    let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+    let pool = open_pool(db_path).await?;
+    sqlx::query("UPDATE notes SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL OR uuid = ''")
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("回填 uuid 失败: {}", e))?;
+    let placeholders = note_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled \
+         FROM notes WHERE id IN ({}) AND COALESCE(is_private, 0) = 0",
+        placeholders
+    );
+    let mut q = sqlx::query_as::<_, SyncNote>(&sql);
+    for id in &note_ids {
+        q = q.bind(id);
+    }
+    let local: Vec<SyncNote> = q
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| format!("读取笔记失败: {}", e))?;
+    if local.is_empty() {
+        pool.close().await;
+        conn.close(0u8.into(), b"done");
+        return Err("找不到选中的笔记".to_string());
+    }
+    let sent = local.len();
+    let attachments = collect_attachments(&app, &local);
+    let bytes = serde_json::to_vec(&SyncPackage {
+        version: 1,
+        notes: local,
+        attachments,
+        device_name: local_device_name(&app),
+    })
+    .map_err(|e| e.to_string())?;
+    send.write_all(&bytes).await.map_err(|e| e.to_string())?;
+    send.finish().map_err(|e| e.to_string())?;
+    let resp = recv
+        .read_to_end(MAX_MSG as usize)
+        .await
+        .map_err(|e| e.to_string())?;
+    let remote: SyncPackage =
+        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    save_attachments(&app, &remote.attachments);
+    let received = remote.notes.len();
+    let (inserted, updated, conflicts) =
+        merge_notes(&pool, &remote.notes, &remote.device_name).await?;
+    pool.close().await;
+    conn.close(0u8.into(), b"done");
+    if inserted > 0 || updated > 0 || conflicts > 0 {
+        let _ = app.emit("db:changed", ());
+    }
+    Ok(SyncStats {
+        sent,
+        received,
+        inserted,
+        updated,
+        conflicts,
+    })
+}
+
 /// 局域网多条推送：从选择列表勾选若干笔记，一次推给某地址
 /// 与 lan_push_note 共用 TCP 帧 + merge 内核，区别仅 SELECT 的 IN 子句
 pub async fn lan_push_notes(

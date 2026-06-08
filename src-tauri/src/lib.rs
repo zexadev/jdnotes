@@ -194,6 +194,7 @@ pub fn run() {
             commands::sync_iroh_connect,
             commands::sync_iroh_probe,
             commands::sync_iroh_push_note,
+            commands::sync_iroh_push_notes,
             commands::sync_lan_push_note,
             commands::sync_lan_push_notes,
             commands::sync_lan_discover,

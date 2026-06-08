@@ -9,10 +9,12 @@ interface NoteSelectModalProps {
   onClose: () => void
   /** 目标设备的显示名 */
   deviceName: string
-  /** 推送目标地址（局域网 ip:port） */
+  /** 推送目标地址（局域网 ip:port）；走 iroh 跨网时留空、改用 peerId */
   address: string
   /** 目标设备指纹（mDNS 发现的会带上，用于校验应答方身份防 ARP 冒名；手输地址为空） */
   fingerprint?: string
+  /** 跨网目标设备 iroh ID；设了就走 iroh 选发，否则走局域网 address */
+  peerId?: string
   /** 同步成功后回调（外层刷新数据并记录上次同步时间） */
   onSynced?: () => void
 }
@@ -25,7 +27,7 @@ type SyncStats = { sent: number; received: number; inserted: number; updated: nu
  * 设计：借鉴 ExportModal 的多选样式（搜索 / 全选 / 卡片化勾选 / 计数）。
  * 同步过程仍是双向的：会发出选中的、也会收到对方的更新并 merge。
  */
-export function NoteSelectModal({ open, onClose, deviceName, address, fingerprint, onSynced }: NoteSelectModalProps) {
+export function NoteSelectModal({ open, onClose, deviceName, address, fingerprint, peerId, onSynced }: NoteSelectModalProps) {
   const [notes, setNotes] = useState<Note[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
@@ -108,7 +110,9 @@ export function NoteSelectModal({ open, onClose, deviceName, address, fingerprin
     const noteIds = Array.from(selectedIds)
     setIsSyncing(true)
     try {
-      const stats = await invoke<SyncStats>('sync_lan_push_notes', { address, noteIds, fingerprint })
+      const stats = peerId
+        ? await invoke<SyncStats>('sync_iroh_push_notes', { peerId, noteIds })
+        : await invoke<SyncStats>('sync_lan_push_notes', { address, noteIds, fingerprint })
       const local =
         stats.inserted > 0 || stats.updated > 0
           ? `本机新增 ${stats.inserted}、更新 ${stats.updated}`

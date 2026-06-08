@@ -15,7 +15,10 @@ interface SyncSettingsProps {
 type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number }
 
 // 已保存的跨网设备（iroh ID 持久不变，所以值得记住，避免每次重填）
-type SavedDevice = { id: string; name: string }
+// kind：'mine' = 我的设备（可全量双向同步）；'shared' = 分享对象（只能选笔记发）。
+// 旧数据无此字段，按 'mine' 处理（向后兼容，行为不变）。
+type DeviceKind = 'mine' | 'shared'
+type SavedDevice = { id: string; name: string; kind?: DeviceKind }
 const DEVICES_KEY = 'jdnotes_sync_devices'
 function loadDevices(): SavedDevice[] {
   try {
@@ -64,6 +67,8 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   // 跨网设备列表
   const [devices, setDevices] = useState<SavedDevice[]>(loadDevices)
   const [newDeviceId, setNewDeviceId] = useState('')
+  // 添加设备时选的类型：我的设备（全量同步）/ 分享对象（只选笔记发）
+  const [newDeviceKind, setNewDeviceKind] = useState<DeviceKind>('mine')
   const [addingDevice, setAddingDevice] = useState(false)
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null)
   const [deviceStatus, setDeviceStatus] = useState<Record<string, 'checking' | 'online' | 'offline'>>({})
@@ -74,11 +79,13 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [discovered, setDiscovered] = useState<{ address: string; device_name: string; fingerprint?: string; protocol?: string }[]>([])
   const [discovering, setDiscovering] = useState(false)
   // 选笔记同步弹窗目标（null 表示未打开）
-  const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string; fingerprint?: string } | null>(null)
-  // 首次配对码弹窗目标（null 表示未打开）；确认后转交给 noteSelectTarget 或 syncDevice
+  const [noteSelectTarget, setNoteSelectTarget] = useState<{ address: string; deviceName: string; fingerprint?: string; peerId?: string } | null>(null)
+  // 首次配对码弹窗目标（null 表示未打开）；确认后按 kind 决定接着做什么：
+  // lan→选笔记(局域网)；iroh-full→全量同步(我的设备)；iroh-select→选笔记(跨网分享对象)
   const [pairingTarget, setPairingTarget] = useState<
     | { kind: 'lan'; address: string; deviceName: string; fingerprint: string }
-    | { kind: 'iroh'; device: SavedDevice; fingerprint: string }
+    | { kind: 'iroh-full'; device: SavedDevice; fingerprint: string }
+    | { kind: 'iroh-select'; device: SavedDevice; fingerprint: string }
     | null
   >(null)
 
@@ -147,7 +154,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     try {
       const name = await invoke<string>('sync_iroh_probe', { peerId: id })
       const finalName = name.trim() || '未命名设备'
-      persistDevices([...devices, { id, name: finalName }])
+      persistDevices([...devices, { id, name: finalName, kind: newDeviceKind }])
       setNewDeviceId('')
       toast.success(`已连接并添加设备「${finalName}」`)
     } catch (e) {
@@ -161,12 +168,12 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     toast.info(`已移除设备「${name}」`)
   }
 
-  // 跨网：点设备旁的「同步」，用存好的 ID 发起一次双向同步
+  // 跨网「我的设备」：点「同步」用存好的 ID 发起一次全量双向同步
   const syncDevice = async (device: SavedDevice) => {
     // 首次配对码确认：iroh 的 device.id 前 16 字符即 fp（与本机 mDNS 派生口径一致）
     const fp = device.id.slice(0, 16)
     if (fp && !isPaired(fp)) {
-      setPairingTarget({ kind: 'iroh', device, fingerprint: fp })
+      setPairingTarget({ kind: 'iroh-full', device, fingerprint: fp })
       return
     }
     setSyncingDeviceId(device.id)
@@ -193,6 +200,25 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       toast.error(`「${device.name}」同步失败：` + (e instanceof Error ? e.message : String(e)), { duration: 7000 })
     }
     setSyncingDeviceId(null)
+  }
+
+  // 跨网「分享对象」：点「选笔记」→（未配对先弹码）→ 打开多选弹窗，只发选中的（不全量）
+  const shareToDevice = (device: SavedDevice) => {
+    const fp = device.id.slice(0, 16)
+    if (fp && !isPaired(fp)) {
+      setPairingTarget({ kind: 'iroh-select', device, fingerprint: fp })
+      return
+    }
+    setNoteSelectTarget({ address: '', deviceName: device.name, peerId: device.id })
+  }
+
+  // 切换设备类型：我的设备 ↔ 分享对象
+  const toggleDeviceKind = (id: string) => {
+    persistDevices(
+      devices.map((d) =>
+        d.id === id ? { ...d, kind: (d.kind ?? 'mine') === 'mine' ? 'shared' : 'mine' } : d
+      )
+    )
   }
 
   // 局域网：mDNS 搜索同网段的其它 jdnotes 设备
@@ -370,13 +396,36 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                   <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate pl-3.5">{d.id.slice(0, 20)}…</div>
                 </div>
                 <button
-                  onClick={() => syncDevice(d)}
-                  disabled={syncingDeviceId !== null}
-                  className="px-3 py-1.5 text-xs font-medium text-[#5E6AD2] bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 shrink-0"
+                  onClick={() => toggleDeviceKind(d.id)}
+                  title="点击切换：我的设备(全量双向同步) / 分享对象(只能选笔记发)"
+                  className={`shrink-0 px-2 py-1 text-[10px] rounded-md font-medium transition-colors ${
+                    (d.kind ?? 'mine') === 'mine'
+                      ? 'text-[#5E6AD2] bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/20'
+                      : 'text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                  }`}
                 >
-                  {syncingDeviceId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                  同步
+                  {(d.kind ?? 'mine') === 'mine' ? '我的设备' : '分享对象'}
                 </button>
+                {(d.kind ?? 'mine') === 'mine' ? (
+                  <button
+                    onClick={() => syncDevice(d)}
+                    disabled={syncingDeviceId !== null}
+                    title="全量双向同步（适用于你自己的设备）"
+                    className="px-3 py-1.5 text-xs font-medium text-[#5E6AD2] bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 shrink-0"
+                  >
+                    {syncingDeviceId === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    同步
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => shareToDevice(d)}
+                    title="只发送选中的笔记（适用于别人的设备）"
+                    className="px-3 py-1.5 text-xs font-medium text-[#5E6AD2] bg-[#5E6AD2]/10 hover:bg-[#5E6AD2]/20 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    选笔记
+                  </button>
+                )}
                 <button
                   onClick={() => removeDevice(d.id, d.name)}
                   title="移除设备"
@@ -389,19 +438,44 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
           </div>
         )}
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newDeviceId}
-            onChange={(e) => setNewDeviceId(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addDevice()}
-            placeholder="粘贴对方设备 ID，添加时自动获取名称"
-            className={INPUT_CLASS}
-          />
-          <button onClick={addDevice} disabled={addingDevice || !newDeviceId.trim()} className={PRIMARY_BTN}>
-            {addingDevice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            {addingDevice ? '连接中' : '添加'}
-          </button>
+        <div className="space-y-2">
+          {/* 添加为哪种设备：决定它能全量同步还是只能选笔记发 */}
+          <div className="flex gap-1.5 text-xs">
+            <button
+              onClick={() => setNewDeviceKind('mine')}
+              className={`flex-1 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                newDeviceKind === 'mine'
+                  ? 'border-[#5E6AD2] bg-[#5E6AD2]/10 text-[#5E6AD2] font-medium'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              我的设备 · 全量双向同步
+            </button>
+            <button
+              onClick={() => setNewDeviceKind('shared')}
+              className={`flex-1 px-2.5 py-1.5 rounded-lg border transition-colors ${
+                newDeviceKind === 'shared'
+                  ? 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              分享对象 · 只选笔记发
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newDeviceId}
+              onChange={(e) => setNewDeviceId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addDevice()}
+              placeholder="粘贴对方设备 ID，添加时自动获取名称"
+              className={INPUT_CLASS}
+            />
+            <button onClick={addDevice} disabled={addingDevice || !newDeviceId.trim()} className={PRIMARY_BTN}>
+              {addingDevice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {addingDevice ? '连接中' : '添加'}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -548,6 +622,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
         deviceName={noteSelectTarget?.deviceName ?? ''}
         address={noteSelectTarget?.address ?? ''}
         fingerprint={noteSelectTarget?.fingerprint}
+        peerId={noteSelectTarget?.peerId}
         onSynced={() => {
           onDataChange?.()
           markSynced()
@@ -558,14 +633,20 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       <PairingCodeModal
         open={pairingTarget !== null}
         onClose={() => setPairingTarget(null)}
-        deviceName={pairingTarget?.kind === 'iroh' ? pairingTarget.device.name : pairingTarget?.deviceName ?? ''}
+        deviceName={
+          pairingTarget && pairingTarget.kind !== 'lan'
+            ? pairingTarget.device.name
+            : pairingTarget?.deviceName ?? ''
+        }
         remoteFingerprint={pairingTarget?.fingerprint ?? ''}
         onConfirmed={() => {
-          // markPaired 已在 modal 内执行，这里负责"接着做"
+          // markPaired 已在 modal 内执行，这里按类型决定接着做什么
           if (pairingTarget?.kind === 'lan') {
             setNoteSelectTarget({ address: pairingTarget.address, deviceName: pairingTarget.deviceName, fingerprint: pairingTarget.fingerprint })
-          } else if (pairingTarget?.kind === 'iroh') {
+          } else if (pairingTarget?.kind === 'iroh-full') {
             syncDeviceConfirmed(pairingTarget.device)
+          } else if (pairingTarget?.kind === 'iroh-select') {
+            setNoteSelectTarget({ address: '', deviceName: pairingTarget.device.name, peerId: pairingTarget.device.id })
           }
         }}
       />

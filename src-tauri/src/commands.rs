@@ -307,6 +307,17 @@ pub async fn sync_iroh_push_note(
     sync::iroh_push_note(app.clone(), &db_path, &peer_id, note_id).await
 }
 
+/// 跨网多条推送：iroh 直连对端，只发选中的若干（「分享对象」类设备用）
+#[tauri::command]
+pub async fn sync_iroh_push_notes(
+    app: tauri::AppHandle,
+    peer_id: String,
+    note_ids: Vec<i64>,
+) -> Result<sync::SyncStats, String> {
+    let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
+    sync::iroh_push_notes(app.clone(), &db_path, &peer_id, note_ids).await
+}
+
 /// 局域网版的单条推送：TCP 直连地址，只发指定那一条
 /// fingerprint：来自 mDNS 发现的设备会带上，用于校验应答方身份防 ARP 冒名；手输地址为 None
 #[tauri::command]
