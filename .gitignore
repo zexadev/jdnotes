@@ -31,3 +31,11 @@ src-tauri/keys/
 
 # 本地文档（不入库的临时笔记/设计探索/调试草稿）
 docs/local/
+
+# 品牌资产（logo/宣传片/提示词/Remotion 工程）—— 知识产权，不进公开仓库
+branding/
+
+# StyleSeed 第三方设计系统（vendored skill，不入库）
+.agents/
+skills-lock.json
+.claude/skills/ss-*
