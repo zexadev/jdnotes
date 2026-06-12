@@ -57,6 +57,10 @@ pub struct SyncPackage {
     /// 发送方设备名（用于对端冲突副本标注来源；serde default 兼容旧包）
     #[serde(default)]
     pub device_name: String,
+    /// 单向推送标记：true=对方只是"分享/发笔记"给我，接收端合并后绝不把自己整库回发
+    /// （仅"我的设备 全量同步"才双向回发）。serde default 兼容旧包=false=双向。
+    #[serde(default)]
+    pub one_way: bool,
 }
 
 /// 同步结果统计
@@ -508,7 +512,7 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     let local = read_local_notes(&pool).await?;
     let sent = local.len();
     let attachments = collect_attachments(&app, &local);
-    let pkg = SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) };
+    let pkg = SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app), one_way: false };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
     // 手输地址，无预期指纹（用户主动信任）：仅验签不绑身份
@@ -564,9 +568,15 @@ async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> 
         serde_json::from_slice(&req).map_err(|e| format!("解析对端数据失败: {}", e))?;
     let pool = open_pool(&db_path).await?;
     save_attachments(&app, &remote.attachments);
-    let local = read_local_notes(&pool).await?;
-    let attachments = collect_attachments(&app, &local);
-    let pkg = SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) };
+    // 单向推送:只接收对端发来的,绝不把本机整库回发(回空包);全量同步才双向回发
+    let (notes, attachments) = if remote.one_way {
+        (Vec::new(), Vec::new())
+    } else {
+        let local = read_local_notes(&pool).await?;
+        let atts = collect_attachments(&app, &local);
+        (local, atts)
+    };
+    let pkg = SyncPackage { version: 1, notes, attachments, device_name: local_device_name(&app), one_way: false };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
     write_msg(&mut stream, &bytes).await?;
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
@@ -679,7 +689,7 @@ pub async fn export_package(app: &AppHandle, db_path: &str) -> Result<String, St
     let notes = read_local_notes(&pool).await?;
     pool.close().await;
     let attachments = collect_attachments(app, &notes);
-    let pkg = SyncPackage { version: 1, notes, attachments, device_name: local_device_name(app) };
+    let pkg = SyncPackage { version: 1, notes, attachments, device_name: local_device_name(app), one_way: false };
     serde_json::to_string(&pkg).map_err(|e| e.to_string())
 }
 
@@ -846,9 +856,15 @@ async fn handle_iroh_conn(
 
     let pool = open_pool(&db_path).await?;
     save_attachments(&app, &remote.attachments);
-    let local = read_local_notes(&pool).await?;
-    let attachments = collect_attachments(&app, &local);
-    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) }).map_err(|e| e.to_string())?;
+    // 单向推送:回空包不灌库;全量同步才双向回发
+    let (notes, attachments) = if remote.one_way {
+        (Vec::new(), Vec::new())
+    } else {
+        let local = read_local_notes(&pool).await?;
+        let atts = collect_attachments(&app, &local);
+        (local, atts)
+    };
+    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes, attachments, device_name: local_device_name(&app), one_way: false }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
     send.finish().map_err(|e| e.to_string())?;
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
@@ -948,6 +964,7 @@ pub async fn iroh_push_note(
         notes: local,
         attachments,
         device_name: local_device_name(&app),
+        one_way: true,
     })
     .map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
@@ -1033,6 +1050,7 @@ pub async fn iroh_push_notes(
         notes: local,
         attachments,
         device_name: local_device_name(&app),
+        one_way: true,
     })
     .map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
@@ -1106,6 +1124,7 @@ pub async fn lan_push_notes(
         notes: local,
         attachments,
         device_name: local_device_name(&app),
+        one_way: true,
     };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
@@ -1358,6 +1377,7 @@ pub async fn lan_push_note(
         notes: local,
         attachments,
         device_name: local_device_name(&app),
+        one_way: true,
     };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
 
@@ -1410,7 +1430,7 @@ pub async fn iroh_sync_connect(
     let local = read_local_notes(&pool).await?;
     let sent = local.len();
     let attachments = collect_attachments(&app, &local);
-    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app) }).map_err(|e| e.to_string())?;
+    let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes: local, attachments, device_name: local_device_name(&app), one_way: false }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
     send.finish().map_err(|e| e.to_string())?;
     let resp = recv
