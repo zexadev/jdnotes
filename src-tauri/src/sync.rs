@@ -214,7 +214,7 @@ async fn create_conflict_copy(pool: &SqlitePool, remote: &SyncNote, peer_name: &
          VALUES (?,?,?,?,?,?,?,?,?,?,?,1)",
     )
     .bind(&new_uuid).bind(&title).bind(&remote.content).bind(&remote.tags)
-    .bind(remote.is_favorite).bind(0i64).bind(&remote.created_at).bind(&now)
+    .bind(remote.is_favorite).bind(remote.is_deleted).bind(&remote.created_at).bind(&now)
     .bind(&remote.reminder_date).bind(remote.reminder_enabled).bind(&remote.content)
     .execute(pool)
     .await
@@ -268,6 +268,17 @@ async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote], peer_name: &str) ->
         // 本地不存在 → 直接插入，基准设为对端内容
         let l = match local {
             None => {
+                // 已被本机彻底删除的 uuid 不复活(墓碑拦截)
+                let purged: i64 = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM deleted_notes WHERE uuid = ?)",
+                )
+                .bind(&n.uuid)
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
+                if purged != 0 {
+                    continue;
+                }
                 sqlx::query(
                     "INSERT INTO notes (uuid,title,content,tags,is_favorite,is_deleted,created_at,updated_at,reminder_date,reminder_enabled,synced_content,has_conflict) \
                      VALUES (?,?,?,?,?,?,?,?,?,?,?,0)",
@@ -311,6 +322,19 @@ async fn merge_notes(pool: &SqlitePool, remote: &[SyncNote], peer_name: &str) ->
             // 本地删除、远端有编辑 → 恢复并采用远端编辑
             apply_remote(pool, n).await?;
             conflicts += 1;
+            continue;
+        }
+        // ---- 两端都在废纸篓：内容分叉也不复活、不生成可见冲突副本，LWW 调和后仍留废纸篓 ----
+        if l.is_deleted == 1 && n.is_deleted == 1 {
+            if n.updated_at > l.updated_at {
+                apply_remote(pool, n).await?; // 采用远端但 is_deleted=1，仍在废纸篓
+                updated += 1;
+            } else {
+                // 推进基准到对端内容，避免下次重复落入冲突分支
+                sqlx::query("UPDATE notes SET synced_content=? WHERE uuid=?")
+                    .bind(&n.content).bind(&n.uuid)
+                    .execute(pool).await.map_err(|e| e.to_string())?;
+            }
             continue;
         }
 

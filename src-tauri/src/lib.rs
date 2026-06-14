@@ -130,6 +130,12 @@ pub fn run() {
                     sql: include_str!("../migrations/006_private.sql"),
                     kind: MigrationKind::Up,
                 },
+                Migration {
+                    version: 7,
+                    description: "add deleted_notes tombstone to prevent resurrection on sync",
+                    sql: include_str!("../migrations/007_deleted_tombstone.sql"),
+                    kind: MigrationKind::Up,
+                },
             ];
 
             // 注册 SQL 插件

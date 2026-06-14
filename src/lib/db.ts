@@ -401,13 +401,14 @@ export const noteOperations = {
     )
   },
 
-  // 切换收藏状态（不更新 updatedAt，因为收藏是元数据操作，不是内容修改）
+  // 切换收藏状态。bump updated_at：收藏是要同步的字段，靠 updated_at 走 LWW，
+  // 否则切换收藏不更新时间戳 → merge 的"内容相同"分支会静默丢掉收藏变更。
   async toggleFavorite(id: number): Promise<void> {
     const db = await getDatabase()
-
+    const now = new Date().toISOString()
     await db.execute(
-      `UPDATE notes SET is_favorite = 1 - is_favorite WHERE id = ?`,
-      [id]
+      `UPDATE notes SET is_favorite = 1 - is_favorite, updated_at = ? WHERE id = ?`,
+      [now, id]
     )
   },
 
@@ -446,7 +447,13 @@ export const noteOperations = {
   // 彻底删除
   async permanentDelete(id: number): Promise<void> {
     const db = await getDatabase()
-    
+
+    // 记墓碑：保留 uuid，防止同步时被仍持有该笔记的对端重新插入"复活"
+    const rows = await db.select<{ uuid: string | null }[]>('SELECT uuid FROM notes WHERE id = ?', [id])
+    const uuid = rows[0]?.uuid
+    if (uuid) {
+      await db.execute('INSERT OR IGNORE INTO deleted_notes (uuid, deleted_at) VALUES (?, ?)', [uuid, new Date().toISOString()])
+    }
     // 先删除相关的聊天消息
     await db.execute('DELETE FROM chat_messages WHERE note_id = ?', [id])
     // 再删除笔记
@@ -482,6 +489,12 @@ export const noteOperations = {
     if (ids.length === 0) return
     const db = await getDatabase()
     const placeholders = ids.map(() => '?').join(',')
+    // 记墓碑：防止同步时被对端重新插入复活
+    const rows = await db.select<{ uuid: string | null }[]>(`SELECT uuid FROM notes WHERE id IN (${placeholders})`, [...ids])
+    const now = new Date().toISOString()
+    for (const r of rows) {
+      if (r.uuid) await db.execute('INSERT OR IGNORE INTO deleted_notes (uuid, deleted_at) VALUES (?, ?)', [r.uuid, now])
+    }
     await db.execute(`DELETE FROM chat_messages WHERE note_id IN (${placeholders})`, [...ids])
     await db.execute(`DELETE FROM notes WHERE id IN (${placeholders})`, [...ids])
   },
@@ -900,11 +913,14 @@ export const dbOperations = {
     
     let notesImported = 0
     let messagesImported = 0
-    
+    // 旧 note id → 新自增 id 映射:导入笔记拿到新 id，聊天消息必须按此重链，
+    // 否则消息会挂到错误笔记或悬空(导出体里的 noteId 是源库旧自增 id)
+    const noteIdMap = new Map<number, number>()
+
     // 导入笔记
     if (data.notes && Array.isArray(data.notes)) {
       for (const note of data.notes) {
-        await db.execute(
+        const res = await db.execute(
           `INSERT INTO notes (uuid, title, content, tags, is_favorite, is_deleted, created_at, updated_at, reminder_date, reminder_enabled)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
@@ -920,17 +936,22 @@ export const dbOperations = {
             note.reminderEnabled || 0
           ]
         )
+        if (note.id != null && res?.lastInsertId != null) {
+          noteIdMap.set(Number(note.id), Number(res.lastInsertId))
+        }
         notesImported++
       }
     }
     
-    // 导入聊天消息
+    // 导入聊天消息：按 noteIdMap 把旧 noteId 重链到新笔记 id；映射缺失则跳过(不写悬空消息)
     if (data.chat_messages && Array.isArray(data.chat_messages)) {
       for (const msg of data.chat_messages) {
+        const newNoteId = noteIdMap.get(Number(msg.noteId))
+        if (newNoteId == null) continue
         await db.execute(
           `INSERT INTO chat_messages (note_id, role, content, timestamp) VALUES (?, ?, ?, ?)`,
           [
-            msg.noteId,
+            newNoteId,
             msg.role,
             msg.content,
             msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
