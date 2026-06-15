@@ -592,13 +592,14 @@ async fn handle_conn(app: AppHandle, db_path: String, mut stream: TcpStream) -> 
         serde_json::from_slice(&req).map_err(|e| format!("解析对端数据失败: {}", e))?;
     let pool = open_pool(&db_path).await?;
     save_attachments(&app, &remote.attachments);
-    // 单向推送:只接收对端发来的,绝不把本机整库回发(回空包);全量同步才双向回发
-    let (notes, attachments) = if remote.one_way {
-        (Vec::new(), Vec::new())
-    } else {
+    // 回灌整库仅限「我的设备」全量同步：要求 !one_way 且对端是后端权威标记的我的设备。
+    // 分享对象/未标记设备即便发来 one_way=false 想骗整库，也只回空包，绝不泄露本机全库。
+    let (notes, attachments) = if !remote.one_way && crate::db::is_mine(&app, &remote_fp) {
         let local = read_local_notes(&pool).await?;
         let atts = collect_attachments(&app, &local);
         (local, atts)
+    } else {
+        (Vec::new(), Vec::new())
     };
     let pkg = SyncPackage { version: 1, notes, attachments, device_name: local_device_name(&app), one_way: false };
     let bytes = serde_json::to_vec(&pkg).map_err(|e| e.to_string())?;
@@ -880,13 +881,14 @@ async fn handle_iroh_conn(
 
     let pool = open_pool(&db_path).await?;
     save_attachments(&app, &remote.attachments);
-    // 单向推送:回空包不灌库;全量同步才双向回发
-    let (notes, attachments) = if remote.one_way {
-        (Vec::new(), Vec::new())
-    } else {
+    // 回灌整库仅限「我的设备」全量同步：要求 !one_way 且对端为后端权威标记的我的设备。
+    // 分享对象/未标记设备即便伪造 one_way=false，也只回空包，绝不泄露本机全库。
+    let (notes, attachments) = if !remote.one_way && crate::db::is_mine(&app, &remote_fp) {
         let local = read_local_notes(&pool).await?;
         let atts = collect_attachments(&app, &local);
         (local, atts)
+    } else {
+        (Vec::new(), Vec::new())
     };
     let bytes = serde_json::to_vec(&SyncPackage { version: 1, notes, attachments, device_name: local_device_name(&app), one_way: false }).map_err(|e| e.to_string())?;
     send.write_all(&bytes).await.map_err(|e| e.to_string())?;
@@ -1443,6 +1445,10 @@ pub async fn iroh_sync_connect(
     let peer_fp: String = peer.to_string().chars().take(16).collect();
     if !crate::db::is_paired(&app, &peer_fp) {
         return Err("目标设备未在本机配对白名单，请先完成配对再同步".to_string());
+    }
+    // 全量双向同步仅限「我的设备」（后端权威）：分享对象只能用选笔记单向发送，前端篡改类型也无法升格
+    if !crate::db::is_mine(&app, &peer_fp) {
+        return Err("该设备不是『我的设备』，全量同步已拒绝；分享请用『选笔记』单向发送".to_string());
     }
     let ep = get_iroh_endpoint(app.clone(), db_path.to_string()).await?;
     let conn = ep

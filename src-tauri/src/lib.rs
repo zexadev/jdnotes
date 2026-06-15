@@ -197,6 +197,8 @@ pub fn run() {
             commands::sync_accept_pairing,
             commands::sync_revoke_pairing,
             commands::sync_is_paired,
+            commands::sync_set_device_kind,
+            commands::sync_is_mine,
             commands::sync_iroh_connect,
             commands::sync_iroh_probe,
             commands::sync_iroh_push_note,

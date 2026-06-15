@@ -279,6 +279,19 @@ pub async fn sync_is_paired(app: tauri::AppHandle, fingerprint: String) -> Resul
     Ok(db::is_paired(&app, &fingerprint))
 }
 
+/// 设置/取消某设备为「我的设备」（后端权威；mine=true 时要求已配对）
+/// 决定该设备能否走全量双向同步——前端 localStorage 类型仅做 UI，权威以此为准
+#[tauri::command]
+pub async fn sync_set_device_kind(app: tauri::AppHandle, fingerprint: String, mine: bool) -> Result<(), String> {
+    db::set_device_mine(&app, &fingerprint, mine)
+}
+
+/// 查询某设备是否为「我的设备」
+#[tauri::command]
+pub async fn sync_is_mine(app: tauri::AppHandle, fingerprint: String) -> Result<bool, String> {
+    Ok(db::is_mine(&app, &fingerprint))
+}
+
 /// 通过对端 iroh 设备 ID 发起一次跨网双向同步
 #[tauri::command]
 pub async fn sync_iroh_connect(

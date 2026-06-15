@@ -63,6 +63,11 @@ pub struct AppConfig {
     /// 接收端在合并前校验对端 fp 在册才放行；这是后端权威白名单，前端 localStorage 仅做 UI 展示
     #[serde(default)]
     pub paired_fingerprints: Vec<String>,
+    /// 「我的设备」指纹（paired 的子集）。只有在此名单内的设备才允许全量双向同步：
+    /// 出站发起全量同步、入站回灌整库都要求 is_mine 为真。不在此名单的已配对设备 = 分享对象（仅单向选发）。
+    /// 后端权威，杜绝前端篡改把分享对象升格成全量同步。
+    #[serde(default)]
+    pub mine_fingerprints: Vec<String>,
 }
 
 fn default_ai_sources() -> Vec<AISource> {
@@ -454,10 +459,40 @@ pub fn add_paired(app: &tauri::AppHandle, fingerprint: &str) -> Result<(), Strin
     Ok(())
 }
 
-/// 从配对白名单移除对端指纹
+/// 从配对白名单移除对端指纹（一并从「我的设备」名单移除）
 pub fn remove_paired(app: &tauri::AppHandle, fingerprint: &str) -> Result<(), String> {
     let mut config = load_config(app)?;
     config.paired_fingerprints.retain(|fp| fp != fingerprint);
+    config.mine_fingerprints.retain(|fp| fp != fingerprint);
+    save_config(app, &config)
+}
+
+/// 对端是否被标记为「我的设备」（全量双向同步的权威开关，接收端/出站都校验）
+pub fn is_mine(app: &tauri::AppHandle, fingerprint: &str) -> bool {
+    if fingerprint.is_empty() {
+        return false;
+    }
+    load_config(app)
+        .map(|c| c.mine_fingerprints.iter().any(|fp| fp == fingerprint))
+        .unwrap_or(false)
+}
+
+/// 设置/取消某设备为「我的设备」。设为 mine 前要求已配对（不允许给陌生设备开全量同步）。
+pub fn set_device_mine(app: &tauri::AppHandle, fingerprint: &str, mine: bool) -> Result<(), String> {
+    if fingerprint.is_empty() {
+        return Err("空指纹".to_string());
+    }
+    let mut config = load_config(app)?;
+    if mine {
+        if !config.paired_fingerprints.iter().any(|fp| fp == fingerprint) {
+            return Err("该设备尚未配对，不能标记为『我的设备』".to_string());
+        }
+        if !config.mine_fingerprints.iter().any(|fp| fp == fingerprint) {
+            config.mine_fingerprints.push(fingerprint.to_string());
+        }
+    } else {
+        config.mine_fingerprints.retain(|fp| fp != fingerprint);
+    }
     save_config(app, &config)
 }
 

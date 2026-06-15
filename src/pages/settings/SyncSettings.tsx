@@ -98,6 +98,9 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     invoke<{ address: string }>('sync_get_info').then(setSyncInfo).catch(() => {})
     // 进页面探测各设备在线状态
     devices.forEach((d) => checkDevice(d.id))
+    // 迁移：把已有 localStorage 设备类型同步到后端权威白名单（旧数据无 kind=按 mine）。
+    // 已配对的「我的设备」补登记成 mine，避免升级后全量同步被新的后端闸拦下。
+    devices.forEach((d) => setBackendKind(d.id.slice(0, 16), (d.kind ?? 'mine') === 'mine'))
     // 进页面自动搜索局域网邻居（mDNS，约 1.5s）
     handleDiscoverLan()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,6 +145,18 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     localStorage.setItem(DEVICES_KEY, JSON.stringify(list))
   }
 
+  // 把设备类型落到后端权威白名单（决定能否全量双向同步）。
+  // mine=true 要求该 fp 已配对（后端会校验）；best-effort，失败不阻塞 UI。
+  // 需要紧接着发起全量同步的地方要 await 它，确保后端 is_mine 在 sync_iroh_connect 之前就位。
+  const setBackendKind = async (fp: string, mine: boolean) => {
+    if (!fp) return
+    try {
+      await invoke('sync_set_device_kind', { fingerprint: fp, mine })
+    } catch {
+      /* 未配对时设 mine 会失败，属正常：首次同步配对后会再设一次 */
+    }
+  }
+
   // 添加设备：先 probe 对端验证连通并取回它自己设的设备名（无需手动填名）
   const addDevice = async () => {
     const id = newDeviceId.trim()
@@ -178,6 +193,8 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     }
     setSyncingDeviceId(device.id)
     try {
+      // 确保后端把它登记为「我的设备」，否则新的 is_mine 闸会拒绝全量同步（已配对才会成功）
+      await setBackendKind(device.id.slice(0, 16), true)
       const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
       toastSyncResult(`「${device.name}」`, stats)
       onDataChange?.()
@@ -192,6 +209,8 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const syncDeviceConfirmed = async (device: SavedDevice) => {
     setSyncingDeviceId(device.id)
     try {
+      // 配对刚完成，补登记为「我的设备」再发起全量同步
+      await setBackendKind(device.id.slice(0, 16), true)
       const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
       toastSyncResult(`「${device.name}」`, stats)
       onDataChange?.()
@@ -212,13 +231,13 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     setNoteSelectTarget({ address: '', deviceName: device.name, peerId: device.id })
   }
 
-  // 切换设备类型：我的设备 ↔ 分享对象
+  // 切换设备类型：我的设备 ↔ 分享对象（同时落到后端权威）
   const toggleDeviceKind = (id: string) => {
-    persistDevices(
-      devices.map((d) =>
-        d.id === id ? { ...d, kind: (d.kind ?? 'mine') === 'mine' ? 'shared' : 'mine' } : d
-      )
-    )
+    const cur = devices.find((d) => d.id === id)
+    const nextKind: DeviceKind = (cur?.kind ?? 'mine') === 'mine' ? 'shared' : 'mine'
+    persistDevices(devices.map((d) => (d.id === id ? { ...d, kind: nextKind } : d)))
+    // 后端权威同步：标成「我的设备」才放行全量同步；标「分享对象」立即收回该权限
+    setBackendKind(id.slice(0, 16), nextKind === 'mine')
   }
 
   // 局域网：mDNS 搜索同网段的其它 jdnotes 设备
