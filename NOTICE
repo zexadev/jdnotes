@@ -1,0 +1,45 @@
+Lapis — Copyright & Additional Terms
+====================================
+
+Copyright (C) 2026 zexa (zexadev)  ·  https://zexa.cc
+Project repository: https://github.com/zexadev/lapis
+
+
+LICENSING
+---------
+Lapis version 2.0 and all later versions are licensed under the
+GNU Affero General Public License, version 3 or (at your option) any
+later version (AGPL-3.0-or-later). The full text is in the LICENSE file.
+
+Earlier releases — version 1.9.1 and before — were published under the
+MIT License and remain available under those terms; see LICENSE-MIT.
+The MIT-licensed history is incorporated into this AGPL-licensed work by
+its sole copyright holder.
+
+
+ADDITIONAL TERMS (pursuant to Section 7 of the GNU AGPL v3)
+----------------------------------------------------------
+The following additional terms apply to this Program and to every modified
+version or derivative work, to the fullest extent permitted by AGPL §7:
+
+(a) Author attribution (AGPL §7b).
+    If you convey a modified version of the Program — including making its
+    Corresponding Source available because you run a modified version as a
+    network service (AGPL §13) — you MUST retain the following attribution
+    in the source of your distribution (its README, credits, or a NOTICE
+    file in your repository):
+
+        Based on Lapis — © 2026 zexadev — https://github.com/zexadev/lapis
+
+    The attribution must be reasonably visible to anyone who obtains the
+    source, and must not be removed or misrepresented. You are NOT required
+    to display it inside the application's user interface.
+
+(b) Marking of changes and origin (AGPL §7b/§7c).
+    Modified versions must carry prominent notices stating that you changed
+    the files and the date of those changes, must retain all copyright and
+    license notices, and must not misrepresent the origin of the Program or
+    imply endorsement by the original author.
+
+These are additional terms under AGPL §7 and travel with all copies and
+derivative works of the Program.
