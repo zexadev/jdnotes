@@ -19,7 +19,7 @@ const CHANGELOG_DATA: ChangelogEntry[] = [
     version: '2.0.0',
     date: '2026-05-28',
     notes: `## 🎉 多设备同步首发
-JD Notes 从单机笔记迈向**多设备同步**：公司、家里、未来的手机互为对端，各持全量副本，互相同步、最终一致。**不依赖任何中心服务器** —— 你的笔记永远在你自己手里。
+Lapis 从单机笔记迈向**多设备同步**：公司、家里、未来的手机互为对端，各持全量副本，互相同步、最终一致。**不依赖任何中心服务器** —— 你的笔记永远在你自己手里。
 ## ✨ 核心新增
 ### 🔄 多设备同步
 - **mDNS 自动发现**：同一 WiFi 下设备互相可见，无需手输 IP
@@ -108,7 +108,7 @@ JD Notes 从单机笔记迈向**多设备同步**：公司、家里、未来的�
 - AI 工具现在可以查看、搜索和列出笔记内容
 ### 🤖 Agent Skill 自动安装
 - 启动时自动安装 Agent Skill 到 Claude Code、Copilot、Gemini CLI
-- 各 AI 工具自动获知 JD Notes 的使用方法`
+- 各 AI 工具自动获知 Lapis 的使用方法`
   },
   {
     version: '1.6.4',
@@ -456,7 +456,7 @@ export function ChangelogModal({ open, onClose }: ChangelogModalProps) {
         {/* 底部 */}
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 shrink-0 flex items-center justify-between">
           <a
-            href="https://github.com/zexadev/jdnotes/releases"
+            href="https://github.com/zexadev/lapis/releases"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#5E6AD2] transition-colors"

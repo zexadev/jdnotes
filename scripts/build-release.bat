@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 
 echo.
 echo ╔═══════════════════════════════════════════╗
-echo ║       JD Notes 打包发布脚本 v1.0          ║
+echo ║       Lapis 打包发布脚本 v1.0          ║
 echo ╚═══════════════════════════════════════════╝
 echo.
 

@@ -152,7 +152,7 @@ pub struct UpdateNoteParams {
 
 #[tool_router]
 impl JdNotesMcpServer {
-    #[tool(description = "Create a new note in JD Notes / 在 JD Notes 中创建新笔记")]
+    #[tool(description = "Create a new note in Lapis / 在 Lapis 中创建新笔记")]
     async fn create_note(
         &self,
         Parameters(params): Parameters<CreateNoteParams>,
@@ -474,7 +474,7 @@ impl ServerHandler for JdNotesMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_instructions(
-                "JD Notes MCP Server - 本地笔记应用的读写接口。\n\n\
+                "Lapis MCP Server - 本地笔记应用的读写接口。\n\n\
                  可用工具：\n\
                  - create_note: 创建新笔记（标题、内容、标签）\n\
                  - append_note: 按 ID 或标题模糊匹配，追加内容到已有笔记\n\
@@ -675,13 +675,13 @@ fn register_mcp_entry_nested(
 /// Agent Skill 文件内容
 const SKILL_CONTENT: &str = r#"---
 name: jdnotes
-description: Read and write notes in JD Notes app via MCP / 通过 MCP 读写 JD Notes 笔记
+description: Read and write notes in Lapis app via MCP / 通过 MCP 读写 Lapis 笔记
 user-invocable: true
 ---
 
-# JD Notes MCP
+# Lapis MCP
 
-JD Notes 提供本地 MCP Server，可读取和写入笔记。
+Lapis 提供本地 MCP Server，可读取和写入笔记。
 
 ## 前提
 

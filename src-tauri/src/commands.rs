@@ -4,7 +4,7 @@ use crate::models::ExportData;
 use crate::sync;
 
 // ============= 架构说明 =============
-// JD Notes 使用 tauri-plugin-sql 插件在前端直接执行 SQL 操作
+// Lapis 使用 tauri-plugin-sql 插件在前端直接执行 SQL 操作
 // 笔记和聊天消息的 CRUD 操作都在前端 src/lib/db.ts 中实现
 // 后端命令仅用于：
 // 1. 数据库路径管理（获取/更改数据库位置）

@@ -1,11 +1,11 @@
 ---
-description: Read and write notes in JD Notes app via MCP / 通过 MCP 读写 JD Notes 笔记
+description: Read and write notes in Lapis app via MCP / 通过 MCP 读写 Lapis 笔记
 user-invocable: true
 ---
 
-# JD Notes MCP
+# Lapis MCP
 
-JD Notes 提供本地 MCP Server，可读取和写入笔记。
+Lapis 提供本地 MCP Server，可读取和写入笔记。
 
 ## 前提
 

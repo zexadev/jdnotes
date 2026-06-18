@@ -271,8 +271,8 @@ export async function initializeDefaultNotes(): Promise<void> {
        VALUES (?, ?, ?, ?, 0, 0, ?, ?, 0)`,
       [
         WELCOME_NOTE_UUID,
-        '欢迎使用 JD Notes',
-        `欢迎使用 JD Notes！这是一个简洁高效的本地笔记应用。
+        '欢迎使用 Lapis',
+        `欢迎使用 Lapis！这是一个简洁高效的本地笔记应用。
 
 ## 功能特性
 

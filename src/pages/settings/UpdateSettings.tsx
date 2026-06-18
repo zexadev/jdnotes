@@ -14,7 +14,7 @@ export function UpdateSettings() {
           软件更新
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          检查并安装 JD Notes 的最新版本
+          检查并安装 Lapis 的最新版本
         </p>
       </div>
 

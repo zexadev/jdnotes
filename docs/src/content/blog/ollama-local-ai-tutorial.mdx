@@ -24,7 +24,7 @@ keywords:
 
 想用 AI 辅助写作，但不想付月费？不想把隐私数据传到云端？**Ollama** 让你在自己的电脑上运行开源 AI 大模型，完全离线、数据不出本机，是 GPT-5 等云端服务的本地替代方案。
 
-本教程手把手教你从零开始，在 Windows 上安装 Ollama，运行本地大模型，搭建你的本地 AI Agent 写作助手，并接入 JD Notes 实现 AI 辅助写作。
+本教程手把手教你从零开始，在 Windows 上安装 Ollama，运行本地大模型，搭建你的本地 AI Agent 写作助手，并接入 Lapis 实现 AI 辅助写作。
 
 ---
 
@@ -99,12 +99,12 @@ ollama run qwen2.5:7b
 
 Ollama 启动后会在 `localhost:11434` 提供 API 服务，兼容 OpenAI 格式。大多数支持自定义 API 的工具都能接入。
 
-### 接入 JD Notes
+### 接入 Lapis
 
-[JD Notes](https://github.com/zexadev/jdnotes) 原生支持 Ollama，配置非常简单：
+[Lapis](https://github.com/zexadev/lapis) 原生支持 Ollama，配置非常简单：
 
 1. 确保 Ollama 在后台运行
-2. 打开 JD Notes → 设置 → AI 设置
+2. 打开 Lapis → 设置 → AI 设置
 3. 点击「添加来源」
 4. 填写配置：
    - **名称**：本地 AI（随便取）
@@ -167,7 +167,7 @@ ollama pull qwen2.5:7b
 - **Ollama**：免费、离线、隐私安全，但模型能力不如 GPT-5、Claude 4 等云端模型
 - **ChatGPT**：云端模型能力强，但需要付费、需要联网、数据上传云端
 
-两者可以结合使用——日常写作用本地模型保护隐私，重要任务用云端 API（GPT-5、DeepSeek V4、Claude 4 等）。JD Notes 支持同时配置多个来源，随时切换，是灵活的知识管理与生产力工具。
+两者可以结合使用——日常写作用本地模型保护隐私，重要任务用云端 API（GPT-5、DeepSeek V4、Claude 4 等）。Lapis 支持同时配置多个来源，随时切换，是灵活的知识管理与生产力工具。
 
 ### Q: 模型下载太慢怎么办？
 
@@ -181,7 +181,7 @@ ollama pull qwen2.5:7b
 |------|------|------|
 | 1. 安装 Ollama | 下载安装包 | 2 分钟 |
 | 2. 下载模型 | `ollama pull qwen2.5:7b` | 5-15 分钟 |
-| 3. 接入 JD Notes | 设置中添加 Ollama 来源 | 1 分钟 |
+| 3. 接入 Lapis | 设置中添加 Ollama 来源 | 1 分钟 |
 
 总共不到 20 分钟，你就拥有了一个**完全离线、隐私安全**的本地 AI 写作环境。
 
@@ -190,9 +190,9 @@ ollama pull qwen2.5:7b
 ## 相关阅读
 
 - [免费 AI 写作工具推荐：本地运行、隐私安全的 AI 笔记方案](/blog/free-ai-writing-tools) — 除了 Ollama，还有哪些 AI 写作方案？多模型混合使用策略一览。
-- [2026 年本地笔记软件推荐：Obsidian vs 思源笔记 vs JD Notes 深度对比](/blog/local-note-apps-comparison) — 选好了 AI 模型，还需要一款好的本地笔记软件来搭配使用。
+- [2026 年本地笔记软件推荐：Obsidian vs 思源笔记 vs Lapis 深度对比](/blog/local-note-apps-comparison) — 选好了 AI 模型，还需要一款好的本地笔记软件来搭配使用。
 - [Markdown 编辑器推荐 2026：支持 AI 辅助的 5 款最佳选择](/blog/markdown-editors-with-ai) — 了解哪些 Markdown 编辑器支持接入本地 AI 模型。
 
 ---
 
-*下载 [JD Notes](https://github.com/zexadev/jdnotes/releases) 搭配 Ollama，体验本地 AI 写作。*
+*下载 [Lapis](https://github.com/zexadev/lapis/releases) 搭配 Ollama，体验本地 AI 写作。*

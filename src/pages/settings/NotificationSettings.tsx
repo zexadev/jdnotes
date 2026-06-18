@@ -36,7 +36,7 @@ export function NotificationSettings() {
 
       if (result === 'granted') {
         await sendNotification({
-          title: 'JD Notes',
+          title: 'Lapis',
           body: '通知已启用！',
         })
       }
@@ -52,7 +52,7 @@ export function NotificationSettings() {
       // 重新请求一次权限确保生效
       await requestPermission()
       await sendNotification({
-        title: 'JD Notes',
+        title: 'Lapis',
         body: '每一个被记录的瞬间，都值得被温柔对待',
       })
     } catch (e) {

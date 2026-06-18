@@ -70,7 +70,7 @@ interface UseAIStreamReturn {
 
 // 模板提示词
 const TEMPLATE_PROMPTS: Record<TemplateType, string> = {
-  meeting: `你是 JD Notes 的会议助手。请根据上下文生成一个结构化的会议纪要模板，使用 Markdown 格式：
+  meeting: `你是 Lapis 的会议助手。请根据上下文生成一个结构化的会议纪要模板，使用 Markdown 格式：
 
 ## 会议纪要
 
@@ -91,9 +91,9 @@ const TEMPLATE_PROMPTS: Record<TemplateType, string> = {
 
 只返回模板内容，不要任何解释。`,
 
-  brainstorm: `你是 JD Notes 的创意助手。请根据以下上下文，生成一个 5 点思维大纲，帮助用户深入思考这个主题。使用 Markdown 格式，每个要点要有简短的说明。只返回大纲内容，不要任何前缀。`,
+  brainstorm: `你是 Lapis 的创意助手。请根据以下上下文，生成一个 5 点思维大纲，帮助用户深入思考这个主题。使用 Markdown 格式，每个要点要有简短的说明。只返回大纲内容，不要任何前缀。`,
 
-  code: `你是 JD Notes 的编程助手。请根据上下文中的描述，生成相应的代码实现。使用适当的编程语言，并添加简洁的注释。只返回代码块，不要任何额外解释。`,
+  code: `你是 Lapis 的编程助手。请根据上下文中的描述，生成相应的代码实现。使用适当的编程语言，并添加简洁的注释。只返回代码块，不要任何额外解释。`,
 }
 
 // 构建上下文感知的系统提示（用于编辑器内联 AI，不带 tools）
@@ -107,11 +107,11 @@ function buildSystemPrompt(action: AIAction, context?: AIContext, templateType?:
   }
 
   const basePrompts: Record<Exclude<AIAction, 'template'>, string> = {
-    refine: '你是 JD Notes 的专业写作助手。请改进以下文本的清晰度、语气和语法。只返回改进后的文本，不要任何解释或前缀。',
-    summarize: '你是 JD Notes 的专业写作助手。请用简洁专业的方式总结以下文本，使用要点列表形式。使用与输入文本相同的语言。只返回总结内容。',
-    translate: '你是 JD Notes 的翻译助手。如果文本是中文，翻译成英文；如果是英文，翻译成中文。只返回翻译结果，不要任何解释。',
-    continue: '你是 JD Notes 的创意写作助手。请自然流畅地续写以下文本，保持与现有文本一致的风格和语气。只返回续写内容，不要任何前缀如"续写："。',
-    custom: '你是 JD Notes 的智能助手。请精确遵循用户的指示，只返回结果，不要解释。',
+    refine: '你是 Lapis 的专业写作助手。请改进以下文本的清晰度、语气和语法。只返回改进后的文本，不要任何解释或前缀。',
+    summarize: '你是 Lapis 的专业写作助手。请用简洁专业的方式总结以下文本，使用要点列表形式。使用与输入文本相同的语言。只返回总结内容。',
+    translate: '你是 Lapis 的翻译助手。如果文本是中文，翻译成英文；如果是英文，翻译成中文。只返回翻译结果，不要任何解释。',
+    continue: '你是 Lapis 的创意写作助手。请自然流畅地续写以下文本，保持与现有文本一致的风格和语气。只返回续写内容，不要任何前缀如"续写："。',
+    custom: '你是 Lapis 的智能助手。请精确遵循用户的指示，只返回结果，不要解释。',
   }
 
   let prompt = basePrompts[action as Exclude<AIAction, 'template'>]

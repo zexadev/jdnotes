@@ -43,7 +43,7 @@ export function TitleBar() {
       <div data-tauri-drag-region className="flex items-center gap-2 px-3 h-full">
         <img 
           src="/app-icon.png" 
-          alt="JD Notes" 
+          alt="Lapis" 
           className="h-4 w-4 rounded pointer-events-none"
           draggable={false}
         />
@@ -51,7 +51,7 @@ export function TitleBar() {
           data-tauri-drag-region
           className="text-[11px] font-medium text-slate-500 dark:text-slate-400 tracking-tight"
         >
-          JD Notes
+          Lapis
         </span>
       </div>
 

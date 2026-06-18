@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="./app-icon.png" width="128" height="128" alt="JD Notes Logo">
+  <img src="./app-icon.png" width="128" height="128" alt="Lapis Logo">
 </p>
 
-<h1 align="center">JD Notes</h1>
+<h1 align="center">Lapis</h1>
 
 <p align="center">
   <strong>thinking is water</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/zexadev/jdnotes/releases/latest">
-    <img src="https://img.shields.io/github/v/release/zexadev/jdnotes?style=flat-square&logo=github" alt="Latest Release">
+  <a href="https://github.com/zexadev/lapis/releases/latest">
+    <img src="https://img.shields.io/github/v/release/zexadev/lapis?style=flat-square&logo=github" alt="Latest Release">
   </a>
-  <a href="https://github.com/zexadev/jdnotes/releases">
-    <img src="https://img.shields.io/github/downloads/zexadev/jdnotes/total?style=flat-square&logo=github" alt="Downloads">
+  <a href="https://github.com/zexadev/lapis/releases">
+    <img src="https://img.shields.io/github/downloads/zexadev/lapis/total?style=flat-square&logo=github" alt="Downloads">
   </a>
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License">
 </p>
 
 <p align="center">
@@ -46,7 +46,7 @@
 
 ## About
 
-**JD Notes** is a local-first desktop note-taking app built with Tauri 2, featuring a built-in AI assistant and MCP Server. All data is stored locally on your device — no cloud, no tracking, full privacy.
+**Lapis** is a local-first desktop note-taking app built with Tauri 2, featuring a built-in AI assistant and MCP Server. All data is stored locally on your device — no cloud, no tracking, full privacy.
 
 | | Feature | Description |
 |---|---|---|
@@ -118,7 +118,7 @@
 
 ### Windows
 
-Download the latest version from [Releases](https://github.com/zexadev/jdnotes/releases/latest):
+Download the latest version from [Releases](https://github.com/zexadev/lapis/releases/latest):
 
 | File | Description |
 |------|-------------|
@@ -133,9 +133,9 @@ Download the latest version from [Releases](https://github.com/zexadev/jdnotes/r
 
 ### Installation
 
-1. Download the latest installer from [Releases](https://github.com/zexadev/jdnotes/releases/latest)
+1. Download the latest installer from [Releases](https://github.com/zexadev/lapis/releases/latest)
 2. Run the installer and follow the prompts
-3. Launch JD Notes and start writing
+3. Launch Lapis and start writing
 
 ### Configure AI
 
@@ -145,7 +145,7 @@ Download the latest version from [Releases](https://github.com/zexadev/jdnotes/r
 
 ### Using MCP Server
 
-JD Notes automatically starts an MCP Server on `127.0.0.1:19230` and registers with Claude Code. Just say "save this to notes" in Claude Code.
+Lapis automatically starts an MCP Server on `127.0.0.1:19230` and registers with Claude Code. Just say "save this to notes" in Claude Code.
 
 Manual registration:
 ```bash
@@ -226,7 +226,7 @@ claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
 
 If you encounter any issues or have suggestions:
 
-- Submit a [GitHub Issue](https://github.com/zexadev/jdnotes/issues/new)
+- Submit a [GitHub Issue](https://github.com/zexadev/lapis/issues/new)
 - Visit the [Documentation](https://jdnotes.zexa.cc)
 
 ### FAQ
@@ -243,16 +243,20 @@ If you encounter any issues or have suggestions:
 
 <details>
 <summary><strong>Q: How does the MCP Server work?</strong></summary>
-<p>JD Notes automatically starts a local MCP Server and registers with Claude Code on launch. Just say "save this to notes" in Claude Code to use it.</p>
+<p>Lapis automatically starts a local MCP Server and registers with Claude Code on launch. Just say "save this to notes" in Claude Code to use it.</p>
 </details>
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Lapis **2.0 and later** is licensed under the **[GNU AGPL-3.0-or-later](LICENSE)** (strong copyleft: modifying, distributing, or offering it over a network all require releasing your changes under the AGPL).
 
-Copyright © 2026 [Zexa](https://zexa.cc)
+Additional term (AGPL §7, see [NOTICE](NOTICE)): when you modify or distribute Lapis, you must **keep an attribution to the original author and project in your repository's README / source / NOTICE** (`Based on Lapis — © 2026 zexadev — https://github.com/zexadev/lapis`) and mark your changes. Displaying it inside the app UI is not required.
+
+Earlier releases — **version 1.9.1 and before** — were published under the [MIT License](LICENSE-MIT) and remain available under those terms.
+
+Copyright © 2026 [Zexa (zexadev)](https://zexa.cc)
 
 ---
 
@@ -275,7 +279,7 @@ Thanks to these open-source projects:
 </p>
 
 <p align="center">
-  <a href="https://github.com/zexadev/jdnotes">
+  <a href="https://github.com/zexadev/lapis">
     If this project helps you, please give it a Star :star:
   </a>
 </p>

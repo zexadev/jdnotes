@@ -8,7 +8,7 @@ export function AboutSettings() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          关于 JD Notes
+          关于 Lapis
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           应用信息和开发者信息
@@ -23,7 +23,7 @@ export function AboutSettings() {
           </div>
           <div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-              JD Notes
+              Lapis
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               v{updater.currentVersion || '0.1.0'}
@@ -125,7 +125,7 @@ export function AboutSettings() {
       {/* 版权信息 */}
       <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
         <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-          © 2024 JD Notes. All rights reserved.
+          © 2024 Lapis. All rights reserved.
         </p>
       </div>
     </div>

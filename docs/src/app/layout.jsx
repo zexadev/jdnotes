@@ -5,23 +5,23 @@ import 'nextra-theme-docs/style.css'
 
 export const metadata = {
   title: {
-    default: 'JD Notes — 简洁高效的本地笔记应用',
-    template: '%s — JD Notes',
+    default: 'Lapis — 简洁高效的本地笔记应用',
+    template: '%s — Lapis',
   },
-  description: 'JD Notes 是一款免费开源的 Windows 本地笔记软件，内置 AI 写作助手，支持 Markdown 富文本编辑、多模型 AI 对话（OpenAI/Claude/Gemini/Ollama）、日历提醒、代码高亮，数据完全离线存储，保护隐私安全。',
-  keywords: ['JD Notes', '笔记应用', '本地笔记', '免费笔记软件', 'Windows笔记软件', 'AI写作助手', 'AI笔记应用', 'Markdown编辑器', '离线笔记工具', '开源笔记应用', 'Tauri桌面应用', '本地存储笔记', '隐私安全笔记', '代码高亮笔记', 'MCP工具集成'],
+  description: 'Lapis 是一款免费开源的 Windows 本地笔记软件，内置 AI 写作助手，支持 Markdown 富文本编辑、多模型 AI 对话（OpenAI/Claude/Gemini/Ollama）、日历提醒、代码高亮，数据完全离线存储，保护隐私安全。',
+  keywords: ['Lapis', '笔记应用', '本地笔记', '免费笔记软件', 'Windows笔记软件', 'AI写作助手', 'AI笔记应用', 'Markdown编辑器', '离线笔记工具', '开源笔记应用', 'Tauri桌面应用', '本地存储笔记', '隐私安全笔记', '代码高亮笔记', 'MCP工具集成'],
   metadataBase: new URL('https://jdnotes.zexa.cc'),
   openGraph: {
-    title: 'JD Notes — 简洁高效的本地笔记应用',
+    title: 'Lapis — 简洁高效的本地笔记应用',
     description: '基于 Tauri + React 的本地笔记应用，内置 AI 助手，支持 Markdown 编辑、多模型对话、日历提醒。',
     url: 'https://jdnotes.zexa.cc',
-    siteName: 'JD Notes',
+    siteName: 'Lapis',
     type: 'website',
     locale: 'zh_CN',
   },
   twitter: {
     card: 'summary',
-    title: 'JD Notes — 简洁高效的本地笔记应用',
+    title: 'Lapis — 简洁高效的本地笔记应用',
     description: '基于 Tauri + React 的本地笔记应用，内置 AI 助手，数据完全存储在本地。',
   },
   alternates: {
@@ -37,15 +37,15 @@ const navbar = (
   <Navbar
     logo={
       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <img src="/app-icon.png" alt="JD Notes" width={24} height={24} />
-        <b>JD Notes</b>
+        <img src="/app-icon.png" alt="Lapis" width={24} height={24} />
+        <b>Lapis</b>
       </span>
     }
-    projectLink="https://github.com/zexadev/jdnotes"
+    projectLink="https://github.com/zexadev/lapis"
   />
 )
 
-const footer = <Footer>MIT {new Date().getFullYear()} © JD Notes.</Footer>
+const footer = <Footer>MIT {new Date().getFullYear()} © Lapis.</Footer>
 
 // JSON-LD 结构化数据
 const jsonLd = {
@@ -55,14 +55,14 @@ const jsonLd = {
       '@type': 'WebSite',
       '@id': 'https://jdnotes.zexa.cc/#website',
       url: 'https://jdnotes.zexa.cc',
-      name: 'JD Notes',
+      name: 'Lapis',
       description: '简洁高效的本地笔记应用，内置 AI 写作助手',
       inLanguage: 'zh-CN',
     },
     {
       '@type': 'SoftwareApplication',
       '@id': 'https://jdnotes.zexa.cc/#app',
-      name: 'JD Notes',
+      name: 'Lapis',
       description: '免费开源的 Windows 本地笔记软件，内置 AI 写作助手，支持 Markdown 编辑、多模型 AI 对话、日历提醒，数据完全离线存储。',
       applicationCategory: 'ProductivityApplication',
       operatingSystem: 'Windows 10/11',
@@ -71,7 +71,7 @@ const jsonLd = {
         price: '0',
         priceCurrency: 'CNY',
       },
-      downloadUrl: 'https://github.com/zexadev/jdnotes/releases',
+      downloadUrl: 'https://github.com/zexadev/lapis/releases',
       softwareVersion: '1.6.4',
       author: {
         '@type': 'Organization',
@@ -101,7 +101,7 @@ export default async function RootLayout({ children }) {
         <Layout
           navbar={navbar}
           pageMap={await getPageMap()}
-          docsRepositoryBase="https://github.com/zexadev/jdnotes/tree/main/docs"
+          docsRepositoryBase="https://github.com/zexadev/lapis/tree/main/docs"
           footer={footer}
         >
           {children}

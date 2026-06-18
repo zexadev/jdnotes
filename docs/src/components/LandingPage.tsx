@@ -45,7 +45,7 @@ const comparisons = [
 ]
 
 const blogs = [
-  { title: '2026 年本地笔记软件推荐：Obsidian vs 思源 vs JD Notes', href: '/blog/local-note-apps-comparison' },
+  { title: '2026 年本地笔记软件推荐：Obsidian vs 思源 vs Lapis', href: '/blog/local-note-apps-comparison' },
   { title: '免费 AI 写作工具推荐：本地运行、隐私安全的方案', href: '/blog/free-ai-writing-tools' },
   { title: 'Ollama 本地部署 AI 大模型完整教程', href: '/blog/ollama-local-ai-tutorial' },
   { title: 'Markdown 编辑器推荐 2026：支持 AI 辅助', href: '/blog/markdown-editors-with-ai' },
@@ -59,14 +59,14 @@ export function LandingPage() {
       {/* Hero */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
-        <img src="/app-icon.png" alt="JD Notes" width={88} height={88} className="landing-hero-logo" />
-        <h1 className="landing-hero-title">JD Notes</h1>
+        <img src="/app-icon.png" alt="Lapis" width={88} height={88} className="landing-hero-logo" />
+        <h1 className="landing-hero-title">Lapis</h1>
         <p className="landing-hero-subtitle">
           免费开源的本地笔记应用<br />
           内置 AI 写作助手，数据完全离线，隐私安全
         </p>
         <div className="landing-hero-buttons">
-          <a href="https://github.com/zexadev/jdnotes/releases" className="landing-btn-primary">
+          <a href="https://github.com/zexadev/lapis/releases" className="landing-btn-primary">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             下载安装
           </a>
@@ -75,16 +75,16 @@ export function LandingPage() {
           </a>
         </div>
         <div className="landing-hero-badges">
-          <img src="https://img.shields.io/github/v/release/zexadev/jdnotes?style=flat-square&logo=github" alt="Release" />
-          <img src="https://img.shields.io/github/downloads/zexadev/jdnotes/total?style=flat-square&logo=github" alt="Downloads" />
-          <img src="https://img.shields.io/github/stars/zexadev/jdnotes?style=flat-square&logo=github" alt="Stars" />
+          <img src="https://img.shields.io/github/v/release/zexadev/lapis?style=flat-square&logo=github" alt="Release" />
+          <img src="https://img.shields.io/github/downloads/zexadev/lapis/total?style=flat-square&logo=github" alt="Downloads" />
+          <img src="https://img.shields.io/github/stars/zexadev/lapis?style=flat-square&logo=github" alt="Stars" />
           <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
         </div>
       </section>
 
       {/* Features with MagicCard */}
       <section className="landing-section">
-        <h2 className="landing-section-title">为什么选择 JD Notes？</h2>
+        <h2 className="landing-section-title">为什么选择 Lapis？</h2>
         <p className="landing-section-subtitle">专为注重隐私和效率的用户设计</p>
         <div className="landing-features">
           {features.map((f) => (
@@ -112,7 +112,7 @@ export function LandingPage() {
             <thead>
               <tr>
                 <th>特性</th>
-                <th className="landing-table-highlight">JD Notes</th>
+                <th className="landing-table-highlight">Lapis</th>
                 <th>Obsidian</th>
                 <th>思源笔记</th>
               </tr>
@@ -146,13 +146,13 @@ export function LandingPage() {
 
       {/* CTA */}
       <section className="landing-cta">
-        <h2 className="landing-cta-title">开始使用 JD Notes</h2>
+        <h2 className="landing-cta-title">开始使用 Lapis</h2>
         <p className="landing-cta-subtitle">免费开源，一键安装，数据完全属于你</p>
         <div className="landing-hero-buttons">
-          <a href="https://github.com/zexadev/jdnotes/releases" className="landing-btn-primary">
+          <a href="https://github.com/zexadev/lapis/releases" className="landing-btn-primary">
             下载最新版本
           </a>
-          <a href="https://github.com/zexadev/jdnotes" className="landing-btn-secondary">
+          <a href="https://github.com/zexadev/lapis" className="landing-btn-secondary">
             GitHub 仓库
           </a>
         </div>

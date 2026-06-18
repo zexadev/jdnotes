@@ -514,7 +514,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
           </button>
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 -mt-1">
-          自动发现同一 WiFi/网络下打开了 JD Notes 的其它设备，点「选笔记」勾选要同步给对方的条目（可全选/单选）。
+          自动发现同一 WiFi/网络下打开了 Lapis 的其它设备，点「选笔记」勾选要同步给对方的条目（可全选/单选）。
         </p>
 
         {/* 本机地址 */}
@@ -543,7 +543,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
             <Wifi className="h-6 w-6 text-gray-300 dark:text-gray-600" />
             <p className="text-xs text-gray-400">同网段暂未发现其它设备</p>
             <p className="text-[11px] text-gray-400 px-4">
-              确认对方已打开 JD Notes 新版本；若被防火墙挡住，用下方手动输入地址兜底
+              确认对方已打开 Lapis 新版本；若被防火墙挡住，用下方手动输入地址兜底
             </p>
           </div>
         ) : (

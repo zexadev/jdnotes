@@ -86,14 +86,14 @@ export function WelcomeInfoCard({ className = '' }: WelcomeInfoCardProps) {
         <div className="flex items-center gap-3 mb-4">
           <Calendar className="w-4 h-4 opacity-80" />
           <p className="text-sm opacity-90">
-            JD Notes 已陪伴你 <span className="font-bold text-lg mx-1">{companionDays}</span> 天
+            Lapis 已陪伴你 <span className="font-bold text-lg mx-1">{companionDays}</span> 天
           </p>
         </div>
 
         {/* 激励语 */}
         <p className="text-sm opacity-80 leading-relaxed">
           {companionDays === 1
-            ? '欢迎使用 JD Notes,开启你的笔记之旅!'
+            ? '欢迎使用 Lapis,开启你的笔记之旅!'
             : companionDays < 7
             ? '持续记录,让思考沉淀。'
             : companionDays < 30

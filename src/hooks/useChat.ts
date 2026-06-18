@@ -61,7 +61,7 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
     const now = new Date()
     const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`
 
-    return `你是 JD Notes 的 AI 助手。当前时间：${dateStr}。
+    return `你是 Lapis 的 AI 助手。当前时间：${dateStr}。
 
 你拥有以下能力：
 1. **笔记操作**：读取、搜索、创建、修改、删除笔记

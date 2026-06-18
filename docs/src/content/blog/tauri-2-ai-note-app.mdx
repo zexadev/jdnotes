@@ -1,6 +1,6 @@
 ---
 title: Tauri 2 开发实战：从零构建一个带 AI 的桌面笔记应用
-description: 分享使用 Tauri 2 + React + TypeScript 开发桌面笔记应用 JD Notes 的技术选型、架构设计和开发经验，包括 AI 集成、MCP Server、SQLite 存储等实践。
+description: 分享使用 Tauri 2 + React + TypeScript 开发桌面笔记应用 Lapis 的技术选型、架构设计和开发经验，包括 AI 集成、MCP Server、SQLite 存储等实践。
 keywords:
   - Tauri教程
   - Tauri 2开发
@@ -24,7 +24,7 @@ keywords:
 
 为什么越来越多开发者选择 **Tauri** 作为 Electron 替代方案来构建跨平台桌面应用？一个数据可以参考：同样的笔记应用，Electron 打包 90MB+，Tauri 只需要 **8MB**。
 
-本文分享 [JD Notes](https://github.com/zexadev/jdnotes) 的开发经验——一个基于 Tauri 2 + React 的桌面笔记应用，集成了 AI 助手、MCP Server、SQLite 存储等功能。
+本文分享 [Lapis](https://github.com/zexadev/lapis) 的开发经验——一个基于 Tauri 2 + React 的桌面笔记应用，集成了 AI 助手、MCP Server、SQLite 存储等功能。
 
 ---
 
@@ -54,7 +54,7 @@ keywords:
 
 ## 技术架构
 
-JD Notes 的技术栈：
+Lapis 的技术栈：
 
 ```
 ┌─────────────────────────────────────┐
@@ -112,7 +112,7 @@ await db.execute(
 
 ### 2. AI 多模型集成
 
-JD Notes 支持多种 AI Provider（包括 GPT-5、Claude 4、DeepSeek V4、Gemini 3 等 2026 年主流模型），统一封装为相同的接口：
+Lapis 支持多种 AI Provider（包括 GPT-5、Claude 4、DeepSeek V4、Gemini 3 等 2026 年主流模型），统一封装为相同的接口：
 
 ```typescript
 // 所有 Provider 都遵循 OpenAI 兼容的 Chat Completions 格式
@@ -156,7 +156,7 @@ MCP Server 提供三个工具（create_note、append_note、update_note），让
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/zexadev/jdnotes/releases/latest/download/latest.json"
+        "https://github.com/zexadev/lapis/releases/latest/download/latest.json"
       ]
     }
   }
@@ -197,7 +197,7 @@ TAURI_SIGNING_PRIVATE_KEY=... pnpm tauri build
 
 ## 性能数据
 
-JD Notes 的实际性能数据：
+Lapis 的实际性能数据：
 
 | 指标 | 数值 |
 |------|------|
@@ -229,16 +229,16 @@ Tauri 不太适合：
 
 Tauri 2 是 2026 年 Rust 桌面应用开发的主流框架之一。如果你已经有 React/Vue 前端经验，用 Tauri 可以快速构建出体积小、性能好的跨平台桌面应用。配合 Claude Code 等 AI Agent 工具进行开发，可以进一步提升开发效率。
 
-JD Notes 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub](https://github.com/zexadev/jdnotes)，欢迎参考和贡献。
+Lapis 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub](https://github.com/zexadev/lapis)，欢迎参考和贡献。
 
 ---
 
 ## 相关阅读
 
-- [MCP 是什么？如何让 Claude Code 直接操作你的笔记](/blog/mcp-claude-code-notes) — 深入了解 JD Notes 内置的 MCP Server 如何与 Claude Code 等 AI 工具协作。
-- [2026 年本地笔记软件推荐：Obsidian vs 思源笔记 vs JD Notes 深度对比](/blog/local-note-apps-comparison) — 从用户视角看 Tauri 构建的 JD Notes 与 Electron 应用的实际差异。
-- [Markdown 编辑器推荐 2026：支持 AI 辅助的 5 款最佳选择](/blog/markdown-editors-with-ai) — 了解 JD Notes 在 Markdown 编辑器领域的定位和 AI 集成优势。
+- [MCP 是什么？如何让 Claude Code 直接操作你的笔记](/blog/mcp-claude-code-notes) — 深入了解 Lapis 内置的 MCP Server 如何与 Claude Code 等 AI 工具协作。
+- [2026 年本地笔记软件推荐：Obsidian vs 思源笔记 vs Lapis 深度对比](/blog/local-note-apps-comparison) — 从用户视角看 Tauri 构建的 Lapis 与 Electron 应用的实际差异。
+- [Markdown 编辑器推荐 2026：支持 AI 辅助的 5 款最佳选择](/blog/markdown-editors-with-ai) — 了解 Lapis 在 Markdown 编辑器领域的定位和 AI 集成优势。
 
 ---
 
-*想体验 Tauri 构建的应用？[下载 JD Notes](https://github.com/zexadev/jdnotes/releases) 感受 8MB 安装包的轻量体验。*
+*想体验 Tauri 构建的应用？[下载 Lapis](https://github.com/zexadev/lapis/releases) 感受 8MB 安装包的轻量体验。*

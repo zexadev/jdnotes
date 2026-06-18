@@ -79,7 +79,7 @@ export function Sidebar({
               <div className="flex items-center gap-2">
                 <img src="/app-icon.png" alt="JD" className="h-6 w-6 rounded-md flex-shrink-0" />
                 <span className="text-[13px] font-medium text-slate-900 dark:text-slate-100 tracking-tight whitespace-nowrap">
-                  JD Notes
+                  Lapis
                 </span>
               </div>
             )}

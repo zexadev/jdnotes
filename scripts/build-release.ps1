@@ -1,4 +1,4 @@
-# JD Notes Build Release Script (PowerShell)
+# Lapis Build Release Script (PowerShell)
 # Usage: .\scripts\build-release.ps1 [-Version "0.2.0"] [-SkipBuild]
 
 param(
@@ -19,7 +19,7 @@ function Write-Err { param($msg) Write-Host "[ERROR] $msg" -ForegroundColor Red 
 # Print banner
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor Magenta
-Write-Host "    JD Notes Build Release Script v1.0  " -ForegroundColor Magenta
+Write-Host "    Lapis Build Release Script v1.0  " -ForegroundColor Magenta
 Write-Host "=========================================" -ForegroundColor Magenta
 Write-Host ""
 
@@ -268,7 +268,7 @@ if ($updateSigFile -and (Test-Path $updateSigFile.FullName)) {
 $updateFileName = if ($updateFile) { $updateFile.Name } else { "" }
 
 # Read GitHub repo from tauri.conf.json endpoints
-$githubRepo = "zexadev/jdnotes"  # Default
+$githubRepo = "zexadev/lapis"  # Default
 $endpoints = $tauriConf.plugins.updater.endpoints
 if ($endpoints -and $endpoints.Count -gt 0) {
     $endpoint = $endpoints[0]

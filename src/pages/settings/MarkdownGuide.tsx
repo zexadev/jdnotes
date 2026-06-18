@@ -188,7 +188,7 @@ export function MarkdownGuide() {
         </h3>
         <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
           Markdown 是一种轻量级标记语言，使用简单的符号来格式化文本。
-          它让你可以专注于内容创作，而不用担心复杂的排版。在 JD Notes 中，
+          它让你可以专注于内容创作，而不用担心复杂的排版。在 Lapis 中，
           你可以使用 Markdown 语法来创建结构清晰、格式美观的笔记。
         </p>
       </div>

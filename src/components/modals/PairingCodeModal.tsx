@@ -92,7 +92,7 @@ export function PairingCodeModal({
 
         <div className="space-y-1.5 text-xs text-gray-500 dark:text-gray-400 mb-5 leading-relaxed">
           <p>
-            <span className="text-gray-700 dark:text-gray-300 font-medium">在「{deviceName}」上也打开 JD Notes</span>，让对方也对你这台机器发起同步。
+            <span className="text-gray-700 dark:text-gray-300 font-medium">在「{deviceName}」上也打开 Lapis</span>，让对方也对你这台机器发起同步。
           </p>
           <p>
             <span className="text-gray-700 dark:text-gray-300 font-medium">两边屏幕上应该看到相同的数字</span>。一致就点下面「一致，建立信任」，之后这两台机器之间就免确认了。

@@ -90,7 +90,7 @@ Claude Code：
 ```
 在 Cursor / Windsurf 中写代码
   ↓ 通过 MCP 保存到笔记
-JD Notes 中查看和编辑
+Lapis 中查看和编辑
   ↓ AI 侧栏继续完善
 最终得到完整的技术文档
 ```
@@ -101,13 +101,13 @@ Cursor 同样支持 MCP 协议。在 Cursor 中，你可以通过设置页面添
 
 ---
 
-## 怎么用？以 JD Notes + Claude Code 为例
+## 怎么用？以 Lapis + Claude Code 为例
 
-[JD Notes](https://github.com/zexadev/jdnotes) 内置了 MCP Server，开箱即用。
+[Lapis](https://github.com/zexadev/lapis) 内置了 MCP Server，开箱即用。
 
-### 第一步：启动 JD Notes
+### 第一步：启动 Lapis
 
-启动 JD Notes 后，MCP Server 自动运行在 `http://127.0.0.1:19230/mcp`，并且**自动注册到 Claude Code**，无需手动配置。
+启动 Lapis 后，MCP Server 自动运行在 `http://127.0.0.1:19230/mcp`，并且**自动注册到 Claude Code**，无需手动配置。
 
 你会在日志中看到：
 ```
@@ -126,11 +126,11 @@ MCP Server 已启动: http://127.0.0.1:19230/mcp
 3. 分页参数标准
 ```
 
-Claude Code 会自动调用 JD Notes 的 MCP 工具，创建一篇新笔记。
+Claude Code 会自动调用 Lapis 的 MCP 工具，创建一篇新笔记。
 
-### 第三步：在 JD Notes 中查看
+### 第三步：在 Lapis 中查看
 
-回到 JD Notes，你会看到笔记列表自动刷新，新笔记已经出现。你可以继续在 JD Notes 中编辑、用 AI 改写、添加标签等。
+回到 Lapis，你会看到笔记列表自动刷新，新笔记已经出现。你可以继续在 Lapis 中编辑、用 AI 改写、添加标签等。
 
 ### 手动注册（如果自动注册失败）
 
@@ -140,7 +140,7 @@ claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
 
 ---
 
-## JD Notes MCP 提供的工具
+## Lapis MCP 提供的工具
 
 | 工具 | 功能 | 示例 |
 |------|------|------|
@@ -154,7 +154,7 @@ claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
 
 ## 支持 MCP 的 AI 工具
 
-JD Notes 的 MCP Server 兼容所有支持 MCP 协议的客户端：
+Lapis 的 MCP Server 兼容所有支持 MCP 协议的客户端：
 
 | AI 工具 | 支持情况 |
 |---------|----------|
@@ -168,7 +168,7 @@ JD Notes 的 MCP Server 兼容所有支持 MCP 协议的客户端：
 | OpenCode | 自动注册 |
 | Kiro | 自动注册 |
 
-JD Notes 启动时会自动检测并注册到以上所有已安装的 AI Agent 工具，无需手动配置 MCP 连接。
+Lapis 启动时会自动检测并注册到以上所有已安装的 AI Agent 工具，无需手动配置 MCP 连接。
 
 ---
 
@@ -190,16 +190,16 @@ MCP 不仅仅用于笔记，还有很多有趣的 MCP Server：
 
 MCP 打通了 AI Agent 工具和外部应用之间的壁垒。对于日常使用来说，无论你用的是 Claude Code、Cursor 还是 Windsurf，都可以通过 MCP 直接操作笔记——不再需要复制粘贴，AI 生成的内容自动保存到你的知识管理系统中。
 
-JD Notes 的 MCP 集成是开箱即用的，启动应用就自动完成注册，没有额外配置成本。
+Lapis 的 MCP 集成是开箱即用的，启动应用就自动完成注册，没有额外配置成本。
 
 ---
 
 ## 相关阅读
 
-- [Tauri 2 开发实战：从零构建一个带 AI 的桌面笔记应用](/blog/tauri-2-ai-note-app) — 了解 JD Notes 的技术架构，包括 MCP Server 的 Rust 实现细节。
-- [免费 AI 写作工具推荐：本地运行、隐私安全的 AI 笔记方案](/blog/free-ai-writing-tools) — 除了 MCP 集成，JD Notes 还支持多种 AI 写作方案。
+- [Tauri 2 开发实战：从零构建一个带 AI 的桌面笔记应用](/blog/tauri-2-ai-note-app) — 了解 Lapis 的技术架构，包括 MCP Server 的 Rust 实现细节。
+- [免费 AI 写作工具推荐：本地运行、隐私安全的 AI 笔记方案](/blog/free-ai-writing-tools) — 除了 MCP 集成，Lapis 还支持多种 AI 写作方案。
 - [Ollama 本地部署 AI 大模型完整教程](/blog/ollama-local-ai-tutorial) — 配合 MCP 使用本地 AI 模型，打造完全离线的 AI 工作流。
 
 ---
 
-*[下载 JD Notes](https://github.com/zexadev/jdnotes/releases)，体验 AI 工具 + 笔记的无缝工作流。*
+*[下载 Lapis](https://github.com/zexadev/lapis/releases)，体验 AI 工具 + 笔记的无缝工作流。*
