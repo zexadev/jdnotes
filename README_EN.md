@@ -149,7 +149,7 @@ Lapis automatically starts an MCP Server on `127.0.0.1:19230` and registers with
 
 Manual registration:
 ```bash
-claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
+claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 ```
 
 ### Keyboard Shortcuts

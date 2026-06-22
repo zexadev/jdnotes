@@ -61,7 +61,7 @@
 | `src/hooks/useSlashCommand.ts` | 斜杠命令逻辑（位置计算/命令执行） |
 | `src/components/layout/MainContent.tsx` | 主内容区布局（标签/工具栏/编辑器） |
 | `src-tauri/src/mcp_server.rs` | MCP HTTP Server（AI 工具集成） |
-| `skills/jdnotes-mcp.md` | Claude Code Skill 使用指引 |
+| `skills/lapis-mcp.md` | Claude Code Skill 使用指引 |
 | `docs/` | Nextra 文档站（Cloudflare Pages 自动部署） |
 | `docs/src/content/changelog.mdx` | 文档站更新日志 |
 | `docs/next.config.mjs` | 文档站构建配置 |

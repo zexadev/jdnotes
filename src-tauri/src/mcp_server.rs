@@ -595,7 +595,7 @@ pub fn register_in_ai_tools() {
     install_skill(&home.join(".gemini"), "Gemini CLI");
 }
 
-/// 通用注册函数：在 JSON 配置文件的指定 key 下添加 jdnotes 条目
+/// 通用注册函数：在 JSON 配置文件的指定 key 下添加 lapis 条目
 /// 仅当配置文件已存在时才注册（说明用户安装了该工具）
 fn register_mcp_entry(
     config_path: &std::path::Path,
@@ -618,18 +618,18 @@ fn register_mcp_entry(
         .entry(servers_key)
         .or_insert_with(|| serde_json::json!({}));
 
-    if servers.get("jdnotes").is_some() {
-        log::debug!("JDNotes MCP 已注册在 {} 中", tool_name);
+    if servers.get("lapis").is_some() {
+        log::debug!("Lapis MCP 已注册在 {} 中", tool_name);
         return;
     }
 
     servers
         .as_object_mut()
         .unwrap()
-        .insert("jdnotes".to_string(), server_config);
+        .insert("lapis".to_string(), server_config);
 
     match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
-        Ok(_) => log::info!("已自动注册 JDNotes MCP 到 {}", tool_name),
+        Ok(_) => log::info!("已自动注册 Lapis MCP 到 {}", tool_name),
         Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
     }
 }
@@ -656,25 +656,25 @@ fn register_mcp_entry_nested(
         .entry(servers_key)
         .or_insert_with(|| serde_json::json!({}));
 
-    if servers.get("jdnotes").is_some() {
-        log::debug!("JDNotes MCP 已注册在 {} 中", tool_name);
+    if servers.get("lapis").is_some() {
+        log::debug!("Lapis MCP 已注册在 {} 中", tool_name);
         return;
     }
 
     servers
         .as_object_mut()
         .unwrap()
-        .insert("jdnotes".to_string(), server_config);
+        .insert("lapis".to_string(), server_config);
 
     match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
-        Ok(_) => log::info!("已自动注册 JDNotes MCP 到 {}", tool_name),
+        Ok(_) => log::info!("已自动注册 Lapis MCP 到 {}", tool_name),
         Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
     }
 }
 
 /// Agent Skill 文件内容
 const SKILL_CONTENT: &str = r#"---
-name: jdnotes
+name: lapis
 description: Read and write notes in Lapis app via MCP / 通过 MCP 读写 Lapis 笔记
 user-invocable: true
 ---
@@ -685,7 +685,7 @@ Lapis 提供本地 MCP Server，可读取和写入笔记。
 
 ## 前提
 
-- JDNotes 应用必须正在运行
+- Lapis 应用必须正在运行
 - MCP Server 地址：http://127.0.0.1:19230/mcp
 
 ## 最佳实践
@@ -743,7 +743,7 @@ fn install_skill(tool_dir: &std::path::Path, tool_name: &str) {
         return;
     }
 
-    let skill_dir = tool_dir.join("skills").join("jdnotes");
+    let skill_dir = tool_dir.join("skills").join("lapis");
     let skill_path = skill_dir.join("SKILL.md");
 
     if let Err(e) = std::fs::create_dir_all(&skill_dir) {
@@ -752,7 +752,7 @@ fn install_skill(tool_dir: &std::path::Path, tool_name: &str) {
     }
 
     match std::fs::write(&skill_path, SKILL_CONTENT) {
-        Ok(_) => log::info!("已安装 JDNotes Skill 到 {}", tool_name),
+        Ok(_) => log::info!("已安装 Lapis Skill 到 {}", tool_name),
         Err(e) => log::warn!("写入 {} skill 文件失败: {}", tool_name, e),
     }
 }

@@ -170,7 +170,7 @@ JDNotes 启动时自动在 `127.0.0.1:19230` 提供 MCP Server，并自动注册
 
 手动注册：
 ```bash
-claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp
+claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 ```
 
 ### 快捷键

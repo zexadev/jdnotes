@@ -9,8 +9,8 @@ Lapis 提供本地 MCP Server，可读取和写入笔记。
 
 ## 前提
 
-- JDNotes 应用必须正在运行
-- 已注册 MCP Server：`claude mcp add --transport http jdnotes http://127.0.0.1:19230/mcp`
+- Lapis 应用必须正在运行
+- 已注册 MCP Server：`claude mcp add --transport http lapis http://127.0.0.1:19230/mcp`
 
 ## 最佳实践
 
