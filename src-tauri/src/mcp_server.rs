@@ -612,25 +612,34 @@ fn register_mcp_entry(
         Err(_) => return,
     };
 
-    let servers = config
+    let servers_obj = config
         .as_object_mut()
         .unwrap()
         .entry(servers_key)
-        .or_insert_with(|| serde_json::json!({}));
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .unwrap();
 
-    if servers.get("lapis").is_some() {
+    let mut changed = false;
+    // 迁移：清掉旧版遗留的 jdnotes 注册，避免更名后与 lapis 重复
+    if servers_obj.remove("jdnotes").is_some() {
+        log::info!("已清理 {} 中遗留的旧 jdnotes MCP 注册", tool_name);
+        changed = true;
+    }
+    if servers_obj.contains_key("lapis") {
         log::debug!("Lapis MCP 已注册在 {} 中", tool_name);
+    } else {
+        servers_obj.insert("lapis".to_string(), server_config);
+        log::info!("已自动注册 Lapis MCP 到 {}", tool_name);
+        changed = true;
+    }
+
+    if !changed {
         return;
     }
 
-    servers
-        .as_object_mut()
-        .unwrap()
-        .insert("lapis".to_string(), server_config);
-
-    match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
-        Ok(_) => log::info!("已自动注册 Lapis MCP 到 {}", tool_name),
-        Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
+    if let Err(e) = std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
+        log::warn!("写入 {} 配置失败: {}", tool_name, e);
     }
 }
 
@@ -650,25 +659,34 @@ fn register_mcp_entry_nested(
         Err(_) => return,
     };
 
-    let servers = config
+    let servers_obj = config
         .as_object_mut()
         .unwrap()
         .entry(servers_key)
-        .or_insert_with(|| serde_json::json!({}));
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .unwrap();
 
-    if servers.get("lapis").is_some() {
+    let mut changed = false;
+    // 迁移：清掉旧版遗留的 jdnotes 注册，避免更名后与 lapis 重复
+    if servers_obj.remove("jdnotes").is_some() {
+        log::info!("已清理 {} 中遗留的旧 jdnotes MCP 注册", tool_name);
+        changed = true;
+    }
+    if servers_obj.contains_key("lapis") {
         log::debug!("Lapis MCP 已注册在 {} 中", tool_name);
+    } else {
+        servers_obj.insert("lapis".to_string(), server_config);
+        log::info!("已自动注册 Lapis MCP 到 {}", tool_name);
+        changed = true;
+    }
+
+    if !changed {
         return;
     }
 
-    servers
-        .as_object_mut()
-        .unwrap()
-        .insert("lapis".to_string(), server_config);
-
-    match std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
-        Ok(_) => log::info!("已自动注册 Lapis MCP 到 {}", tool_name),
-        Err(e) => log::warn!("写入 {} 配置失败: {}", tool_name, e),
+    if let Err(e) = std::fs::write(config_path, serde_json::to_string_pretty(&config).unwrap()) {
+        log::warn!("写入 {} 配置失败: {}", tool_name, e);
     }
 }
 
@@ -741,6 +759,15 @@ Lapis 提供本地 MCP Server，可读取和写入笔记。
 fn install_skill(tool_dir: &std::path::Path, tool_name: &str) {
     if !tool_dir.exists() {
         return;
+    }
+
+    // 迁移：删掉旧版遗留的 jdnotes skill 目录，更名后避免残留
+    let old_skill_dir = tool_dir.join("skills").join("jdnotes");
+    if old_skill_dir.exists() {
+        match std::fs::remove_dir_all(&old_skill_dir) {
+            Ok(_) => log::info!("已清理 {} 中遗留的旧 jdnotes skill", tool_name),
+            Err(e) => log::warn!("清理 {} 旧 jdnotes skill 目录失败: {}", tool_name, e),
+        }
     }
 
     let skill_dir = tool_dir.join("skills").join("lapis");
