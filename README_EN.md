@@ -1,11 +1,8 @@
 <p align="center">
-  <img src="./app-icon.png" width="128" height="128" alt="Lapis Logo">
-</p>
-
-<h1 align="center">Lapis</h1>
-
-<p align="center">
-  <strong>thinking is water</strong>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./banner-dark.png">
+    <img src="./banner-light.png" alt="Lapis — Clarity, kept." width="100%">
+  </picture>
 </p>
 
 <p align="center">
