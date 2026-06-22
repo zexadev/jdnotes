@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FileText, Plus, Moon, Sun, Search } from 'lucide-react'
@@ -7,44 +6,34 @@ import { useTheme } from '../../contexts/ThemeContext'
 
 interface CommandMenuProps {
   notes: Note[]
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSelectNote: (id: number) => void
   onCreateNote: () => void
 }
 
 export function CommandMenu({
   notes,
+  open,
+  onOpenChange,
   onSelectNote,
   onCreateNote,
 }: CommandMenuProps) {
-  const [open, setOpen] = useState(false)
   const { resolvedTheme, toggleTheme } = useTheme()
-
-  // 监听 Ctrl+K / Cmd+K 快捷键
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setOpen((prev) => !prev)
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
 
   const handleSelectNote = (id: number) => {
     onSelectNote(id)
-    setOpen(false)
+    onOpenChange(false)
   }
 
   const handleCreateNote = () => {
     onCreateNote()
-    setOpen(false)
+    onOpenChange(false)
   }
 
   const handleToggleTheme = () => {
     toggleTheme()
-    setOpen(false)
+    onOpenChange(false)
   }
 
   return (
@@ -58,7 +47,7 @@ export function CommandMenu({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
           />
 
           {/* 命令面板 */}

@@ -7,8 +7,6 @@ import { CommandMenu } from './components/modals/CommandMenu'
 import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
 import type { SidebarState } from './components/layout/Sidebar'
 import { ThemeProvider } from './contexts/ThemeContext'
-import { TemplateModal } from './components/modals/TemplateModal'
-import type { NoteTemplate } from './components/modals/TemplateModal'
 import { UpdateAvailableModal } from './components/modals/UpdateAvailableModal'
 import { PairingCodeModal } from './components/modals/PairingCodeModal'
 import { AIChatSidebar } from './components/ai/AIChatSidebar'
@@ -37,7 +35,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
-  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [toasts, setToasts] = useState(toast.getToasts())
 
   // 侧栏状态（从 localStorage 恢复）
@@ -49,10 +47,51 @@ function App() {
     return 'expanded'
   })
 
-  // 侧栏状态变化时持久化到 localStorage
-  const handleSidebarStateChange = useCallback((state: SidebarState) => {
-    setSidebarState(state)
-    localStorage.setItem('jdnotes-sidebar-state', state)
+  // 循环切换侧栏状态（展开 → 收起 → 隐藏 → …）并持久化；Ctrl+\ 与顶栏按钮共用
+  const cycleSidebar = useCallback(() => {
+    setSidebarState((prev) => {
+      const next = SIDEBAR_CYCLE[(SIDEBAR_CYCLE.indexOf(prev) + 1) % SIDEBAR_CYCLE.length]
+      localStorage.setItem('jdnotes-sidebar-state', next)
+      return next
+    })
+  }, [])
+
+  // Ctrl+K / Cmd+K 打开/关闭全局命令面板（标题栏搜索框之外的快捷入口）
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen((prev) => !prev)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // 始终持有最新视图，供 ref 类回调读取（避免闭包过期）
+  const currentViewRef = useRef(currentView)
+  currentViewRef.current = currentView
+  // 记住「开始搜索前」停留的非列表视图，清空搜索后据此回退
+  const viewBeforeSearchRef = useRef<ViewType | null>(null)
+
+  const isNotesListView = (view: ViewType) =>
+    view === 'inbox' || view === 'favorites' || view === 'trash' || view.startsWith('tag-')
+
+  // 顶部搜索框输入：在非笔记列表视图下开始搜索时记住当前视图并切到「全部笔记」让结果可见；
+  // 清空搜索后回到搜索前的视图（仅当仍停留在自动切入的「全部笔记」，避免覆盖用户手动导航）。
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value)
+    const view = currentViewRef.current
+    if (value.trim()) {
+      if (!isNotesListView(view)) {
+        viewBeforeSearchRef.current = view
+        setCurrentView('inbox')
+      }
+    } else if (viewBeforeSearchRef.current) {
+      const prev = viewBeforeSearchRef.current
+      viewBeforeSearchRef.current = null
+      if (currentViewRef.current === 'inbox') setCurrentView(prev)
+    }
   }, [])
 
   // Ctrl+\ 快捷键循环切换侧栏状态
@@ -60,17 +99,12 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault()
-        setSidebarState((prev) => {
-          const idx = SIDEBAR_CYCLE.indexOf(prev)
-          const next = SIDEBAR_CYCLE[(idx + 1) % SIDEBAR_CYCLE.length]
-          localStorage.setItem('jdnotes-sidebar-state', next)
-          return next
-        })
+        cycleSidebar()
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [cycleSidebar])
 
   // 订阅 toast 变化
   useEffect(() => {
@@ -335,12 +369,7 @@ function App() {
     setLocalContent(latestNote.content)
   }, [activeNoteId, localTitle, localContent, saveNoteById, hasUnsavedChanges, currentView])
 
-  // 显示模板选择弹窗
-  const handleShowTemplateModal = () => {
-    setShowTemplateModal(true)
-  }
-
-  // 创建新笔记（空白，内部使用）
+  // 创建新笔记（空白）
   const handleCreateNote = async () => {
     try {
       if (activeNoteId !== null && hasUnsavedChanges()) {
@@ -351,39 +380,14 @@ function App() {
       setActiveNoteId(Number(id))
       setLocalTitle('无标题')
       setLocalContent('')
+      // 清掉可能存在的搜索过滤（否则新空白笔记会被过滤掉、像「凭空消失」），
+      // 并切到「全部笔记」——新建的空白笔记（非收藏/未删除/无标签）只可能出现在这里，
+      // 留在收藏/废纸篓/某标签视图都会被过滤掉而看不见。
+      setSearchQuery('')
+      viewBeforeSearchRef.current = null
+      setCurrentView('inbox')
     } catch (error) {
       console.error('Failed to create note:', error)
-    }
-  }
-
-  // 从模板创建新笔记
-  const handleCreateNoteFromTemplate = async (template: NoteTemplate) => {
-    try {
-      if (activeNoteId !== null && hasUnsavedChanges()) {
-        await saveNoteById(activeNoteId, localTitle, localContent)
-      }
-
-      if (template.id === 'blank') {
-        // 空白模板走原有逻辑
-        const id = await createNote()
-        setActiveNoteId(Number(id))
-        setLocalTitle('无标题')
-        setLocalContent('')
-      } else {
-        // 使用模板内容创建
-        const id = await noteOperations.create(template.noteTitle, template.content)
-        await refreshNotes()
-        setActiveNoteId(Number(id))
-        setLocalTitle(template.noteTitle)
-        setLocalContent(template.content)
-      }
-
-      // 确保在笔记列表视图
-      if (currentView !== 'inbox' && !currentView.startsWith('tag-')) {
-        setCurrentView('inbox')
-      }
-    } catch (error) {
-      console.error('Failed to create note from template:', error)
     }
   }
 
@@ -463,9 +467,9 @@ function App() {
     setContentToInsert(null)
   }, [])
 
-  // 从命令面板选择笔记
+  // 从命令面板 / 仪表盘选择笔记：对全量笔记取，避免被当前视图或搜索过滤掉而点击无反应
   const handleCommandSelectNote = (id: number) => {
-    const note = notes.find((n) => n.id === id)
+    const note = allNotes?.find((n) => n.id === id)
     if (note) {
       handleSelectNote(note)
     }
@@ -498,15 +502,10 @@ function App() {
       {/* 全局命令面板 */}
       <CommandMenu
         notes={notes}
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
         onSelectNote={handleCommandSelectNote}
-        onCreateNote={handleShowTemplateModal}
-      />
-
-      {/* 模板选择弹窗 */}
-      <TemplateModal
-        open={showTemplateModal}
-        onClose={() => setShowTemplateModal(false)}
-        onSelect={handleCreateNoteFromTemplate}
+        onCreateNote={handleCreateNote}
       />
 
       {/* 启动时新版本提示 */}
@@ -522,26 +521,30 @@ function App() {
         onSkip={handleSkipUpdate}
       />
 
-      <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
-        {/* 自定义标题栏 */}
-        <TitleBar />
+      <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
+        {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区 */}
+        <Sidebar
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          counts={counts}
+          allTags={allTags}
+          allNotes={allNotes || []}
+          onOpenSettings={() => setCurrentView('settings')}
+          sidebarState={sidebarState}
+        />
 
-        {/* 主内容区域 */}
-        <div className="flex-1 flex overflow-hidden">
-          <Sidebar
+        {/* 右列：顶栏（只压内容区）+ 内容 */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TitleBar
             searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            currentView={currentView}
-            onViewChange={setCurrentView}
-            counts={counts}
-            allTags={allTags}
-            allNotes={allNotes || []}
-            onOpenSettings={() => setCurrentView('settings')}
+            onSearchChange={handleSearchChange}
             sidebarState={sidebarState}
-            onSidebarStateChange={handleSidebarStateChange}
+            onToggleSidebar={cycleSidebar}
+            showBrandFallback={sidebarState === 'hidden'}
           />
 
-          <AnimatePresence mode="wait">
+          <div className="flex-1 flex overflow-hidden">
+            <AnimatePresence mode="wait">
             {/* Dashboard 页面 */}
             {currentView === 'dashboard' ? (
               <motion.div
@@ -554,7 +557,7 @@ function App() {
               >
                 <DashboardPage
                   onNavigate={(view) => setCurrentView(view)}
-                  onCreateNote={handleShowTemplateModal}
+                  onCreateNote={handleCreateNote}
                   onOpenNote={handleCommandSelectNote}
                 />
               </motion.div>
@@ -597,11 +600,17 @@ function App() {
               >
                 <NoteList
                   searchQuery={searchQuery}
+                  onClearSearch={() => {
+                    // 列表内「清空搜索」：只清过滤、留在当前笔记列表，
+                    // 不走标题栏 × 的「回到搜索前视图」逻辑，避免把人弹回仪表盘
+                    setSearchQuery('')
+                    viewBeforeSearchRef.current = null
+                  }}
                   currentView={currentView}
                   notes={notes}
                   activeNoteId={activeNoteId}
                   onSelectNote={handleSelectNote}
-                  onCreateNote={handleShowTemplateModal}
+                  onCreateNote={handleCreateNote}
                   onDeleteNote={handleDeleteNote}
                   onRestoreNote={handleRestoreNote}
                   onPermanentDelete={handlePermanentDelete}
@@ -643,7 +652,8 @@ function App() {
                 </div>
               </motion.div>
             )}
-          </AnimatePresence>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 

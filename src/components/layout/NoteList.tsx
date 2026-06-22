@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { NoteCard } from '../common/NoteCard'
-import { NoNotesState } from '../common/EmptyState'
+import { NoNotesState, NoSearchResultState } from '../common/EmptyState'
 import { NoteCardSkeleton } from '../common/Skeleton'
 import type { Note } from '../../lib/db'
 
 interface NoteListProps {
   searchQuery: string
+  onClearSearch: () => void
   currentView: string
   notes: Note[]
   activeNoteId: number | null
@@ -24,6 +25,7 @@ interface NoteListProps {
 
 export function NoteList({
   searchQuery,
+  onClearSearch,
   currentView,
   notes,
   activeNoteId,
@@ -184,7 +186,11 @@ export function NoteList({
             <NoteCardSkeleton />
           </>
         ) : !notes || notes.length === 0 ? (
-          <NoNotesState onCreateNote={onCreateNote} />
+          searchQuery.trim() ? (
+            <NoSearchResultState query={searchQuery} onClear={onClearSearch} />
+          ) : (
+            <NoNotesState onCreateNote={onCreateNote} />
+          )
         ) : (
           <AnimatePresence mode="popLayout">
             {notes.map((note) => (

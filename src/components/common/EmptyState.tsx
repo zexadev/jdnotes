@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react'
+import { FileText, SearchX } from 'lucide-react'
 
 export function EmptyState({ onCreateNote }: { onCreateNote: () => void }) {
   return (
@@ -11,6 +11,29 @@ export function EmptyState({ onCreateNote }: { onCreateNote: () => void }) {
         className="mt-4 px-4 py-2 bg-[#5E6AD2] text-white text-[13px] rounded-lg hover:bg-[#4F5ABF] transition-colors btn-press"
       >
         创建笔记
+      </button>
+    </div>
+  )
+}
+
+export function NoSearchResultState({
+  query,
+  onClear,
+}: {
+  query: string
+  onClear: () => void
+}) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 text-center text-slate-400 dark:text-slate-500">
+      <SearchX className="h-12 w-12 mb-3" strokeWidth={1} />
+      <p className="text-[13px]">
+        未找到匹配「<span className="text-slate-600 dark:text-slate-300">{query}</span>」的笔记
+      </p>
+      <button
+        onClick={onClear}
+        className="mt-3 px-3 py-1.5 bg-white dark:bg-white/[0.03] text-slate-600 dark:text-slate-300 text-[12px] rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm btn-press"
+      >
+        清空搜索
       </button>
     </div>
   )

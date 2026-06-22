@@ -1,8 +1,8 @@
-import { useRef } from 'react'
+import { useRef, type CSSProperties } from 'react'
 import { useTheme } from '../../contexts/ThemeContext'
 import './ThemeToggleButton.css'
 
-export function ThemeToggleButton() {
+export function ThemeToggleButton({ size }: { size?: string } = {}) {
   const { resolvedTheme, toggleTheme } = useTheme()
   const checkboxRef = useRef<HTMLInputElement>(null)
 
@@ -11,7 +11,10 @@ export function ThemeToggleButton() {
   }
 
   return (
-    <label className="theme-switch">
+    <label
+      className="theme-switch"
+      style={size ? ({ ['--toggle-size']: size } as CSSProperties) : undefined}
+    >
       <input
         ref={checkboxRef}
         type="checkbox"
