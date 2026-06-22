@@ -158,7 +158,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
         } else {
           // 多个笔记合并导出为单个 md 文件
           const content = generateCombinedMarkdown(selectedNotes)
-          const filename = `jdnotes-export-${new Date().toISOString().split('T')[0]}.md`
+          const filename = `lapis-export-${new Date().toISOString().split('T')[0]}.md`
           
           const filePath = await save({
             filters: [{ name: 'Markdown', extensions: ['md'] }],
@@ -174,7 +174,7 @@ export function ExportModal({ open, onClose }: ExportModalProps) {
       } else {
         // JSON 格式导出
         const content = generateJSON(selectedNotes)
-        const filename = `jdnotes-export-${new Date().toISOString().split('T')[0]}.json`
+        const filename = `lapis-export-${new Date().toISOString().split('T')[0]}.json`
         
         const filePath = await save({
           filters: [{ name: 'JSON', extensions: ['json'] }],

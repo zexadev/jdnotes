@@ -57,7 +57,7 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
           name: 'JSON',
           extensions: ['json']
         }],
-        defaultPath: `jdnotes-backup-${new Date().toISOString().split('T')[0]}.json`
+        defaultPath: `lapis-backup-${new Date().toISOString().split('T')[0]}.json`
       })
 
       if (filePath) {

@@ -519,7 +519,7 @@ async fn lan_connect_authed(
     }
     // 反向认证：解析应答方回证帧并验签（证明应答方确实持有其声称的私钥）
     let auth: LanAuth = serde_json::from_slice(&resp)
-        .map_err(|_| "握手响应无效（对方可能为旧版或非 jdnotes 设备）".to_string())?;
+        .map_err(|_| "握手响应无效（对方可能为旧版或非 Lapis 设备）".to_string())?;
     let (_resp_pk, resp_fp) = verify_lan_auth(&auth, &challenge_i)
         .map_err(|_| "对方身份验证失败（应答方未持有声称的私钥）".to_string())?;
     if let Some(exp) = expected_fp {
@@ -740,7 +740,7 @@ pub async fn import_package(app: AppHandle, db_path: &str, json_data: &str) -> R
 // 配对方式：交换本机 EndpointId（公钥字符串），靠 iroh 的 relay/discovery 找到对端。
 
 /// iroh 同步协议 ALPN
-const IROH_ALPN: &[u8] = b"jdnotes-sync/0";
+const IROH_ALPN: &[u8] = b"lapis-sync/0";
 
 /// 全局 iroh Endpoint（首次使用时初始化并启动接收循环）
 static IROH_EP: OnceCell<Endpoint> = OnceCell::const_new();
@@ -1179,7 +1179,7 @@ pub async fn lan_push_notes(
 }
 
 // ==================== 局域网设备发现（mDNS / DNS-SD）====================
-const MDNS_SERVICE: &str = "_jdnotes._tcp.local.";
+const MDNS_SERVICE: &str = "_lapis._tcp.local.";
 static MDNS_DAEMON: OnceCell<mdns_sd::ServiceDaemon> = OnceCell::const_new();
 
 #[derive(serde::Serialize, Clone)]
@@ -1211,7 +1211,7 @@ async fn ensure_mdns_started(app: &AppHandle) -> Result<&'static mdns_sd::Servic
             let fingerprint: String = secret.public().to_string().chars().take(16).collect();
             let _ = LOCAL_FINGERPRINT.set(fingerprint.clone());
             // 实例名也用 fingerprint，不再每次随机——重启同台机在对方眼里就是同一设备
-            let instance = format!("jdnotes-{}", fingerprint);
+            let instance = format!("lapis-{}", fingerprint);
             let host_name = format!("{}.local.", instance);
             let mut txt = std::collections::HashMap::new();
             txt.insert("device".to_string(), device);
@@ -1241,7 +1241,7 @@ async fn ensure_mdns_started(app: &AppHandle) -> Result<&'static mdns_sd::Servic
         .await
 }
 
-/// 浏览同网段的 jdnotes 服务，约 1.5s 后返回发现的设备列表
+/// 浏览同网段的 Lapis 服务，约 1.5s 后返回发现的设备列表
 pub async fn lan_discover(app: AppHandle) -> Result<Vec<DiscoveredDevice>, String> {
     let daemon = ensure_mdns_started(&app).await?.clone();
     tokio::task::spawn_blocking(move || -> Result<Vec<DiscoveredDevice>, String> {
@@ -1316,7 +1316,7 @@ pub async fn lan_discover(app: AppHandle) -> Result<Vec<DiscoveredDevice>, Strin
 }
 
 /// 重新注册 mDNS 服务（用户改设备名后调，使对方能立即看到新名字）
-/// 实例名 = `jdnotes-<fp>` 一直不变，只换 TXT 里的 device。
+/// 实例名 = `lapis-<fp>` 一直不变，只换 TXT 里的 device。
 pub async fn mdns_reregister_device_name(app: &AppHandle) -> Result<(), String> {
     let Some(daemon) = MDNS_DAEMON.get() else {
         // mDNS 还没启动，首次启动时会自然用上最新 device_name，啥也不用做
@@ -1327,7 +1327,7 @@ pub async fn mdns_reregister_device_name(app: &AppHandle) -> Result<(), String> 
     };
     let local = local_ip();
     let device = local_device_name(app);
-    let instance = format!("jdnotes-{}", fingerprint);
+    let instance = format!("lapis-{}", fingerprint);
     let fullname = format!("{}.{}", instance, MDNS_SERVICE);
     let host_name = format!("{}.local.", instance);
     // 撤销旧的（同 fullname 直接 register 不会换 TXT，必须先 unregister）

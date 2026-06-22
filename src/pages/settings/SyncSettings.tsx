@@ -268,7 +268,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       const json = await invoke<string>('sync_export_package')
       const filePath = await save({
         filters: [{ name: 'JSON', extensions: ['json'] }],
-        defaultPath: `jdnotes-sync-${new Date().toISOString().split('T')[0]}.json`,
+        defaultPath: `lapis-sync-${new Date().toISOString().split('T')[0]}.json`,
       })
       if (filePath) {
         await writeTextFile(filePath, json)

@@ -115,8 +115,8 @@
    pnpm tauri build
    ```
    产物位于：
-   - `src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe` + `.sig`
-   - `src-tauri/target/release/bundle/msi/jdnotes_x.y.z_x64_en-US.msi` + `.sig`
+   - `src-tauri/target/release/bundle/nsis/Lapis_x.y.z_x64-setup.exe` + `.sig`
+   - `src-tauri/target/release/bundle/msi/Lapis_x.y.z_x64_en-US.msi` + `.sig`
 
 8. **创建 GitHub Release 并上传全部资产**
    ```bash
@@ -124,10 +124,10 @@
    gh release create vx.y.z --title "vx.y.z" --notes "..."
    # 上传全部文件（exe + sig + msi + sig + latest.json）
    gh release upload vx.y.z \
-     ./src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe \
-     ./src-tauri/target/release/bundle/nsis/jdnotes_x.y.z_x64-setup.exe.sig \
-     ./src-tauri/target/release/bundle/msi/jdnotes_x.y.z_x64_en-US.msi \
-     ./src-tauri/target/release/bundle/msi/jdnotes_x.y.z_x64_en-US.msi.sig \
+     ./src-tauri/target/release/bundle/nsis/Lapis_x.y.z_x64-setup.exe \
+     ./src-tauri/target/release/bundle/nsis/Lapis_x.y.z_x64-setup.exe.sig \
+     ./src-tauri/target/release/bundle/msi/Lapis_x.y.z_x64_en-US.msi \
+     ./src-tauri/target/release/bundle/msi/Lapis_x.y.z_x64_en-US.msi.sig \
      ./latest.json
    ```
    其中 `latest.json` 需手动创建，格式参考之前版本，包含 version、notes、pub_date、platforms（signature + url）。
