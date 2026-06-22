@@ -212,7 +212,7 @@ export function Sidebar({
                 <span>设置</span>
               </button>
               <p className="text-[10px] text-slate-300 dark:text-slate-700 text-center mt-3 italic tracking-wide">
-                Think is Water
+                Clarity, kept.
               </p>
             </>
           )}
