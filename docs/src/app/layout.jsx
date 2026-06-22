@@ -45,7 +45,7 @@ const navbar = (
   />
 )
 
-const footer = <Footer>MIT {new Date().getFullYear()} © Lapis.</Footer>
+const footer = <Footer>AGPL-3.0 {new Date().getFullYear()} © Lapis.</Footer>
 
 // JSON-LD 结构化数据
 const jsonLd = {
@@ -72,7 +72,7 @@ const jsonLd = {
         priceCurrency: 'CNY',
       },
       downloadUrl: 'https://github.com/zexadev/lapis/releases',
-      softwareVersion: '1.6.4',
+      softwareVersion: '2.0.0',
       author: {
         '@type': 'Organization',
         name: 'Zexa',

@@ -41,7 +41,7 @@ const comparisons = [
   { feature: 'MCP 集成', jd: '内置 6 个工具', obsidian: '需插件', siyuan: '不支持' },
   { feature: '数据存储', jd: '本地 SQLite', obsidian: '本地 Markdown', siyuan: '本地自定义格式' },
   { feature: '双向链接', jd: '不支持', obsidian: '支持', siyuan: '支持' },
-  { feature: '开源协议', jd: 'MIT', obsidian: '部分开源', siyuan: 'AGPL' },
+  { feature: '开源协议', jd: 'AGPL-3.0', obsidian: '部分开源', siyuan: 'AGPL' },
 ]
 
 const blogs = [
@@ -78,7 +78,7 @@ export function LandingPage() {
           <img src="https://img.shields.io/github/v/release/zexadev/lapis?style=flat-square&logo=github" alt="Release" />
           <img src="https://img.shields.io/github/downloads/zexadev/lapis/total?style=flat-square&logo=github" alt="Downloads" />
           <img src="https://img.shields.io/github/stars/zexadev/lapis?style=flat-square&logo=github" alt="Stars" />
-          <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+          <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License" />
         </div>
       </section>
 
@@ -157,7 +157,7 @@ export function LandingPage() {
           </a>
         </div>
         <p className="landing-cta-footer">
-          支持 Windows 10/11 (64位) · MIT License · <a href="https://zexa.cc">Zexa</a> 出品
+          支持 Windows 10/11 (64位) · AGPL-3.0 · <a href="https://zexa.cc">Zexa</a> 出品
         </p>
       </section>
     </div>
