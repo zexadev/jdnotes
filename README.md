@@ -93,7 +93,7 @@
 
 ### 🔗 MCP Server 集成
 
-- **内置 HTTP MCP Server** — JDNotes 启动时自动提供服务（`127.0.0.1:19230`）
+- **内置 HTTP MCP Server** — Lapis 启动时自动提供服务（`127.0.0.1:19230`）
 - **自动注册** — 启动时自动注册到 Claude Code、Cursor、Windsurf 等 9 个 AI 工具
 - **6 个工具** — 读取（`get_note`、`search_notes`、`list_notes`）+ 写入（`create_note`、`append_note`、`update_note`）
 - **Agent Skill 自动安装** — 启动时自动安装 Agent Skill 到 Claude Code、Copilot、Gemini CLI，AI 工具自动获知使用方法
@@ -143,8 +143,8 @@
 
 | 文件 | 说明 |
 |------|------|
-| `jdnotes_x.x.x_x64-setup.exe` | Windows 安装包（推荐） |
-| `jdnotes_x.x.x_x64_en-US.msi` | Windows MSI 安装包 |
+| `Lapis_x.x.x_x64-setup.exe` | Windows 安装包（推荐） |
+| `Lapis_x.x.x_x64_en-US.msi` | Windows MSI 安装包 |
 
 **系统要求：** Windows 10/11 (64位)
 
@@ -166,7 +166,7 @@
 
 ### 使用 MCP Server
 
-JDNotes 启动时自动在 `127.0.0.1:19230` 提供 MCP Server，并自动注册到 Claude Code。在 Claude Code 中可以直接说"把这段内容保存到笔记"。
+Lapis 启动时自动在 `127.0.0.1:19230` 提供 MCP Server，并自动注册到 Claude Code。在 Claude Code 中可以直接说"把这段内容保存到笔记"。
 
 手动注册：
 ```bash
@@ -265,7 +265,7 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 
 <details>
 <summary><strong>Q: MCP Server 怎么用？</strong></summary>
-<p>启动 JDNotes 后会自动在本地提供 MCP Server 并注册到 Claude Code。在 Claude Code 中直接说"保存到笔记"即可使用。</p>
+<p>启动 Lapis 后会自动在本地提供 MCP Server 并注册到 Claude Code。在 Claude Code 中直接说"保存到笔记"即可使用。</p>
 </details>
 
 ---

@@ -122,8 +122,8 @@ Download the latest version from [Releases](https://github.com/zexadev/lapis/rel
 
 | File | Description |
 |------|-------------|
-| `jdnotes_x.x.x_x64-setup.exe` | Windows Installer (recommended) |
-| `jdnotes_x.x.x_x64_en-US.msi` | Windows MSI Installer |
+| `Lapis_x.x.x_x64-setup.exe` | Windows Installer (recommended) |
+| `Lapis_x.x.x_x64_en-US.msi` | Windows MSI Installer |
 
 **Requirements:** Windows 10/11 (64-bit)
 
