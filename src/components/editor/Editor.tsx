@@ -66,6 +66,8 @@ export function Editor({
   onEditorReady,
 }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
+  // 在 editorProps.handlePaste 等回调中访问编辑器实例（定义早于 editor 变量）
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
 
   // 使用 ref 存储最新的 content，避免闭包问题
   const contentRef = useRef(content)
@@ -178,8 +180,53 @@ export function Editor({
           return false
         },
       },
+      // 粘贴多张图片：一次性按顺序插入，避免逐张 setImage 互相覆盖
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items
+        if (!items) return false
+        const imageFiles: File[] = []
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i]
+          if (item.kind === 'file' && item.type.startsWith('image/')) {
+            const file = item.getAsFile()
+            if (file) imageFiles.push(file)
+          }
+        }
+        if (imageFiles.length === 0) return false
+        event.preventDefault()
+        Promise.allSettled(
+          imageFiles.map(
+            (file) =>
+              new Promise<string>((resolve, reject) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.onerror = reject
+                reader.readAsDataURL(file)
+              })
+          )
+        ).then((settled) => {
+          // 用 allSettled：个别图片读取失败时仍插入其余的，而不是整批静默丢弃
+          const srcs = settled
+            .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+            .map((r) => r.value)
+          const failed = settled.length - srcs.length
+          if (failed > 0) console.error(`粘贴图片：${failed} 张读取失败已跳过`)
+          if (srcs.length === 0) return
+          const ed = editorRef.current
+          if (!ed) return
+          ed
+            .chain()
+            .focus()
+            .insertContent(srcs.map((src) => ({ type: 'image', attrs: { src } })))
+            .run()
+        })
+        return true
+      },
     },
   })
+
+  // 让 editorProps 回调能拿到最新的编辑器实例
+  editorRef.current = editor
 
   // 通知父组件编辑器就绪
   useEffect(() => {
@@ -300,6 +347,8 @@ export function Editor({
       }
 
       const paths = event.payload.paths
+      // 先把所有图片读成 data URL，再一次性按顺序插入，避免逐张 setImage 互相覆盖
+      const srcs: string[] = []
       for (const filePath of paths) {
         const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
         if (!imageExts.includes(ext)) continue
@@ -315,10 +364,17 @@ export function Editor({
           const base64 = btoa(
             Array.from(data).map(b => String.fromCharCode(b)).join('')
           )
-          editor.chain().focus().setImage({ src: `data:${mimeType};base64,${base64}` }).run()
+          srcs.push(`data:${mimeType};base64,${base64}`)
         } catch (err) {
           console.error('拖拽图片插入失败:', err)
         }
+      }
+      if (srcs.length > 0) {
+        editor
+          .chain()
+          .focus()
+          .insertContent(srcs.map((src) => ({ type: 'image', attrs: { src } })))
+          .run()
       }
     }).then((fn) => {
       if (cancelled) {

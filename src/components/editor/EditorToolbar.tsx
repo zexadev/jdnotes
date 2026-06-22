@@ -39,15 +39,36 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !file.type.startsWith('image/')) return
+    const files = Array.from(e.target.files ?? []).filter((f) =>
+      f.type.startsWith('image/')
+    )
+    if (files.length === 0) return
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = reader.result as string
-      editor.chain().focus().setImage({ src: base64 }).run()
-    }
-    reader.readAsDataURL(file)
+    // 读完所有图片再一次性按顺序插入，避免逐张 setImage 互相覆盖；
+    // 用 allSettled：个别图片读取失败时仍插入其余的，而不是整批静默丢弃
+    Promise.allSettled(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+      )
+    ).then((settled) => {
+      const srcs = settled
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+        .map((r) => r.value)
+      const failed = settled.length - srcs.length
+      if (failed > 0) console.error(`插入图片：${failed} 张读取失败已跳过`)
+      if (srcs.length === 0) return
+      editor
+        .chain()
+        .focus()
+        .insertContent(srcs.map((src) => ({ type: 'image', attrs: { src } })))
+        .run()
+    })
 
     // 重置 input 以便重复选同一文件
     e.target.value = ''
@@ -236,6 +257,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        multiple
         onChange={handleFileChange}
         className="hidden"
       />
