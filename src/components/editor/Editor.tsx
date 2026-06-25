@@ -127,7 +127,9 @@ export function Editor({
         allowBase64: true,
       }),
       Markdown.configure({
-        html: false,
+        // html:true —— 复杂表格(多块单元格/合并/无表头)无法转 GFM 时序列化为 HTML 保住内容，
+        // 而非 html:false 下回退成 [table] 占位符丢失内容；简单表格仍输出干净 GFM。
+        html: true,
         tightLists: true,
         transformPastedText: true,
         transformCopiedText: false,
