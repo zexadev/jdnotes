@@ -52,20 +52,18 @@ export function Sidebar({
       {/* 左上角品牌展示区：贯穿到顶、比顶栏高的独立 logo+名称块 */}
       <div
         data-tauri-drag-region
-        className={`h-[88px] flex-shrink-0 flex items-center overflow-hidden border-b border-black/[0.03] dark:border-white/[0.06] ${
-          isCollapsed ? 'justify-center px-0' : 'gap-2.5 px-5'
-        }`}
+        className="h-[88px] flex-shrink-0 flex items-center justify-center gap-3 overflow-hidden border-b border-black/[0.03] dark:border-white/[0.06]"
       >
         <img
           src="/app-icon.png"
           alt="Lapis"
-          className={`${isCollapsed ? 'h-6 w-6' : 'h-7 w-7'} rounded-lg pointer-events-none flex-shrink-0`}
+          className={`${isCollapsed ? 'h-8 w-8' : 'h-10 w-10'} rounded-lg pointer-events-none flex-shrink-0`}
           draggable={false}
         />
         {!isCollapsed && (
           <span
             data-tauri-drag-region
-            className="text-[17px] font-semibold text-slate-800 dark:text-slate-100 tracking-[-0.01em] leading-none whitespace-nowrap"
+            className="text-[22px] font-semibold text-slate-800 dark:text-slate-100 tracking-[0.08em] leading-none whitespace-nowrap"
           >
             Lapis
           </span>

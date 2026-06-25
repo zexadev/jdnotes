@@ -52,11 +52,10 @@ export function TitleBar({
     appWindow.hide()
   }
 
+  // 根节点「不」带 data-tauri-drag-region —— Tauri v2 按 closest() 判定，
+  // 整条带上会把搜索/主题/按钮都算进可拖区；改为只让中间空白区可拖。
   return (
-    <div
-      data-tauri-drag-region
-      className="h-12 flex-shrink-0 flex items-center select-none bg-[#F9FBFC] dark:bg-[#0B0D11] border-b border-black/[0.03] dark:border-white/[0.06] transition-colors duration-300"
-    >
+    <div className="h-12 flex-shrink-0 flex items-center select-none bg-[#F9FBFC] dark:bg-[#0B0D11] border-b border-black/[0.03] dark:border-white/[0.06] transition-colors duration-300">
       {/* 侧栏隐藏时，品牌回落到顶栏最左 */}
       {showBrandFallback && <BrandLockup />}
 
@@ -79,13 +78,9 @@ export function TitleBar({
         )}
       </button>
 
-      {/* 沉浸式搜索框（置顶）。
-          搜索区不带 data-tauri-drag-region，且显式拦截 mousedown，
-          确保点击聚焦 / 拖选文字不会被窗口拖拽吞掉。 */}
-      <div
-        className="flex items-center min-w-0 px-3"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+      {/* 沉浸式搜索框（置顶）。顶栏整体不可拖，仅中间空白区可拖，
+          故搜索/主题/按钮区点击都不会触发窗口拖动。 */}
+      <div className="flex items-center min-w-0 px-3">
         <div className="flex items-center gap-2 w-64 min-w-0 px-3 py-1.5 bg-black/[0.03] dark:bg-white/[0.04] border border-transparent rounded-full text-[13px] text-slate-400 focus-within:bg-white dark:focus-within:bg-white/[0.06] focus-within:border-[#5E6AD2]/40 transition-colors duration-200">
           <Search className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
           <input
