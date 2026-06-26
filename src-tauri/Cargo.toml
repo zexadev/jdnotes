@@ -45,13 +45,13 @@ reqwest = { version = "0.12", features = ["rustls-tls"] }
 scraper = "0.26.0"
 ego-tree = "0.11.0"
 # P2P 跨网同步
-iroh = "=1.0.0-rc.0"
+iroh = "1.0.0"
 # 三路文本合并（git 式 diff3）
 diffy = "0.4"
 # 图片附件：内容寻址（sha256）+ base64 编解码
 sha2 = "0.10"
 base64 = "0.22"
 # 选真实局域网网卡 IP（避开 Docker/WSL 虚拟网卡），与 iroh 共用同版本
-netdev = "0.43"
+netdev = "0.44"
 # 局域网设备自动发现：mDNS / DNS-SD 广播 + 浏览
 mdns-sd = "0.13"
