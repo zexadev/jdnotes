@@ -5,6 +5,7 @@ import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
 import { WritingStats } from '../editor/WritingStats'
+import { Backlinks } from '../editor/Backlinks'
 import { formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import { isPaired } from '../../lib/pairing'
@@ -33,6 +34,7 @@ interface MainContentProps {
   onClearReminder?: (noteId: number) => void
   allNotes?: Note[] // 笔记引用 [[ 选择器的候选
   onOpenNoteRef?: (uuid: string) => void // 点击 note:// 引用跳转
+  onOpenNote?: (id: number) => void // 反向链接面板点击跳转（按 id）
 }
 
 export function MainContent({
@@ -54,6 +56,7 @@ export function MainContent({
   onClearReminder,
   allNotes = [],
   onOpenNoteRef,
+  onOpenNote,
 }: MainContentProps) {
   const [showReminderPicker, setShowReminderPicker] = useState(false)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
@@ -504,6 +507,11 @@ export function MainContent({
             {/* 写作统计栏 */}
             {editorInstance && (
               <WritingStats editor={editorInstance} />
+            )}
+
+            {/* 反向链接：被哪些笔记引用 */}
+            {onOpenNote && (
+              <Backlinks noteUuid={activeNote?.uuid} onOpenNote={onOpenNote} />
             )}
           </motion.div>
         ) : (

@@ -650,6 +650,7 @@ function App() {
                     onClearReminder={handleClearReminder}
                     allNotes={allNotes || []}
                     onOpenNoteRef={handleOpenNoteRef}
+                    onOpenNote={handleCommandSelectNote}
                   />
 
                   {/* AI 聊天侧栏 */}
