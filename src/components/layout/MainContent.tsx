@@ -31,6 +31,8 @@ interface MainContentProps {
   onContentInserted: () => void
   onSetReminder?: (noteId: number, reminderDate: Date) => void
   onClearReminder?: (noteId: number) => void
+  allNotes?: Note[] // 笔记引用 [[ 选择器的候选
+  onOpenNoteRef?: (uuid: string) => void // 点击 note:// 引用跳转
 }
 
 export function MainContent({
@@ -50,6 +52,8 @@ export function MainContent({
   onContentInserted,
   onSetReminder,
   onClearReminder,
+  allNotes = [],
+  onOpenNoteRef,
 }: MainContentProps) {
   const [showReminderPicker, setShowReminderPicker] = useState(false)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
@@ -492,6 +496,9 @@ export function MainContent({
               contentToInsert={contentToInsert}
               onContentInserted={onContentInserted}
               onEditorReady={handleEditorReady}
+              allNotes={allNotes}
+              currentNoteId={activeNoteId}
+              onOpenNoteRef={onOpenNoteRef}
             />
 
             {/* 写作统计栏 */}

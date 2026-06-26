@@ -23,7 +23,8 @@ import { CodeBlockComponent } from './CodeBlockComponent'
 import { ResizableImage } from './ResizableImage'
 import { AIReviewToolbar } from '../ai/AIReviewToolbar'
 import { SlashCommand } from './SlashCommand'
-import { useEditorAI, useSlashCommand } from '../../hooks'
+import { NoteRefMenu, type NoteRefItem } from './NoteRefMenu'
+import { useEditorAI, useSlashCommand, useNoteRefMenu } from '../../hooks'
 import { useAutoTitle } from '../../hooks/useAutoTitle'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -49,6 +50,9 @@ interface EditorProps {
   contentToInsert?: string | null // 要插入的内容
   onContentInserted?: () => void // 插入完成后的回调
   onEditorReady?: (editor: ReturnType<typeof useEditor>) => void // 编辑器就绪回调
+  allNotes?: NoteRefItem[] // 笔记引用选择器（[[）的候选笔记
+  currentNoteId?: number | null // 当前笔记 id，引用选择器里排除自身
+  onOpenNoteRef?: (uuid: string) => void // 点击 note://<uuid> 引用时跳转
 }
 
 export function Editor({
@@ -64,8 +68,14 @@ export function Editor({
   contentToInsert,
   onContentInserted,
   onEditorReady,
+  allNotes = [],
+  currentNoteId = null,
+  onOpenNoteRef,
 }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
+  // 用 ref 持有最新的跳转回调，避免 editorProps.click 闭包拿到旧引用
+  const onOpenNoteRefRef = useRef(onOpenNoteRef)
+  onOpenNoteRefRef.current = onOpenNoteRef
   // 在 editorProps.handlePaste 等回调中访问编辑器实例（定义早于 editor 变量）
   const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
 
@@ -83,6 +93,8 @@ export function Editor({
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        // 放行 note: 协议，让笔记引用 note://<uuid> 不被链接消毒过滤；点击交给下方 click 处理
+        link: { openOnClick: false, protocols: ['note'] },
       }),
       CodeBlock.extend({
         addAttributes() {
@@ -171,13 +183,20 @@ export function Editor({
       handleDOMEvents: {
         click: (_view, event) => {
           const { target } = event
-          if (target instanceof HTMLAnchorElement && (event.ctrlKey || event.metaKey)) {
-            const href = target.getAttribute('href')
-            if (href) {
-              event.preventDefault()
-              openUrl(href)
-              return true
-            }
+          if (!(target instanceof HTMLAnchorElement)) return false
+          const href = target.getAttribute('href')
+          if (!href) return false
+          // 内部笔记引用：单击直接跳转
+          if (href.startsWith('note://')) {
+            event.preventDefault()
+            onOpenNoteRefRef.current?.(href.slice('note://'.length))
+            return true
+          }
+          // 外部链接：Ctrl/⌘ + 单击用系统浏览器打开
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault()
+            openUrl(href)
+            return true
           }
           return false
         },
@@ -272,6 +291,13 @@ export function Editor({
     editorContainerRef,
     onAIAction: handleSlashAction,
     diffStateActive: diffState.isActive,
+  })
+
+  // 笔记引用菜单（输入 [[ 触发）
+  const { noteRefMenuPos, noteRefQuery, closeNoteRefMenu, insertNoteRef } = useNoteRefMenu({
+    editor,
+    editorContainerRef,
+    enabled: !diffState.isActive,
   })
 
   // Ctrl+K 内联提问
@@ -529,6 +555,18 @@ export function Editor({
               position={slashMenuPos}
               onSelect={(item) => item.action(editor)}
               onClose={closeSlashMenu}
+            />
+          )}
+
+          {/* 笔记引用菜单（[[ 触发） */}
+          {noteRefMenuPos && (
+            <NoteRefMenu
+              notes={allNotes}
+              query={noteRefQuery}
+              currentNoteId={currentNoteId}
+              position={noteRefMenuPos}
+              onSelect={(note) => insertNoteRef(note.uuid!, note.title)}
+              onClose={closeNoteRefMenu}
             />
           )}
 

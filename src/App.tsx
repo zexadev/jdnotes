@@ -475,6 +475,16 @@ function App() {
     }
   }
 
+  // 点击笔记内 note://<uuid> 引用：按 uuid 在全量笔记里定位并跳转
+  const handleOpenNoteRef = useCallback((uuid: string) => {
+    const note = allNotes?.find((n) => n.uuid === uuid)
+    if (note) {
+      handleSelectNote(note)
+    } else {
+      toast.info('引用的笔记不存在或尚未同步到本设备')
+    }
+  }, [allNotes, handleSelectNote])
+
   // 启动加载状态
   if (!isReady) {
     return (
@@ -638,6 +648,8 @@ function App() {
                     onContentInserted={handleContentInserted}
                     onSetReminder={handleSetReminder}
                     onClearReminder={handleClearReminder}
+                    allNotes={allNotes || []}
+                    onOpenNoteRef={handleOpenNoteRef}
                   />
 
                   {/* AI 聊天侧栏 */}

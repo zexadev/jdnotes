@@ -1266,3 +1266,29 @@ body {
 .sidebar-transition {
   transition: width 0.2s ease, padding 0.2s ease, opacity 0.15s ease;
 }
+
+/* ===== 笔记引用 note://<uuid>：编辑器内呈现为可点击 chip，区别于外部链接 ===== */
+.prose a[href^="note://"] {
+  color: #5E6AD2;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  border-radius: 0.3em;
+  padding: 0.05em 0.3em;
+  background: rgba(94, 106, 210, 0.1);
+  transition: background 0.15s ease;
+}
+.prose a[href^="note://"]::before {
+  content: '🔗';
+  font-size: 0.78em;
+  margin-right: 0.2em;
+  opacity: 0.65;
+}
+.prose a[href^="note://"]:hover {
+  background: rgba(94, 106, 210, 0.2);
+  text-decoration: none;
+}
+.dark .prose a[href^="note://"] {
+  color: #9aa2f0;
+  background: rgba(124, 131, 224, 0.16);
+}

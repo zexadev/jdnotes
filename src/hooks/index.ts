@@ -7,6 +7,7 @@ export { useChat } from './useChat'
 export { useNotes } from './useNotes'
 export { useEditorAI } from './useEditorAI'
 export { useSlashCommand } from './useSlashCommand'
+export { useNoteRefMenu } from './useNoteRefMenu'
 export {
   useCalendar,
   getWeekNumber,
