@@ -75,6 +75,23 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [addingDevice, setAddingDevice] = useState(false)
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null)
   const [deviceStatus, setDeviceStatus] = useState<Record<string, 'checking' | 'online' | 'offline'>>({})
+  // 每台设备「上次同步」的连接方式（direct/relay），持久化后显示在设备卡上。
+  // 取自实际同步（连接已稳定）而非 probe（probe 太快通常还在 relay 阶段，会误报中转）。
+  const [connTypes, setConnTypes] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('jdnotes_conn_types') || '{}')
+    } catch {
+      return {}
+    }
+  })
+  const recordConnType = (id: string, t?: string | null) => {
+    if (t !== 'direct' && t !== 'relay') return
+    setConnTypes((prev) => {
+      const next = { ...prev, [id]: t }
+      localStorage.setItem('jdnotes_conn_types', JSON.stringify(next))
+      return next
+    })
+  }
 
   // 局域网
   const [peerAddress, setPeerAddress] = useState('')
@@ -200,6 +217,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       await setBackendKind(device.id.slice(0, 16), true)
       const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
       toastSyncResult(`「${device.name}」`, stats)
+      recordConnType(device.id, stats.conn_type)
       onDataChange?.()
       markSynced()
     } catch (e) {
@@ -216,6 +234,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       await setBackendKind(device.id.slice(0, 16), true)
       const stats = await invoke<SyncStats>('sync_iroh_connect', { peerId: device.id })
       toastSyncResult(`「${device.name}」`, stats)
+      recordConnType(device.id, stats.conn_type)
       onDataChange?.()
       markSynced()
     } catch (e) {
@@ -413,7 +432,13 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                       }`}
                       title={deviceStatus[d.id] === 'online' ? '在线' : deviceStatus[d.id] === 'checking' ? '检测中' : '离线'}
                     />
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{d.name}</div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate min-w-0">{d.name}</div>
+                    {connTypes[d.id] === 'direct' && (
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-green-600 dark:text-green-400 bg-green-500/10" title="上次同步：NAT 打洞直连 P2P">⚡ 直连</span>
+                    )}
+                    {connTypes[d.id] === 'relay' && (
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10" title="上次同步：经 relay 中转">🔁 中转</span>
+                    )}
                   </div>
                   <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate pl-3.5">{d.id.slice(0, 20)}…</div>
                 </div>
