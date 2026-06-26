@@ -436,11 +436,19 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                       title={deviceStatus[d.id] === 'online' ? '在线' : deviceStatus[d.id] === 'checking' ? '检测中' : '离线'}
                     />
                     <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate min-w-0">{d.name}</div>
-                    {connTypes[d.id] === 'direct' && (
-                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-green-600 dark:text-green-400 bg-green-500/10" title="当前为 NAT 打洞直连 P2P（进页面实时探测）">⚡ 直连</span>
-                    )}
-                    {connTypes[d.id] === 'relay' && (
-                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10" title="当前经 relay 中转（进页面实时探测；若刚连上可能仍在打洞，稍候自动转直连）">🔁 中转</span>
+                    {deviceStatus[d.id] === 'checking' && !connTypes[d.id] ? (
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-gray-400 dark:text-gray-500 bg-gray-400/10 flex items-center gap-1" title="正在探测连接方式…">
+                        <Loader2 className="h-3 w-3 animate-spin" />检测中
+                      </span>
+                    ) : (
+                      <>
+                        {connTypes[d.id] === 'direct' && (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-green-600 dark:text-green-400 bg-green-500/10" title="当前为 NAT 打洞直连 P2P（进页面实时探测）">⚡ 直连</span>
+                        )}
+                        {connTypes[d.id] === 'relay' && (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10" title="当前经 relay 中转（进页面实时探测；若刚连上可能仍在打洞，稍候自动转直连）">🔁 中转</span>
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate pl-3.5">{d.id.slice(0, 20)}…</div>

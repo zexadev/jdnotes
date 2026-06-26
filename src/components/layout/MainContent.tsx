@@ -70,6 +70,8 @@ export function MainContent({
       return {}
     }
   })
+  // 正在 probe 探测连接方式的设备（显示「检测中」加载动画）
+  const [probingConn, setProbingConn] = useState<Record<string, boolean>>({})
   // mDNS 发现的同网段设备（打开 popover 时拉一次，和「设置 → 选笔记」一致）
   const [discovered, setDiscovered] = useState<{ address: string; device_name: string; fingerprint?: string }[]>([])
   const [discovering, setDiscovering] = useState(false)
@@ -115,6 +117,7 @@ export function MainContent({
       }
       setDevices(devs)
       // 实时探测每台设备的连接方式（直连/中转），刷新到 connTypes（带 ~1.5s 打洞窗口）
+      setProbingConn(Object.fromEntries(devs.map((d) => [d.id, true])))
       devs.forEach((d) => {
         invoke<{ device_name: string; conn_type?: string | null }>('sync_iroh_probe', { peerId: d.id })
           .then((r) => {
@@ -127,6 +130,7 @@ export function MainContent({
             }
           })
           .catch(() => {})
+          .finally(() => setProbingConn((prev) => ({ ...prev, [d.id]: false })))
       })
       // 局域网自动发现同网段设备（与「设置 → 选笔记」一致，约 1.5s 返回）
       setDiscovering(true)
@@ -373,11 +377,19 @@ export function MainContent({
                                 <MonitorSmartphone className="h-3.5 w-3.5 text-[#5E6AD2]" />
                               </div>
                               <span className="flex-1 truncate">{d.name}</span>
-                              {connTypes[d.id] === 'direct' && (
-                                <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400">⚡ 直连</span>
-                              )}
-                              {connTypes[d.id] === 'relay' && (
-                                <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-400">🔁 中转</span>
+                              {probingConn[d.id] && !connTypes[d.id] ? (
+                                <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                                  <Loader2 className="h-3 w-3 animate-spin" />检测中
+                                </span>
+                              ) : (
+                                <>
+                                  {connTypes[d.id] === 'direct' && (
+                                    <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400">⚡ 直连</span>
+                                  )}
+                                  {connTypes[d.id] === 'relay' && (
+                                    <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-400">🔁 中转</span>
+                                  )}
+                                </>
                               )}
                               {pushingDeviceId === d.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5E6AD2]" />}
                             </button>
