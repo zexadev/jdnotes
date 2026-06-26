@@ -1,17 +1,23 @@
 /* ===== Landing Page Styles ===== */
 
 .landing {
-  --accent: #5E6AD2;
-  --accent-light: #7C83E0;
-  --accent-glow: rgba(94, 106, 210, 0.4);
+  --accent: #0E327F;
+  --accent-light: #2E5BC0;
+  --accent-glow: rgba(46, 91, 192, 0.4);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 /* ===== Hero ===== */
 .landing-hero {
   position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--nextra-navbar-height) - 4rem);
   text-align: center;
-  padding: 5rem 1.5rem 3rem;
+  padding: 1rem 1.5rem 3rem;
   overflow: hidden;
 }
 
@@ -32,30 +38,22 @@
   50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
 }
 
-/* 品牌块：logo + 标题，作为巨型 2.0 水印的定位锚 */
-.landing-hero-brand {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* 巨型 2.0 背景水印：flex 居中坐在 logo+标题后面，对称溢出、绝对水平居中 */
+/* 巨型 2.0 背景：充满整个 hero，置于所有内容之下（isolation 隔离 + z-index:-1） */
 .landing-hero-bignum {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(11rem, 30vw, 26rem);
+  font-size: min(46vw, 72vh);
   font-weight: 900;
   letter-spacing: -0.05em;
   line-height: 1;
   white-space: nowrap;
   user-select: none;
   pointer-events: none;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #5B8DEF 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -63,20 +61,6 @@
 }
 :is(html[class~="dark"]) .landing-hero-bignum {
   opacity: 0.12;
-}
-.landing-hero-brand > .landing-hero-logo,
-.landing-hero-brand > .landing-hero-title {
-  position: relative;
-  z-index: 1;
-}
-
-/* hero 内容抬到光晕之上 */
-.landing-hero > * {
-  position: relative;
-  z-index: 1;
-}
-.landing-hero-glow {
-  z-index: 0;
 }
 
 /* 2.0 公告徽标(指向更新日志) */
@@ -88,8 +72,8 @@
   margin-bottom: 1.5rem;
   padding: 0.35rem 0.95rem;
   border-radius: 999px;
-  background: rgba(94, 106, 210, 0.1);
-  border: 1px solid rgba(94, 106, 210, 0.25);
+  background: rgba(46, 91, 192, 0.1);
+  border: 1px solid rgba(46, 91, 192, 0.25);
   color: var(--accent);
   font-size: 0.85rem;
   font-weight: 600;
@@ -97,7 +81,7 @@
   transition: background 0.2s ease, transform 0.2s ease;
 }
 .landing-hero-announce:hover {
-  background: rgba(94, 106, 210, 0.16);
+  background: rgba(46, 91, 192, 0.16);
   transform: translateY(-1px);
 }
 
@@ -119,7 +103,7 @@
   letter-spacing: -0.03em;
   line-height: 1.1;
   margin: 0;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #5B8DEF 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -307,12 +291,12 @@
 }
 
 .landing-table-highlight {
-  background: rgba(94, 106, 210, 0.06);
+  background: rgba(46, 91, 192, 0.06);
   font-weight: 500;
 }
 
 :is(html[class~="dark"]) .landing-table-highlight {
-  background: rgba(94, 106, 210, 0.1);
+  background: rgba(46, 91, 192, 0.1);
 }
 
 .landing-table tbody tr {
@@ -351,7 +335,7 @@
 .landing-blog-card:hover {
   border-color: var(--accent);
   transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(94, 106, 210, 0.08);
+  box-shadow: 0 4px 12px rgba(46, 91, 192, 0.08);
 }
 
 .landing-blog-arrow {

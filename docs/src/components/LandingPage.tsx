@@ -65,12 +65,10 @@ export function LandingPage() {
       {/* Hero */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
+        <span className="landing-hero-bignum" aria-hidden="true">2.0</span>
         <a href="/changelog" className="landing-hero-announce">✨ 全新 2.0 · 多设备同步首发 →</a>
-        <div className="landing-hero-brand">
-          <span className="landing-hero-bignum" aria-hidden="true">2.0</span>
-          <img src="/app-icon.png" alt="Lapis" width={88} height={88} className="landing-hero-logo" />
-          <h1 className="landing-hero-title">Lapis</h1>
-        </div>
+        <img src="/app-icon.png" alt="Lapis" width={88} height={88} className="landing-hero-logo" />
+        <h1 className="landing-hero-title">Lapis</h1>
         <p className="landing-hero-subtitle">
           免费开源的本地笔记应用<br />
           多设备同步 · 内置 AI 助手 · 数据离线、隐私安全
@@ -101,7 +99,7 @@ export function LandingPage() {
             <MagicCard
               key={f.title}
               className="landing-magic-card"
-              gradientColor="rgba(94, 106, 210, 0.15)"
+              gradientColor="rgba(46, 91, 192, 0.15)"
             >
               <div className="landing-card-inner">
                 <div className="landing-card-icon">{f.icon}</div>
