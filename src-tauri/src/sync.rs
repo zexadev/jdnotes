@@ -931,8 +931,15 @@ pub async fn iroh_get_id(app: AppHandle, db_path: String) -> Result<String, Stri
     Ok(ep.id().to_string())
 }
 
-/// 向对端 probe：验证连通性并取回对端的设备名（不传输笔记，用于"添加设备"）
-pub async fn iroh_probe(app: AppHandle, db_path: &str, peer_id: &str) -> Result<String, String> {
+/// probe 结果：对端设备名 + 当前连接方式（direct=NAT 打洞直连 / relay=经中转 / None=未知）
+#[derive(Debug, Serialize)]
+pub struct ProbeResult {
+    pub device_name: String,
+    pub conn_type: Option<String>,
+}
+
+/// 向对端 probe：验证连通性、取回对端设备名 + 当前连接方式（用于"添加设备" + 设备列表实时显示直连/中转）
+pub async fn iroh_probe(app: AppHandle, db_path: &str, peer_id: &str) -> Result<ProbeResult, String> {
     let peer: EndpointId = peer_id
         .trim()
         .parse()
@@ -949,8 +956,18 @@ pub async fn iroh_probe(app: AppHandle, db_path: &str, peer_id: &str) -> Result<
         .read_to_end(MAX_MSG as usize)
         .await
         .map_err(|e| e.to_string())?;
+    let device_name =
+        String::from_utf8(resp).map_err(|e| format!("解析对端设备名失败: {}", e))?;
+    // 连接刚建立通常还在 relay 路径；给 NAT 打洞 ~1.5s 把路径升级到直连，
+    // 期间轮询选中路径，升到直连即提前结束，否则报当前（通常 relay）。
+    let mut conn_type = iroh_conn_type(&conn);
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(1500);
+    while conn_type.as_deref() != Some("direct") && tokio::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        conn_type = iroh_conn_type(&conn);
+    }
     conn.close(0u8.into(), b"done");
-    String::from_utf8(resp).map_err(|e| format!("解析对端设备名失败: {}", e))
+    Ok(ProbeResult { device_name, conn_type })
 }
 
 /// 主动推送单条笔记给对端（仍走双向 sync 协议：发自己这一条 + 收对端的全部并 merge）

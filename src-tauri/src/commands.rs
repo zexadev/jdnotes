@@ -304,7 +304,7 @@ pub async fn sync_iroh_connect(
 
 /// probe 对端：验证连通并取回对端设备名（"添加设备"时用，不传输笔记）
 #[tauri::command]
-pub async fn sync_iroh_probe(app: tauri::AppHandle, peer_id: String) -> Result<String, String> {
+pub async fn sync_iroh_probe(app: tauri::AppHandle, peer_id: String) -> Result<sync::ProbeResult, String> {
     let db_path = db::get_database_path(&app)?.to_string_lossy().to_string();
     sync::iroh_probe(app.clone(), &db_path, &peer_id).await
 }

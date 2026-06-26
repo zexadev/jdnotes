@@ -130,11 +130,12 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const checkDevice = async (id: string) => {
     setDeviceStatus((s) => ({ ...s, [id]: 'checking' }))
     try {
-      await Promise.race([
-        invoke('sync_iroh_probe', { peerId: id }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      const res = await Promise.race([
+        invoke<{ device_name: string; conn_type?: string | null }>('sync_iroh_probe', { peerId: id }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
       ])
       setDeviceStatus((s) => ({ ...s, [id]: 'online' }))
+      recordConnType(id, res.conn_type)
     } catch {
       setDeviceStatus((s) => ({ ...s, [id]: 'offline' }))
     }
@@ -187,9 +188,10 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     }
     setAddingDevice(true)
     try {
-      const name = await invoke<string>('sync_iroh_probe', { peerId: id })
-      const finalName = name.trim() || '未命名设备'
+      const res = await invoke<{ device_name: string; conn_type?: string | null }>('sync_iroh_probe', { peerId: id })
+      const finalName = res.device_name.trim() || '未命名设备'
       persistDevices([...devices, { id, name: finalName, kind: newDeviceKind }])
+      recordConnType(id, res.conn_type)
       setNewDeviceId('')
       toast.success(`已连接并添加设备「${finalName}」`)
     } catch (e) {

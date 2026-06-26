@@ -62,6 +62,14 @@ export function MainContent({
   const pushPopupRef = useRef<HTMLDivElement>(null)
   const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null)
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([])
+  // 每台设备的连接方式（direct/relay）：localStorage 即时显示 + 打开 popover 时 probe 实时刷新
+  const [connTypes, setConnTypes] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('jdnotes_conn_types') || '{}')
+    } catch {
+      return {}
+    }
+  })
   // mDNS 发现的同网段设备（打开 popover 时拉一次，和「设置 → 选笔记」一致）
   const [discovered, setDiscovered] = useState<{ address: string; device_name: string; fingerprint?: string }[]>([])
   const [discovering, setDiscovering] = useState(false)
@@ -99,11 +107,27 @@ export function MainContent({
   // 单条同步 popover：打开时刷新设备列表 + 点击外部关闭
   useEffect(() => {
     if (showPushPicker) {
+      let devs: { id: string; name: string }[] = []
       try {
-        setDevices(JSON.parse(localStorage.getItem('jdnotes_sync_devices') || '[]'))
+        devs = JSON.parse(localStorage.getItem('jdnotes_sync_devices') || '[]')
       } catch {
-        setDevices([])
+        devs = []
       }
+      setDevices(devs)
+      // 实时探测每台设备的连接方式（直连/中转），刷新到 connTypes（带 ~1.5s 打洞窗口）
+      devs.forEach((d) => {
+        invoke<{ device_name: string; conn_type?: string | null }>('sync_iroh_probe', { peerId: d.id })
+          .then((r) => {
+            if (r.conn_type === 'direct' || r.conn_type === 'relay') {
+              setConnTypes((prev) => {
+                const next = { ...prev, [d.id]: r.conn_type as string }
+                localStorage.setItem('jdnotes_conn_types', JSON.stringify(next))
+                return next
+              })
+            }
+          })
+          .catch(() => {})
+      })
       // 局域网自动发现同网段设备（与「设置 → 选笔记」一致，约 1.5s 返回）
       setDiscovering(true)
       invoke<{ address: string; device_name: string; fingerprint?: string }[]>('sync_lan_discover')
@@ -349,6 +373,12 @@ export function MainContent({
                                 <MonitorSmartphone className="h-3.5 w-3.5 text-[#5E6AD2]" />
                               </div>
                               <span className="flex-1 truncate">{d.name}</span>
+                              {connTypes[d.id] === 'direct' && (
+                                <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400">⚡ 直连</span>
+                              )}
+                              {connTypes[d.id] === 'relay' && (
+                                <span className="shrink-0 text-[10px] text-amber-600 dark:text-amber-400">🔁 中转</span>
+                              )}
                               {pushingDeviceId === d.id && <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5E6AD2]" />}
                             </button>
                           ))}
