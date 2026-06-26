@@ -75,8 +75,9 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
   const [addingDevice, setAddingDevice] = useState(false)
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null)
   const [deviceStatus, setDeviceStatus] = useState<Record<string, 'checking' | 'online' | 'offline'>>({})
-  // 每台设备「上次同步」的连接方式（direct/relay），持久化后显示在设备卡上。
-  // 取自实际同步（连接已稳定）而非 probe（probe 太快通常还在 relay 阶段，会误报中转）。
+  // 每台设备「当前」的连接方式（direct/relay），显示在设备卡上。
+  // 进页面 / 添加 / 同步时实时 probe 刷新（probe 内置 ~1.5s 打洞窗口，等直连稳定再返回）；
+  // localStorage 仅作下次打开的即时回显，随后立即被新 probe 覆盖。
   const [connTypes, setConnTypes] = useState<Record<string, string>>(() => {
     try {
       return JSON.parse(localStorage.getItem('jdnotes_conn_types') || '{}')
@@ -436,10 +437,10 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                     />
                     <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate min-w-0">{d.name}</div>
                     {connTypes[d.id] === 'direct' && (
-                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-green-600 dark:text-green-400 bg-green-500/10" title="上次同步：NAT 打洞直连 P2P">⚡ 直连</span>
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-green-600 dark:text-green-400 bg-green-500/10" title="当前为 NAT 打洞直连 P2P（进页面实时探测）">⚡ 直连</span>
                     )}
                     {connTypes[d.id] === 'relay' && (
-                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10" title="上次同步：经 relay 中转">🔁 中转</span>
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10" title="当前经 relay 中转（进页面实时探测；若刚连上可能仍在打洞，稍候自动转直连）">🔁 中转</span>
                     )}
                   </div>
                   <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500 truncate pl-3.5">{d.id.slice(0, 20)}…</div>
