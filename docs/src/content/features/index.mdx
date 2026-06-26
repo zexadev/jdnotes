@@ -21,6 +21,13 @@ keywords:
 - 标题、列表、代码块、引用等
 - 斜杠命令快速插入内容
 
+## 笔记引用与双向链接
+
+- 输入 `[[` 弹出笔记选择框，选中即插入引用
+- 单击引用直接跳转到目标笔记
+- 被引用的笔记底部自动显示「被以下笔记引用」反向链接
+- 引用基于稳定 ID，跨设备同步、导入导出后依然有效
+
 ## AI 辅助
 
 - 多模型支持：OpenAI 兼容、Anthropic Claude、Google Gemini、Ollama
@@ -29,6 +36,8 @@ keywords:
 - AI 对话：右侧聊天面板，结合笔记上下文对话
 
 ## MCP Server 集成
+
+让 AI agent 直接在你的本地笔记库**写入**（创建 / 追加 / 修改），而不只是只读问答 —— 这是 Lapis 区别于多数本地笔记工具的地方。
 
 - 内置 HTTP MCP Server，启动时自动运行
 - 自动注册到 Claude Code、Cursor、Windsurf 等 9 个 AI 工具

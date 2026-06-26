@@ -9,6 +9,16 @@ const features = [
     desc: '局域网 mDNS 自动发现 + 跨网 P2P 加密直连，各设备各持全量副本、三路合并冲突保留双份。不依赖任何中心服务器，笔记永远在你手里。',
   },
   {
+    icon: '🔌',
+    title: 'AI Agent 直接写入笔记',
+    desc: '内置 MCP Server，启动自动注册到 Claude Code、Cursor 等 9 个 AI 工具。让 AI agent 直接在你的本地笔记库里查看、搜索、创建、追加笔记——不只是只读问答。',
+  },
+  {
+    icon: '🔗',
+    title: '双向链接',
+    desc: '输入 [[ 引用其它笔记，单击跳转；被引用的笔记自动显示反向链接。引用基于稳定 ID，跨设备同步后依然有效。',
+  },
+  {
     icon: '🔒',
     title: '本地优先，隐私安全',
     desc: '所有数据存储在本地 SQLite 数据库，不经过云端服务器。断网可用，数据完全由你掌控。',
@@ -29,11 +39,6 @@ const features = [
     desc: '基于 TipTap 的所见即所得编辑器，支持 Markdown 快捷输入、代码高亮、表格、待办列表、图片拖拽。',
   },
   {
-    icon: '🔗',
-    title: 'MCP + Agent Skill',
-    desc: '内置 MCP Server，自动注册到 Claude Code、Cursor 等 9 个 AI 工具。AI 可直接查看、搜索、创建笔记。',
-  },
-  {
     icon: '📅',
     title: '日历与提醒',
     desc: '月/周/日三种日历视图，为笔记设置提醒，到期系统通知，不错过任何重要事项。',
@@ -46,7 +51,7 @@ const comparisons = [
   { feature: 'AI 集成', jd: '内置多模型支持', obsidian: '需插件', siyuan: '需订阅' },
   { feature: 'MCP 集成', jd: '内置 6 个工具', obsidian: '需插件', siyuan: '不支持' },
   { feature: '数据存储', jd: '本地 SQLite', obsidian: '本地 Markdown', siyuan: '本地自定义格式' },
-  { feature: '双向链接', jd: '不支持', obsidian: '支持', siyuan: '支持' },
+  { feature: '双向链接', jd: '支持（含反向链接）', obsidian: '支持', siyuan: '支持' },
   { feature: '开源协议', jd: 'AGPL-3.0', obsidian: '部分开源', siyuan: 'AGPL' },
 ]
 
