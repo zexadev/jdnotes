@@ -32,6 +32,53 @@
   50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
 }
 
+/* 品牌块：logo + 标题，作为巨型 2.0 水印的定位锚 */
+.landing-hero-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 巨型 2.0 背景水印：flex 居中坐在 logo+标题后面，对称溢出、绝对水平居中 */
+.landing-hero-bignum {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(11rem, 30vw, 26rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  opacity: 0.07;
+}
+:is(html[class~="dark"]) .landing-hero-bignum {
+  opacity: 0.12;
+}
+.landing-hero-brand > .landing-hero-logo,
+.landing-hero-brand > .landing-hero-title {
+  position: relative;
+  z-index: 1;
+}
+
+/* hero 内容抬到光晕之上 */
+.landing-hero > * {
+  position: relative;
+  z-index: 1;
+}
+.landing-hero-glow {
+  z-index: 0;
+}
+
 /* 2.0 公告徽标(指向更新日志) */
 .landing-hero-announce {
   position: relative;
