@@ -4,6 +4,11 @@ import { MagicCard } from './magic-card'
 
 const features = [
   {
+    icon: '🔄',
+    title: '多设备同步',
+    desc: '局域网 mDNS 自动发现 + 跨网 P2P 加密直连，各设备各持全量副本、三路合并冲突保留双份。不依赖任何中心服务器，笔记永远在你手里。',
+  },
+  {
     icon: '🔒',
     title: '本地优先，隐私安全',
     desc: '所有数据存储在本地 SQLite 数据库，不经过云端服务器。断网可用，数据完全由你掌控。',
@@ -37,6 +42,7 @@ const features = [
 
 const comparisons = [
   { feature: '安装包大小', jd: '8MB', obsidian: '~90MB', siyuan: '~120MB' },
+  { feature: '多设备同步', jd: '免费 P2P（局域网 + 跨网）', obsidian: '官方付费 / 第三方', siyuan: '云端订阅 / 自建' },
   { feature: 'AI 集成', jd: '内置多模型支持', obsidian: '需插件', siyuan: '需订阅' },
   { feature: 'MCP 集成', jd: '内置 6 个工具', obsidian: '需插件', siyuan: '不支持' },
   { feature: '数据存储', jd: '本地 SQLite', obsidian: '本地 Markdown', siyuan: '本地自定义格式' },
@@ -59,11 +65,12 @@ export function LandingPage() {
       {/* Hero */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
+        <a href="/changelog" className="landing-hero-announce">✨ 全新 2.0 · 多设备同步首发 →</a>
         <img src="/app-icon.png" alt="Lapis" width={88} height={88} className="landing-hero-logo" />
         <h1 className="landing-hero-title">Lapis</h1>
         <p className="landing-hero-subtitle">
           免费开源的本地笔记应用<br />
-          内置 AI 写作助手，数据完全离线，隐私安全
+          多设备同步 · 内置 AI 助手 · 数据离线、隐私安全
         </p>
         <div className="landing-hero-buttons">
           <a href="https://github.com/zexadev/lapis/releases" className="landing-btn-primary">

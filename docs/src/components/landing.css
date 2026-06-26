@@ -32,6 +32,28 @@
   50% { opacity: 0.8; transform: translateX(-50%) scale(1.1); }
 }
 
+/* 2.0 公告徽标(指向更新日志) */
+.landing-hero-announce {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  padding: 0.35rem 0.95rem;
+  border-radius: 999px;
+  background: rgba(94, 106, 210, 0.1);
+  border: 1px solid rgba(94, 106, 210, 0.25);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.landing-hero-announce:hover {
+  background: rgba(94, 106, 210, 0.16);
+  transform: translateY(-1px);
+}
+
 .landing-hero-logo {
   border-radius: 1.5rem;
   margin-bottom: 1.5rem;
