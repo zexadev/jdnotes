@@ -115,7 +115,7 @@
 - always-on 节点：headless Rust daemon（同步引擎去 UI 编译），部署到用户自己的 VPS/NAS，解决"两端从不同时在线"。
 - 自配存储 transport：WebDAV / S3 / 对象存储作为另一种"管道"实现。
 - **自动同步**（在线状态已完成，此项待做）：检测到已配对设备在线就自动后台双向同步（默认关、用户开启 + 可定频率）。
-- **连接类型标识（直连/中转）：调研后 defer 到 iroh 1.0 stable**。不必换库——iroh 自己的 `Connection::paths()` + `TransportAddr` 的 `Ip`/`Relay` 变体理论上够；但 rc 版要从 paths 快照遍历找 active 路径、且连接瞬时（同步完即 close）捕获时机绕，纯展示功能性价比低。stable 后 API 更顺再做；现阶段看日志可辨直连/中转。
+- **连接类型标识（直连/中转）✅ 已完成（iroh 1.0 stable）**：升级 iroh 1.0.0 后用 `conn.paths().iter().find(|p| p.is_selected())` 取选中路径，`remote_addr().is_ip()` 为 true=直连、否则=中转（`iroh_conn_type()`，在 `conn.close()` 前取）。塞进 `SyncStats.conn_type`（`iroh_sync_connect`/`iroh_push_note`/`iroh_push_notes`），前端同步结果 toast 显示「⚡ P2P 直连 / 🔁 经中转」。局域网/import 路径 `conn_type=None` 不显示。
 
 ### 决策记录（避免重复纠结）
 - **AI 对话历史：暂不纳入同步**。对话是"消息流"非"文档"，需另写消息流 union 合并 + 增量传输；价值低于笔记、体积大；多数本地笔记应用也不同步对话。需要时走「数据管理 → 导出全部数据 JSON」手动迁移（该导出已含对话消息）。

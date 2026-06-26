@@ -12,7 +12,7 @@ interface SyncSettingsProps {
   onDataChange?: () => void
 }
 
-type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number }
+type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number; conn_type?: string | null }
 
 // 已保存的跨网设备（iroh ID 持久不变，所以值得记住，避免每次重填）
 // kind：'mine' = 我的设备（可全量双向同步）；'shared' = 分享对象（只能选笔记发）。
@@ -42,6 +42,9 @@ function describeSync(stats: SyncStats): string {
   if (stats.conflicts > 0) {
     msg += `；${stats.conflicts} 处冲突已存为「冲突副本」笔记，请核对`
   }
+  // 跨网连接类型(iroh)：直连 P2P / 经 relay 中转;局域网无此字段不显示
+  if (stats.conn_type === 'direct') msg += ' · ⚡ P2P 直连'
+  else if (stats.conn_type === 'relay') msg += ' · 🔁 经中转'
   return msg
 }
 

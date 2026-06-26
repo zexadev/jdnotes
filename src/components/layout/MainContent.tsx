@@ -143,14 +143,15 @@ export function MainContent({
     if (!activeNoteId) return
     setPushingDeviceId(device.id)
     try {
-      const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number }>(
+      const stats = await invoke<{ sent: number; received: number; inserted: number; updated: number; conflicts: number; conn_type?: string | null }>(
         'sync_iroh_push_note',
         { peerId: device.id, noteId: activeNoteId }
       )
+      const conn = stats.conn_type === 'direct' ? ' · ⚡ P2P 直连' : stats.conn_type === 'relay' ? ' · 🔁 经中转' : ''
       if (stats.conflicts > 0) {
-        toast.warning(`已推送给「${device.name}」｜⚠️ 对端有 ${stats.conflicts} 处冲突需核对`, { duration: 7000 })
+        toast.warning(`已推送给「${device.name}」${conn}｜⚠️ 对端有 ${stats.conflicts} 处冲突需核对`, { duration: 7000 })
       } else {
-        toast.success(`已推送给「${device.name}」`)
+        toast.success(`已推送给「${device.name}」${conn}`)
       }
       setShowPushPicker(false)
     } catch (e) {

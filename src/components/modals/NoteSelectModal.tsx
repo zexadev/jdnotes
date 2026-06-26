@@ -19,7 +19,7 @@ interface NoteSelectModalProps {
   onSynced?: () => void
 }
 
-type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number }
+type SyncStats = { sent: number; received: number; inserted: number; updated: number; conflicts: number; conn_type?: string | null }
 
 /**
  * 选笔记同步弹窗：从所有笔记里勾选若干，一次性推到指定局域网地址。
@@ -118,8 +118,10 @@ export function NoteSelectModal({ open, onClose, deviceName, address, fingerprin
           ? `本机新增 ${stats.inserted}、更新 ${stats.updated}`
           : '本机已是最新'
       const base = `已发出 ${stats.sent} 条给「${deviceName}」；${local}`
-      const full =
+      let full =
         stats.conflicts > 0 ? `${base}；${stats.conflicts} 处冲突已存为「冲突副本」笔记，请核对` : base
+      if (stats.conn_type === 'direct') full += ' · ⚡ P2P 直连'
+      else if (stats.conn_type === 'relay') full += ' · 🔁 经中转'
       if (stats.conflicts > 0) toast.warning(full, { duration: 7000 })
       else toast.success(full, { duration: 6000 })
       onSynced?.()

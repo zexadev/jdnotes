@@ -71,6 +71,18 @@ pub struct SyncStats {
     pub inserted: usize,
     pub updated: usize,
     pub conflicts: usize,
+    /// 跨网连接类型："direct"=NAT 打洞直连 / "relay"=经 relay 中转 / None=局域网或未知
+    #[serde(default)]
+    pub conn_type: Option<String>,
+}
+
+/// 取 iroh 连接当前「选中路径」的类型：Ip=直连 / 其它(Relay)=中转。
+/// 在 conn.close() 之前调用（连接还活着、路径已选定）。
+fn iroh_conn_type(conn: &iroh::endpoint::Connection) -> Option<String> {
+    conn.paths()
+        .iter()
+        .find(|p| p.is_selected())
+        .map(|p| if p.remote_addr().is_ip() { "direct" } else { "relay" }.to_string())
 }
 
 /// 打开数据库连接池（确保 WAL + busy_timeout，与前端连接并发安全）
@@ -553,7 +565,7 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
     }
-    Ok(SyncStats { sent, received, inserted, updated, conflicts })
+    Ok(SyncStats { sent, received, inserted, updated, conflicts, conn_type: None })
 }
 
 /// 接收方：处理一个进来的同步连接（先握手认证，再收对端，后发本地，再合并）
@@ -730,7 +742,7 @@ pub async fn import_package(app: AppHandle, db_path: &str, json_data: &str) -> R
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
     }
-    Ok(SyncStats { sent: 0, received, inserted, updated, conflicts })
+    Ok(SyncStats { sent: 0, received, inserted, updated, conflicts, conn_type: None })
 }
 
 // ============= iroh 跨网 P2P 同步（阶段二） =============
@@ -1006,6 +1018,7 @@ pub async fn iroh_push_note(
     let (inserted, updated, conflicts) =
         merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
+    let conn_type = iroh_conn_type(&conn);
     conn.close(0u8.into(), b"done");
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
@@ -1016,6 +1029,7 @@ pub async fn iroh_push_note(
         inserted,
         updated,
         conflicts,
+        conn_type,
     })
 }
 
@@ -1092,6 +1106,7 @@ pub async fn iroh_push_notes(
     let (inserted, updated, conflicts) =
         merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
+    let conn_type = iroh_conn_type(&conn);
     conn.close(0u8.into(), b"done");
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
@@ -1102,6 +1117,7 @@ pub async fn iroh_push_notes(
         inserted,
         updated,
         conflicts,
+        conn_type,
     })
 }
 
@@ -1175,6 +1191,7 @@ pub async fn lan_push_notes(
         inserted,
         updated,
         conflicts,
+        conn_type: None,
     })
 }
 
@@ -1428,6 +1445,7 @@ pub async fn lan_push_note(
         inserted,
         updated,
         conflicts,
+        conn_type: None,
     })
 }
 
@@ -1473,9 +1491,10 @@ pub async fn iroh_sync_connect(
     let received = remote.notes.len();
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
     pool.close().await;
+    let conn_type = iroh_conn_type(&conn);
     conn.close(0u8.into(), b"done");
     if inserted > 0 || updated > 0 || conflicts > 0 {
         let _ = app.emit("db:changed", ());
     }
-    Ok(SyncStats { sent, received, inserted, updated, conflicts })
+    Ok(SyncStats { sent, received, inserted, updated, conflicts, conn_type })
 }
