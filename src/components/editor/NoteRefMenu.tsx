@@ -36,25 +36,31 @@ export function NoteRefMenu({ notes, query, currentNoteId, position, onSelect, o
     setSelectedIndex(0)
   }, [query])
 
-  // 键盘导航：只拦截上下/确认/取消，可打印字符仍流入编辑器（由 hook 从文档更新 query）
+  // 键盘导航：用捕获阶段 + stopPropagation 抢在 ProseMirror（挂在 view.dom 的冒泡监听）之前
+  // 吃掉 上下/Enter/Esc，避免 Enter 被编辑器当成换行先处理掉（那会触发菜单关闭、导致选不中）。
+  // 可打印字符不拦截，照常流入编辑器，由 hook 从文档更新 query。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
+        e.stopPropagation()
         setSelectedIndex((prev) => (filtered.length ? (prev + 1) % filtered.length : 0))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
+        e.stopPropagation()
         setSelectedIndex((prev) => (filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0))
       } else if (e.key === 'Enter') {
         e.preventDefault()
+        e.stopPropagation()
         if (filtered[selectedIndex]) onSelect(filtered[selectedIndex])
       } else if (e.key === 'Escape') {
         e.preventDefault()
+        e.stopPropagation()
         onClose()
       }
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
   }, [filtered, selectedIndex, onSelect, onClose])
 
   useEffect(() => {
