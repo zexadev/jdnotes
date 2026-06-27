@@ -157,7 +157,7 @@ impl JdNotesMcpServer {
         &self,
         Parameters(params): Parameters<CreateNoteParams>,
     ) -> Result<CallToolResult, McpError> {
-        let now = chrono::Local::now()
+        let now = chrono::Utc::now()
             .format("%Y-%m-%dT%H:%M:%S%.3fZ")
             .to_string();
         let tags_json = serde_json::to_string(&params.tags.unwrap_or_default())
@@ -210,7 +210,7 @@ impl JdNotesMcpServer {
         match existing {
             Ok(row) => {
                 let existing_content: String = row.get("content");
-                let now = chrono::Local::now()
+                let now = chrono::Utc::now()
                     .format("%Y-%m-%dT%H:%M:%S%.3fZ")
                     .to_string();
                 let new_content = format!("{}\n\n{}", existing_content, params.content);
@@ -255,7 +255,7 @@ impl JdNotesMcpServer {
             Err(e) => return Ok(CallToolResult::error(vec![Content::text(e)])),
         };
 
-        let now = chrono::Local::now()
+        let now = chrono::Utc::now()
             .format("%Y-%m-%dT%H:%M:%S%.3fZ")
             .to_string();
 
