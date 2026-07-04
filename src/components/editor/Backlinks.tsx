@@ -4,6 +4,7 @@ import { noteOperations } from '../../lib/db'
 
 interface BacklinksProps {
   noteUuid?: string
+  noteTitle?: string
   onOpenNote: (id: number) => void
 }
 
@@ -12,19 +13,19 @@ interface BacklinksProps {
  * 进入/切换笔记时懒查询（findBacklinks 走原生 SQLite LIKE，实测万级 ~30ms）；
  * 无反链则整块不渲染，避免干扰。
  */
-export function Backlinks({ noteUuid, onOpenNote }: BacklinksProps) {
+export function Backlinks({ noteUuid, noteTitle, onOpenNote }: BacklinksProps) {
   const [links, setLinks] = useState<{ id: number; title: string }[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!noteUuid) {
+    if (!noteUuid && !noteTitle) {
       setLinks([])
       return
     }
     let cancelled = false
     setLoading(true)
     noteOperations
-      .findBacklinks(noteUuid)
+      .findBacklinks(noteUuid || '', noteTitle)
       .then((rows) => {
         if (!cancelled) setLinks(rows)
       })
@@ -37,10 +38,10 @@ export function Backlinks({ noteUuid, onOpenNote }: BacklinksProps) {
     return () => {
       cancelled = true
     }
-  }, [noteUuid])
+  }, [noteUuid, noteTitle])
 
-  // 无 uuid 或查完无反链：不渲染（加载中先不渲染，避免闪一个空框）
-  if (!noteUuid || (links.length === 0 && !loading)) return null
+  // 查完无反链：不渲染（加载中先不渲染，避免闪一个空框）
+  if ((!noteUuid && !noteTitle) || (links.length === 0 && !loading)) return null
 
   return (
     <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">

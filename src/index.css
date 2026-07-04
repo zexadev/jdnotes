@@ -1292,3 +1292,20 @@ body {
   color: #9aa2f0;
   background: rgba(124, 131, 224, 0.16);
 }
+
+/* ===== 字面 [[标题]] 引用（WikiRef 装饰）：编辑器内高亮成可点击 chip ===== */
+.note-ref-wiki {
+  color: #5e6ad2;
+  cursor: pointer;
+  border-radius: 0.3em;
+  padding: 0.05em 0.2em;
+  background: rgba(94, 106, 210, 0.1);
+  transition: background 0.15s ease;
+}
+.note-ref-wiki:hover {
+  background: rgba(94, 106, 210, 0.2);
+}
+.dark .note-ref-wiki {
+  color: #9aa2f0;
+  background: rgba(124, 131, 224, 0.16);
+}

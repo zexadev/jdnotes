@@ -528,15 +528,31 @@ export const noteOperations = {
     return rows.length > 0 ? rowToNote(rows[0]) : undefined
   },
 
-  // 反向链接：哪些未删除的笔记在正文里引用了 note://<uuid>。
-  // LIKE 全表扫由原生 SQLite 执行、仅回传命中行；实测 1 万笔记 ~30ms，懒加载无感。
-  async findBacklinks(uuid: string): Promise<{ id: number; title: string }[]> {
-    if (!uuid) return []
+  // 反向链接：哪些未删除的笔记在正文里引用了当前笔记。
+  // 两种引用形式都算：note://<uuid>（UI 手选，稳）+ 字面 [[标题]]（AI/手打，Obsidian 风）。
+  // SQLite LIKE 里 [ 不是通配符，'%[[' || ? || ']]%' 即字面 [[标题]]；全表扫原生执行、只回传命中行。
+  async findBacklinks(uuid: string, title?: string): Promise<{ id: number; title: string }[]> {
     const db = await getDatabase()
-    return await db.select<{ id: number; title: string }[]>(
-      "SELECT id, title FROM notes WHERE is_deleted = 0 AND content LIKE '%note://' || ? || '%' ORDER BY updated_at DESC",
-      [uuid]
-    )
+    const clauses: string[] = []
+    const params: string[] = []
+    if (uuid) {
+      clauses.push("content LIKE '%note://' || ? || '%'")
+      params.push(uuid)
+    }
+    const t = (title || '').trim()
+    if (t) {
+      clauses.push("content LIKE '%[[' || ? || ']]%'")
+      params.push(t)
+    }
+    if (clauses.length === 0) return []
+    let sql = `SELECT id, title FROM notes WHERE is_deleted = 0 AND (${clauses.join(' OR ')})`
+    if (uuid) {
+      // 排除笔记自身（自己引用自己标题的边界情况）
+      sql += ' AND (uuid IS NULL OR uuid != ?)'
+      params.push(uuid)
+    }
+    sql += ' ORDER BY updated_at DESC'
+    return await db.select<{ id: number; title: string }[]>(sql, params)
   },
 
   // 获取所有笔记（按更新时间倒序）

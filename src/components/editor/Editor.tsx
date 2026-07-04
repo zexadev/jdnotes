@@ -36,6 +36,7 @@ import { TableBubbleMenu } from './TableBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 import { AIHighlight } from '../ai/AIHighlightMark'
 import { Callout } from './CalloutBlock'
+import { WikiRef } from './WikiRef'
 
 interface EditorProps {
   title: string
@@ -53,6 +54,7 @@ interface EditorProps {
   allNotes?: NoteRefItem[] // 笔记引用选择器（[[）的候选笔记
   currentNoteId?: number | null // 当前笔记 id，引用选择器里排除自身
   onOpenNoteRef?: (uuid: string) => void // 点击 note://<uuid> 引用时跳转
+  onOpenNoteByTitle?: (title: string) => void // 点击字面 [[标题]] 引用时按标题跳转
 }
 
 export function Editor({
@@ -71,11 +73,14 @@ export function Editor({
   allNotes = [],
   currentNoteId = null,
   onOpenNoteRef,
+  onOpenNoteByTitle,
 }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null)
   // 用 ref 持有最新的跳转回调，避免 editorProps.click 闭包拿到旧引用
   const onOpenNoteRefRef = useRef(onOpenNoteRef)
   onOpenNoteRefRef.current = onOpenNoteRef
+  const onOpenNoteByTitleRef = useRef(onOpenNoteByTitle)
+  onOpenNoteByTitleRef.current = onOpenNoteByTitle
   // 在 editorProps.handlePaste 等回调中访问编辑器实例（定义早于 editor 变量）
   const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
 
@@ -158,6 +163,7 @@ export function Editor({
       TableHeader,
       AIHighlight,
       Callout,
+      WikiRef,
       CharacterCount.configure({}),
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
@@ -183,6 +189,14 @@ export function Editor({
       handleDOMEvents: {
         click: (_view, event) => {
           const { target } = event
+          // 字面 [[标题]] 引用（WikiRef 装饰渲染的 span，非 anchor）：单击按标题跳转
+          const wiki =
+            target instanceof HTMLElement ? target.closest('[data-note-ref-title]') : null
+          if (wiki) {
+            event.preventDefault()
+            onOpenNoteByTitleRef.current?.(wiki.getAttribute('data-note-ref-title') || '')
+            return true
+          }
           if (!(target instanceof HTMLAnchorElement)) return false
           const href = target.getAttribute('href')
           if (!href) return false

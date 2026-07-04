@@ -485,6 +485,17 @@ function App() {
     }
   }, [allNotes, handleSelectNote])
 
+  // 点击字面 [[标题]] 引用：按标题在全量笔记里精确匹配并跳转（Obsidian 风格）
+  const handleOpenNoteByTitle = useCallback((title: string) => {
+    const t = title.trim()
+    const note = allNotes?.find((n) => n.title === t)
+    if (note) {
+      handleSelectNote(note)
+    } else {
+      toast.info(`未找到标题为「${t}」的笔记`)
+    }
+  }, [allNotes, handleSelectNote])
+
   // 启动加载状态
   if (!isReady) {
     return (
@@ -650,6 +661,7 @@ function App() {
                     onClearReminder={handleClearReminder}
                     allNotes={allNotes || []}
                     onOpenNoteRef={handleOpenNoteRef}
+                    onOpenNoteByTitle={handleOpenNoteByTitle}
                     onOpenNote={handleCommandSelectNote}
                   />
 

@@ -34,6 +34,7 @@ interface MainContentProps {
   onClearReminder?: (noteId: number) => void
   allNotes?: Note[] // 笔记引用 [[ 选择器的候选
   onOpenNoteRef?: (uuid: string) => void // 点击 note:// 引用跳转
+  onOpenNoteByTitle?: (title: string) => void // 点击字面 [[标题]] 引用跳转
   onOpenNote?: (id: number) => void // 反向链接面板点击跳转（按 id）
 }
 
@@ -56,6 +57,7 @@ export function MainContent({
   onClearReminder,
   allNotes = [],
   onOpenNoteRef,
+  onOpenNoteByTitle,
   onOpenNote,
 }: MainContentProps) {
   const [showReminderPicker, setShowReminderPicker] = useState(false)
@@ -502,6 +504,7 @@ export function MainContent({
               allNotes={allNotes}
               currentNoteId={activeNoteId}
               onOpenNoteRef={onOpenNoteRef}
+              onOpenNoteByTitle={onOpenNoteByTitle}
             />
 
             {/* 写作统计栏 */}
@@ -511,7 +514,7 @@ export function MainContent({
 
             {/* 反向链接：被哪些笔记引用 */}
             {onOpenNote && (
-              <Backlinks noteUuid={activeNote?.uuid} onOpenNote={onOpenNote} />
+              <Backlinks noteUuid={activeNote?.uuid} noteTitle={activeNote?.title} onOpenNote={onOpenNote} />
             )}
           </motion.div>
         ) : (
