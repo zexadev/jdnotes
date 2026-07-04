@@ -1309,3 +1309,17 @@ body {
   color: #9aa2f0;
   background: rgba(124, 131, 224, 0.16);
 }
+/* 常态隐藏 [[ ]] 括号：仅视觉隐藏，文本仍在文档里，Markdown 往返不变 */
+.note-ref-bracket {
+  display: none;
+}
+/* 编辑态（光标落在引用内）：显出完整 [[标题]]，仅轻微高亮、不做 chip 底、可正常编辑 */
+.note-ref-wiki-editing {
+  background: transparent;
+  padding: 0;
+  cursor: text;
+  color: #5e6ad2;
+}
+.dark .note-ref-wiki-editing {
+  color: #9aa2f0;
+}
