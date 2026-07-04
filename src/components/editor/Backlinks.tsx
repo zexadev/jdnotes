@@ -54,7 +54,7 @@ export function Backlinks({ noteUuid, noteTitle, onOpenNote }: BacklinksProps) {
           <span className="text-gray-300 dark:text-gray-600">· {links.length}</span>
         )}
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 max-h-52 overflow-y-auto pr-1">
         {links.map((l) => (
           <button
             key={l.id}
