@@ -54,6 +54,30 @@ const wikiRefKey = new PluginKey('wikiRef')
 // 把正文里字面的 [[标题]] 渲染成可点击引用（按标题解析、单击跳转由 Editor 的 click 处理）
 export const WikiRef = Extension.create({
   name: 'wikiRef',
+  // Backspace/Delete 时，若光标紧贴一个完整的 [[标题]]，整体删除（否则要逐字删，很烦）
+  addKeyboardShortcuts() {
+    const deleteAdjacent = (dir: 'back' | 'forward'): boolean => {
+      const { state } = this.editor
+      const { selection } = state
+      if (!selection.empty) return false
+      const { $from } = selection
+      const pos = $from.pos
+      if (dir === 'back') {
+        const before = state.doc.textBetween($from.start(), pos, '\n')
+        const m = /\[\[[^[\]\n]+?\]\]$/.exec(before)
+        if (!m) return false
+        return this.editor.chain().focus().deleteRange({ from: pos - m[0].length, to: pos }).run()
+      }
+      const after = state.doc.textBetween(pos, $from.end(), '\n')
+      const m = /^\[\[[^[\]\n]+?\]\]/.exec(after)
+      if (!m) return false
+      return this.editor.chain().focus().deleteRange({ from: pos, to: pos + m[0].length }).run()
+    }
+    return {
+      Backspace: () => deleteAdjacent('back'),
+      Delete: () => deleteAdjacent('forward'),
+    }
+  },
   addProseMirrorPlugins() {
     return [
       new Plugin({

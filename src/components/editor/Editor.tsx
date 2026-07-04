@@ -187,26 +187,36 @@ export function Editor({
           'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px] prose-a:cursor-text prose-a:text-indigo-600 dark:prose-a:text-indigo-400 prose-a:underline-offset-4 hover:prose-a:text-indigo-500 prose-a:transition-colors',
       },
       handleDOMEvents: {
-        click: (_view, event) => {
+        // 内部引用用 mousedown 抢在光标落入之前跳转：否则 ProseMirror 先把光标落进引用
+        // → 触发编辑态显出中括号、且跳转落空（这就是"点了不跳、反而展开成 [[..]]"的原因）
+        mousedown: (_view, event) => {
+          if (event.button !== 0) return false
           const { target } = event
-          // 字面 [[标题]] 引用（WikiRef 装饰渲染的 span，非 anchor）：单击按标题跳转
-          const wiki =
-            target instanceof HTMLElement ? target.closest('[data-note-ref-title]') : null
-          if (wiki) {
+          if (!(target instanceof HTMLElement)) return false
+          // 字面 [[标题]] chip（非编辑态）→ 按标题跳转
+          const wiki = target.closest('[data-note-ref-title]')
+          if (wiki && !wiki.classList.contains('note-ref-wiki-editing')) {
             event.preventDefault()
             onOpenNoteByTitleRef.current?.(wiki.getAttribute('data-note-ref-title') || '')
             return true
           }
-          if (!(target instanceof HTMLAnchorElement)) return false
-          const href = target.getAttribute('href')
-          if (!href) return false
-          // 内部笔记引用：单击直接跳转
-          if (href.startsWith('note://')) {
+          // note://uuid 引用 → 按 uuid 跳转
+          const anchor = target.closest('a')
+          const href = anchor?.getAttribute('href')
+          if (href && href.startsWith('note://')) {
             event.preventDefault()
             onOpenNoteRefRef.current?.(href.slice('note://'.length))
             return true
           }
-          // 外部链接：Ctrl/⌘ + 单击用系统浏览器打开
+          return false
+        },
+        // 外部链接：Ctrl/⌘ + 单击用系统浏览器打开（内部引用已在 mousedown 处理）
+        click: (_view, event) => {
+          const { target } = event
+          if (!(target instanceof HTMLElement)) return false
+          const anchor = target.closest('a')
+          const href = anchor?.getAttribute('href')
+          if (!href || href.startsWith('note://')) return false
           if (event.ctrlKey || event.metaKey) {
             event.preventDefault()
             openUrl(href)
