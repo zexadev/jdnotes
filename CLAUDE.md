@@ -29,8 +29,9 @@
 - **CI/CD**：已移除 GitHub Actions 自动构建，手动打包发布
 - **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
-- **数据库**：SQLite（通过 tauri-plugin-sql）
+- **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
 - **Tauri 插件**：log, notification, sql(sqlite), dialog, fs, opener, updater, process
+- **发布状态（待「发」）**：GitHub 仓库当前仍是 `zexadev/jdnotes`，**尚未改名为 lapis、2.0 未正式发布 release**。因此 updater 端点 `.../zexadev/lapis/releases/latest/download/latest.json` 返回 404、README/文档站的 GitHub 徽章显示 repo not found，**均属预期**，发布后自动恢复。发布 = 改名仓库 + 建 release 传资产（含 latest.json）。
 
 ---
 
@@ -59,12 +60,16 @@
 | `src/components/editor/ResizableImage.tsx` | 图片节点组件（预览/缩放/删除） |
 | `src/components/editor/SlashCommand.tsx` | 斜杠命令菜单（编辑器命令 + AI 命令） |
 | `src/hooks/useSlashCommand.ts` | 斜杠命令逻辑（位置计算/命令执行） |
+| `src/components/editor/NoteRefMenu.tsx`·`src/hooks/useNoteRefMenu.ts` | 笔记引用选择弹窗（输入 `[[` 触发，选中插入 `note://<uuid>` 链接） |
+| `src/components/editor/WikiRef.ts` | 字面 `[[标题]]` 渲染扩展（ProseMirror 装饰：常态藏中括号显 chip、选区移入显括号；Backspace/Delete 整体删；点击跳转在 Editor 的 mousedown 处理） |
+| `src/components/editor/Backlinks.tsx` | 反向链接面板（`noteOperations.findBacklinks` 懒查询 note://uuid + 字面 [[标题]]） |
 | `src/components/layout/MainContent.tsx` | 主内容区布局（标签/工具栏/编辑器） |
-| `src-tauri/src/mcp_server.rs` | MCP HTTP Server（AI 工具集成） |
+| `src-tauri/src/mcp_server.rs` | MCP HTTP Server（AI 工具集成；时间戳统一用 `chrono::Utc::now()`） |
 | `skills/lapis-mcp.md` | Claude Code Skill 使用指引 |
-| `docs/` | Nextra 文档站（Cloudflare Pages 自动部署） |
+| `docs/` | 旧 Nextra 文档站（当前线上，Cloudflare Pages，jdnotes.zexa.cc） |
 | `docs/src/content/changelog.mdx` | 文档站更新日志 |
 | `docs/next.config.mjs` | 文档站构建配置 |
+| `D:\project\lapis-docs` | **新文档站**（Vite+React+TS+Tailwind v4 重构，独立 git 仓库，见其自带 CLAUDE.md），目标取代旧 Nextra 站 |
 
 ---
 
@@ -190,5 +195,15 @@
 - 组件：`ResizableImage.tsx`（NodeView）
 
 ### 链接
-- `Ctrl+Click` 打开链接，按住 Ctrl 时显示手型光标和加粗下划线
-- 普通状态下显示文本光标，可正常编辑
+- 外部链接：`Ctrl/⌘+Click` 用系统浏览器打开（在 Editor 的 `click` 处理）
+- 内部引用：单击直接跳转（在 Editor 的 `mousedown` 处理，抢在光标落入前跳，避免误触发编辑态/跳转落空）
+
+### 笔记引用 / 双向链接
+两种引用形式并存，**渲染成 chip、单击跳转、都计入反向链接**：
+- **手动引用**：编辑器输入 `[[` → `NoteRefMenu` 选择 → 插入 `[标题](note://<uuid>)` Link mark。按 **uuid** 解析，改名/跨设备同步不断。
+- **字面 `[[标题]]`**：AI 经 MCP 写入 / 手打 / 粘贴的纯文本，`WikiRef` 装饰渲染成 chip（常态藏中括号、光标移入显）。按**标题**解析（改名会断，因 AI 只有标题、拿不到 uuid）。
+- 反向链接：`findBacklinks(uuid, title)` 同时 LIKE 匹配 `note://uuid` 与 `[[标题]]`。
+- **待办（未定）**：两形式「手感统一」——note:// chip 目前带 🔗 图标、删除逐字，字面 chip 无图标、整体删；是否统一外观 + 给 note:// 加整体删除，待用户拍板（用户曾问「交互统一了吗」，尚未决定方向）。
+
+### 引用键取舍
+引用键用 **uuid**（同步/改名安全），不是自增 id（跨设备不同）。`Note` 接口已暴露 `uuid`；导入 JSON 保留原 uuid，引用跨导入不断链。
