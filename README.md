@@ -182,6 +182,7 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 | `Ctrl+L` | 打开/关闭 AI 侧栏 |
 | `Ctrl+J` | 内联提问（选中文本后） |
 | `Ctrl+\` | 循环切换侧栏（展开/收起/隐藏） |
+| `F11` | 沉浸模式（全屏专注写作） |
 | `Ctrl+B` | 粗体 |
 | `Ctrl+I` | 斜体 |
 | `Ctrl+Shift+C` | 代码块 |

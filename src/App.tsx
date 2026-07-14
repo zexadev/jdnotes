@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { initializeDefaultNotes, initDatabase, noteOperations, type Note } from './lib/db'
 import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { CommandMenu } from './components/modals/CommandMenu'
 import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
 import type { SidebarState } from './components/layout/Sidebar'
@@ -47,7 +48,8 @@ function App() {
     return 'expanded'
   })
 
-  // 循环切换侧栏状态（展开 → 收起 → 隐藏 → …）并持久化；Ctrl+\ 与顶栏按钮共用
+  // 循环切换侧栏状态（展开 → 收起 → 隐藏 → …）并持久化；Ctrl+\ 与顶栏按钮共用。
+  // 按钮图标按状态标注"下一步动作"（收起态是虚线面板=再点隐藏），见 TitleBar
   const cycleSidebar = useCallback(() => {
     setSidebarState((prev) => {
       const next = SIDEBAR_CYCLE[(SIDEBAR_CYCLE.indexOf(prev) + 1) % SIDEBAR_CYCLE.length]
@@ -94,17 +96,37 @@ function App() {
     }
   }, [])
 
-  // Ctrl+\ 快捷键循环切换侧栏状态
+  // 沉浸模式：窗口全屏 + 隐藏侧栏/顶栏/笔记列表，只留内容区；F11 切换
+  const [isImmersive, setIsImmersive] = useState(false)
+  const toggleImmersive = useCallback(() => {
+    setIsImmersive((prev) => {
+      const next = !prev
+      // UI 先切换，窗口全屏异步跟上；失败（如权限缺失）时回滚，避免"全屏没进去但界面全没了"
+      getCurrentWindow()
+        .setFullscreen(next)
+        .catch((e) => {
+          console.error('切换全屏失败:', e)
+          setIsImmersive(prev)
+        })
+      return next
+    })
+  }, [])
+
+  // Ctrl+\ 循环侧栏、F11 沉浸模式
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault()
         cycleSidebar()
       }
+      if (e.key === 'F11') {
+        e.preventDefault()
+        toggleImmersive()
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [cycleSidebar])
+  }, [cycleSidebar, toggleImmersive])
 
   // 订阅 toast 变化
   useEffect(() => {
@@ -543,26 +565,30 @@ function App() {
       />
 
       <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
-        {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区 */}
-        <Sidebar
-          currentView={currentView}
-          onViewChange={setCurrentView}
-          counts={counts}
-          allTags={allTags}
-          allNotes={allNotes || []}
-          onOpenSettings={() => setCurrentView('settings')}
-          sidebarState={sidebarState}
-        />
+        {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区；沉浸模式整列隐藏 */}
+        {!isImmersive && (
+          <Sidebar
+            currentView={currentView}
+            onViewChange={setCurrentView}
+            counts={counts}
+            allTags={allTags}
+            allNotes={allNotes || []}
+            onOpenSettings={() => setCurrentView('settings')}
+            sidebarState={sidebarState}
+          />
+        )}
 
         {/* 右列：顶栏（只压内容区）+ 内容 */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <TitleBar
-            searchQuery={searchQuery}
-            onSearchChange={handleSearchChange}
-            sidebarState={sidebarState}
-            onToggleSidebar={cycleSidebar}
-            showBrandFallback={sidebarState === 'hidden'}
-          />
+          {!isImmersive && (
+            <TitleBar
+              searchQuery={searchQuery}
+              onSearchChange={handleSearchChange}
+              sidebarState={sidebarState}
+              onToggleSidebar={cycleSidebar}
+              showBrandFallback={sidebarState === 'hidden'}
+            />
+          )}
 
           <div className="flex-1 flex overflow-hidden">
             <AnimatePresence mode="wait">
@@ -619,6 +645,7 @@ function App() {
                 transition={{ duration: 0.12 }}
                 className="flex-1 flex h-full overflow-hidden"
               >
+                {!isImmersive && (
                 <NoteList
                   searchQuery={searchQuery}
                   onClearSearch={() => {
@@ -639,6 +666,7 @@ function App() {
                   onBatchRestore={handleRestoreNotes}
                   onBatchPermanentDelete={handlePermanentDeleteNotes}
                 />
+                )}
 
                 {/* 右侧编辑器 + AI 侧栏 */}
                 <div className="flex-1 flex h-full overflow-hidden">
