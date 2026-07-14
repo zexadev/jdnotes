@@ -198,31 +198,39 @@ async function externalizeImages(content: string): Promise<string> {
 }
 
 // 存量迁移：把所有笔记的 base64 内嵌图迁成附件（content 与 synced_content 各自迁移以避免同步假冲突）。
-// 幂等（迁完不再含 data:image），迁移前自动备份数据库。
+// LIKE 只是粗筛：正文里含 "data:image" 字样的代码笔记也会命中，必须按外置化结果算真实差异，
+// 否则这些笔记每次启动都被空更新一遍、还触发无意义的备份。
 async function migrateImagesToAttachments(): Promise<void> {
   try {
     const db = await getDatabase()
     const rows = await db.select<{ id: number; content: string; synced_content: string | null }[]>(
       "SELECT id, content, synced_content FROM notes WHERE content LIKE '%data:image%' OR synced_content LIKE '%data:image%'"
     )
-    if (rows.length === 0) return
-    // 不可逆操作前先备份数据库
-    try {
-      const path = await invoke<string>('get_database_path')
-      await invoke('copy_database_to', { newPath: `${path}.pre-attachment-backup` })
-    } catch (e) {
-      console.warn('迁移前备份失败（仍继续）:', e)
-    }
+    const changes: { id: number; newContent: string; newSynced: string | null }[] = []
     for (const row of rows) {
       const newContent = await externalizeImages(row.content)
       const newSynced = row.synced_content ? await externalizeImages(row.synced_content) : null
+      if (newContent !== row.content || newSynced !== (row.synced_content ?? null)) {
+        changes.push({ id: row.id, newContent, newSynced })
+      }
+    }
+    if (changes.length === 0) return
+    // 不可逆操作前先备份数据库。用 VACUUM INTO（SQLite 在线备份）：
+    // fs::copy 会因数据库文件被本进程占用而报 os error 32
+    try {
+      const path = await invoke<string>('get_database_path')
+      await db.execute('VACUUM INTO ?', [`${path}.pre-attachment-backup`])
+    } catch (e) {
+      console.warn('迁移前备份失败（仍继续，可能已存在旧备份）:', e)
+    }
+    for (const c of changes) {
       await db.execute('UPDATE notes SET content = ?, synced_content = ? WHERE id = ?', [
-        newContent,
-        newSynced,
-        row.id,
+        c.newContent,
+        c.newSynced,
+        c.id,
       ])
     }
-    console.log(`已将 ${rows.length} 条笔记的内嵌图片迁移为附件`)
+    console.log(`已将 ${changes.length} 条笔记的内嵌图片迁移为附件`)
   } catch (e) {
     console.warn('图片附件迁移失败:', e)
   }
