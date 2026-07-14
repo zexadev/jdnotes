@@ -177,8 +177,9 @@ export function NoteList({
         </div>
       )}
 
-      {/* 笔记列表 */}
-      <div className="flex-1 overflow-y-auto">
+      {/* 笔记列表。overflow-x-hidden：卡片 hover 放大(scale 1.01)的 transform 包围盒会超出容器宽度，
+          不裁掉会在列表底部挤出横向滚动条 */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {isLoading ? (
           <>
             <NoteCardSkeleton />
