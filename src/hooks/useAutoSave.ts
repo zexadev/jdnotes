@@ -85,7 +85,6 @@ export function useAutoSave({
 }: UseAutoSaveOptions) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedRef = useRef({ title: '', content: '' })
-  const isFirstRender = useRef(true)
   const isSavingRef = useRef(false)
   
   // 使用 ref 存储当前数据，避免闭包问题
@@ -189,12 +188,9 @@ export function useAutoSave({
 
   // 防抖保存 - 只在编辑模式下触发
   useEffect(() => {
-    // 跳过首次渲染
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      lastSavedRef.current = { title, content }
-      return
-    }
+    // 笔记刚切换的这次渲染由下方基准 effect 接管：此时 lastSavedRef 还是旧笔记的基准，
+    // 在这里比较会误判"有变化"而把刚载入的内容空保存一遍
+    if (noteId !== prevNoteIdRef.current) return
 
     // 只在编辑模式下触发自动保存
     if (!isEditing) {
@@ -204,10 +200,10 @@ export function useAutoSave({
 
     if (noteId === null) return
 
+    if (!hasUnsavedChanges()) return
+
     // 更新全局待保存数据
-    if (hasUnsavedChanges()) {
-      globalPendingData = { noteId, title, content }
-    }
+    globalPendingData = { noteId, title, content }
 
     // 清除之前的定时器
     if (timeoutRef.current) {
@@ -227,26 +223,22 @@ export function useAutoSave({
     }
   }, [noteId, title, content, isEditing, delay, save, hasUnsavedChanges])
 
-  // 当 noteId 变化时，重置状态（不再自动保存旧笔记，由调用方显式保存）
+  // noteId 变化（含首次选中）：把切换时从 DB 载入的值定为该笔记的"已保存基准"。
+  // 不能只在 prev!==null 时复位（首次选中会拿空基准误判有变化 → 打开即空保存刷 updated_at），
+  // 也不能用"吸收下一次变化当基准"的方式复位（切换后的第一次编辑会被吞掉不保存——
+  // 粘贴图片正是单次编辑，切走即丢）
   useEffect(() => {
-    // 检测 noteId 是否真的变化了（而不是首次渲染）
-    if (prevNoteIdRef.current !== null && prevNoteIdRef.current !== noteId) {
-      console.log('[AutoSave] noteId 变化:', prevNoteIdRef.current, '->', noteId)
-      // 清除待执行的定时器，避免保存到错误的笔记
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
-
-      // 重置状态 - 只在 noteId 真正变化时重置
-      isFirstRender.current = true
-      lastSavedRef.current = { title, content }
+    if (prevNoteIdRef.current === noteId) return
+    console.log('[AutoSave] noteId 变化:', prevNoteIdRef.current, '->', noteId)
+    // 清除待执行的定时器，避免保存到错误的笔记
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
     }
-
-    // 更新前一个笔记的引用
+    lastSavedRef.current = { title, content }
     prevNoteIdRef.current = noteId
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteId]) // 只依赖 noteId，避免 title/content 变化时误触发
+  }, [noteId]) // 只依赖 noteId：切换渲染里 title/content 与 noteId 同批设置，取闭包值即为 DB 最新值
 
   // 保存指定笔记的数据（供外部在切换笔记时调用）
   const saveNoteById = useCallback(async (
