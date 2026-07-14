@@ -62,6 +62,7 @@
 | `src/hooks/useSlashCommand.ts` | 斜杠命令逻辑（位置计算/命令执行） |
 | `src/components/editor/NoteRefMenu.tsx`·`src/hooks/useNoteRefMenu.ts` | 笔记引用选择弹窗（输入 `[[` 触发，选中插入 `note://<uuid>` 链接） |
 | `src/components/editor/WikiRef.ts` | 字面 `[[标题]]` 渲染扩展（ProseMirror 装饰：常态藏中括号显 chip、选区移入显括号；Backspace/Delete 整体删；点击跳转在 Editor 的 mousedown 处理） |
+| `src/components/editor/SafeHtmlBlock.ts` | Markdown 解析防吞扩展（html:true 下未闭合 `<style>`/`<script>`/注释会把后文连同图片引用吞到文末：markdown-it html_block 有界化到空行 + raw-text 标签转义防 DOMParser 二次吞） |
 | `src/components/editor/Backlinks.tsx` | 反向链接面板（`noteOperations.findBacklinks` 懒查询 note://uuid + 字面 [[标题]]） |
 | `src/components/layout/MainContent.tsx` | 主内容区布局（标签/工具栏/编辑器） |
 | `src-tauri/src/mcp_server.rs` | MCP HTTP Server（AI 工具集成；时间戳统一用 `chrono::Utc::now()`） |
@@ -164,6 +165,7 @@
 | `Ctrl+L` | 打开/关闭 AI 侧栏 |
 | `Ctrl+J` | 内联提问（选中文本后） |
 | `Ctrl+\` | 循环切换侧栏（展开/收起/隐藏） |
+| `F11` | 沉浸模式（窗口全屏 + 隐藏侧栏/顶栏/笔记列表） |
 | `Ctrl+B` | 粗体 |
 | `Ctrl+I` | 斜体 |
 | `Ctrl+Shift+C` | 代码块 |
