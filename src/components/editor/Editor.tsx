@@ -37,6 +37,7 @@ import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 import { AIHighlight } from '../ai/AIHighlightMark'
 import { Callout } from './CalloutBlock'
 import { WikiRef } from './WikiRef'
+import { SafeHtmlBlock } from './SafeHtmlBlock'
 
 interface EditorProps {
   title: string
@@ -164,6 +165,7 @@ export function Editor({
       AIHighlight,
       Callout,
       WikiRef,
+      SafeHtmlBlock,
       CharacterCount.configure({}),
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
