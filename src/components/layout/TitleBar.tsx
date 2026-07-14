@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Minus, Square, X, Copy, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Minus, Square, X, Copy, Search, PanelLeftClose, PanelLeftOpen, PanelLeftDashed } from 'lucide-react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ThemeToggleButton } from '../common/ThemeToggleButton'
 import { BrandLockup } from './BrandLockup'
@@ -59,7 +59,9 @@ export function TitleBar({
       {/* 侧栏隐藏时，品牌回落到顶栏最左 */}
       {showBrandFallback && <BrandLockup />}
 
-      {/* 侧栏收起/展开（三态循环，移到顶栏最左；侧栏隐藏时也能在此唤回） */}
+      {/* 侧栏三态循环（展开→收起→隐藏→…），Ctrl+\ 与按钮共用；侧栏隐藏时也能在此唤回。
+          图标标注"下一步动作"：收起态若用 PanelLeftOpen 会像"点击展开"，实际是隐藏，
+          故用虚线面板表示"再点就藏起来" */}
       <button
         onClick={onToggleSidebar}
         className="ml-2 flex-shrink-0 p-1.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors duration-150"
@@ -73,6 +75,8 @@ export function TitleBar({
       >
         {sidebarState === 'expanded' ? (
           <PanelLeftClose className="h-4 w-4" strokeWidth={1.5} />
+        ) : sidebarState === 'collapsed' ? (
+          <PanelLeftDashed className="h-4 w-4" strokeWidth={1.5} />
         ) : (
           <PanelLeftOpen className="h-4 w-4" strokeWidth={1.5} />
         )}
