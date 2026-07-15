@@ -487,19 +487,32 @@ export function Editor({
     }
   }, [content, editor, diffState.isActive])
 
-  // 处理从侧栏插入内容
+  // 处理从侧栏插入内容：插入到文末 → 滚动定位 → 插入的块高亮渐隐
   useEffect(() => {
     if (!contentToInsert || !editor || editor.isDestroyed) return
 
-    // 移动光标到文档末尾
-    editor.commands.focus('end')
+    const sizeBefore = editor.state.doc.content.size
 
-    // 插入两个换行符和内容
+    editor.commands.focus('end')
     editor.commands.insertContent('\n\n' + contentToInsert)
 
     // 更新内容（以 Markdown 格式保存）
     const newContent = editor.storage.markdown.getMarkdown()
     onContentChange(newContent)
+
+    // 滚动到插入处，并给新插入的顶层块加一次性闪烁动画（动画结束自动清类）
+    editor.commands.scrollIntoView()
+    const { doc } = editor.state
+    const from = Math.min(sizeBefore, doc.content.size)
+    doc.nodesBetween(from, doc.content.size, (node, pos, parent) => {
+      if (parent?.type.name !== 'doc' || !node.isBlock) return true
+      const dom = editor.view.nodeDOM(pos)
+      if (dom instanceof HTMLElement) {
+        dom.classList.add('ai-inserted-flash')
+        dom.addEventListener('animationend', () => dom.classList.remove('ai-inserted-flash'), { once: true })
+      }
+      return false
+    })
 
     // 通知插入完成
     onContentInserted?.()

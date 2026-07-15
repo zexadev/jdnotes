@@ -548,31 +548,6 @@ body {
   }
 }
 
-/* 流式光标 - 更细腻的闪烁 */
-.ai-streaming-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  background: #5E6AD2;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  animation: ai-cursor-blink 0.6s ease-in-out infinite;
-  border-radius: 1px;
-}
-
-.dark .ai-streaming-cursor {
-  background: #818cf8;
-}
-
-@keyframes ai-cursor-blink {
-  0%, 40% {
-    opacity: 1;
-  }
-  50%, 100% {
-    opacity: 0;
-  }
-}
-
 /* AI 审查工具栏 - 圆润浮动条风格 */
 .ai-review-toolbar {
   animation: ai-toolbar-appear 0.3s cubic-bezier(0, -0.02, 0.4, 1.25);
@@ -1322,4 +1297,60 @@ body {
 }
 .dark .note-ref-wiki-editing {
   color: #9aa2f0;
+}
+
+/* ============= AI 侧栏流式动效 ============= */
+
+/* 思考中 shimmer 文字：微光从左到右扫过 */
+.ai-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    rgb(148 163 184) 0%,
+    rgb(148 163 184) 35%,
+    rgb(71 85 105) 50%,
+    rgb(148 163 184) 65%,
+    rgb(148 163 184) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: ai-shimmer 1.8s linear infinite;
+}
+.dark .ai-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    rgb(100 116 139) 0%,
+    rgb(100 116 139) 35%,
+    rgb(203 213 225) 50%,
+    rgb(100 116 139) 65%,
+    rgb(100 116 139) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+@keyframes ai-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 工具执行中：边框呼吸 */
+.ai-tool-running {
+  animation: ai-tool-breathe 1.6s ease-in-out infinite;
+}
+@keyframes ai-tool-breathe {
+  0%, 100% { border-color: rgb(94 106 210 / 0.15); }
+  50% { border-color: rgb(94 106 210 / 0.45); }
+}
+
+/* AI 内容插入笔记后的定位闪烁（附着在插入范围的块级 DOM 上，动画结束移除类） */
+.ai-inserted-flash {
+  animation: ai-inserted-fade 1.4s ease-out;
+  border-radius: 4px;
+}
+@keyframes ai-inserted-fade {
+  0% { background-color: rgb(94 106 210 / 0.14); }
+  100% { background-color: transparent; }
 }

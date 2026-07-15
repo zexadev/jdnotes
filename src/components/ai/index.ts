@@ -1,5 +1,4 @@
 export { AIBubbleMenu } from './AIBubbleMenu'
 export { AIChatSidebar } from './AIChatSidebar'
 export { AIReviewToolbar } from './AIReviewToolbar'
-export { ChatMessageItem } from './ChatMessageItem'
 export { AIHighlight } from './AIHighlightMark'
