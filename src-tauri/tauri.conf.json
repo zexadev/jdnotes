@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "Lapis",
-        "width": 1200,
-        "height": 800,
+        "width": 1556,
+        "height": 887,
+        "minWidth": 1556,
+        "minHeight": 887,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
