@@ -64,7 +64,7 @@
 | `src/lib/aiTools.ts` | AI 工具层（结果必须带 id、读取带截断分页 offset、append_note/list_notes、Gemini 空 schema 兼容） |
 | `src/lib/chatParts.ts` | assistant 消息 parts JSON 解析（UI 渲染与回传模型共用，回传只取 text 段） |
 | `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
-| `src/components/editor/Editor.tsx` | Tiptap 编辑器主组件 |
+| `src/components/editor/Editor.tsx` | Tiptap 编辑器主组件（userTouchedRef：打开后扩展的规范化事务如 fixTables 不当作编辑上报——否则没编辑就刷 updated_at；CodeBlock language 属性 parseHTML 必须回退 language-xxx class，只认 data-language 会把 markdown 代码块语言洗成 plaintext） |
 | `src/components/editor/EditorToolbar.tsx` | 编辑器固定工具栏（格式/列表/待办/图片） |
 | `src/components/editor/ResizableImage.tsx` | 图片节点组件（预览/缩放/删除） |
 | `src/components/editor/SlashCommand.tsx` | 斜杠命令菜单（编辑器命令 + AI 命令；过滤词=编辑器里 / 后的真实文本——中文/IME 天然支持，keywords 拼音/英文别名，键盘 capture 拦截防 Enter 漏进编辑器换行） |
@@ -206,8 +206,9 @@
 - 组件：`ResizableImage.tsx`（NodeView）
 
 ### 链接
-- 外部链接：`Ctrl/⌘+Click` 用系统浏览器打开（在 Editor 的 `click` 处理）
-- 内部引用：单击直接跳转（在 Editor 的 `mousedown` 处理，抢在光标落入前跳，避免误触发编辑态/跳转落空）
+- 外部链接：`Ctrl/⌘+Click` 用系统浏览器打开（在 Editor 的 `click` 处理）；**悬停出操作卡**（`LinkPopover.tsx`：URL+打开/复制/编辑/取消链接，编辑态行内输入+无协议自动补 https://）
+- 插入/编辑链接统一走 LinkPopover（气泡菜单链接按钮也是它——window.prompt 在 WebView2 里不可用，别用）
+- 内部引用：单击直接跳转（在 Editor 的 `mousedown` 处理，抢在光标落入前跳，避免误触发编辑态/跳转落空），不出悬停卡
 
 ### 笔记引用 / 双向链接
 两种引用形式并存，**渲染成 chip、单击跳转、都计入反向链接**：
