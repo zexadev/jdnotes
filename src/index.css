@@ -908,19 +908,13 @@ body {
   background: rgba(99, 102, 241, 0.1);
 }
 
-/* 浮动输入栏 - 自适应圆角 */
+/* 一体化输入卡（模型选择器/附图/发送并入卡内底行） */
 .input-pill {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 1rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  transition: border-radius 0.15s ease;
-}
-
-/* 单行时使用更圆的药丸样式 */
-.input-pill.single-line {
-  border-radius: 1.5rem;
 }
 
 .dark .input-pill {
