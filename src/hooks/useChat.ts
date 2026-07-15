@@ -11,8 +11,8 @@ export type { StreamSegment, MessageParts }
 
 // 对话自动命名的系统提示
 const TITLE_SYSTEM_PROMPT = '为这段对话起一个简短标题：4~12 个字，直接概括主题，用对话使用的语言。只输出标题本身，不要引号、标点或任何解释。'
-// 默认标题形如「对话 1」——只有仍是默认名时才自动命名，用户改过的名字绝不覆盖
-const DEFAULT_TITLE_RE = /^对话 \d+$/
+// 默认标题「新对话」（旧数据是「对话 N」）——只有仍是默认名时才自动命名，用户改过的名字绝不覆盖
+const DEFAULT_TITLE_RE = /^(新对话|对话 \d+)$/
 
 // 找最后一个压缩点：之前的历史由摘要代表，之后的消息原样携带
 function splitAtLastSummary(history: ChatMessage[]): { summary: string | null; recent: ChatMessage[] } {
@@ -139,7 +139,7 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
 
         // 如果没有对话，自动创建一个
         if (convs.length === 0) {
-          const newId = await conversationOperations.create(noteId, '对话 1')
+          const newId = await conversationOperations.create(noteId, '新对话')
           const updated = await conversationOperations.getByNoteId(noteId)
           setConversations(updated)
           setActiveConversationId(newId)
@@ -775,7 +775,7 @@ export function useChat({ noteId, noteTitle, noteContent }: UseChatProps) {
   const createConversation = useCallback(async (title?: string) => {
     if (!noteId) return
     compactAbortRef.current?.abort()
-    const convTitle = title || `对话 ${conversations.length + 1}`
+    const convTitle = title || '新对话'
     const newId = await conversationOperations.create(noteId, convTitle)
     setActiveConversationId(newId)
     await refreshConversations()

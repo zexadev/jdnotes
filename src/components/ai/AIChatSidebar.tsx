@@ -1,5 +1,5 @@
-import { useRef, useEffect, useCallback, useState } from 'react'
-import { X, Sparkles, ChevronDown, Check, Plus, Trash2, FoldVertical, Loader2 } from 'lucide-react'
+import { useEffect, useCallback, useState } from 'react'
+import { X, Sparkles, Plus, FoldVertical, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useChat } from '../../hooks/useChat'
 import { useAIConfig } from '../../hooks/useSettings'
@@ -13,6 +13,8 @@ import {
   useStickToBottom,
   ScrollToBottomButton,
   CompactDivider,
+  ModelPicker,
+  ConversationSwitcher,
 } from './chat'
 
 interface AIChatSidebarProps {
@@ -45,6 +47,7 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     createConversation,
     switchConversation,
     deleteConversation,
+    renameConversation,
     sendMessage,
     handleEdit,
     handleDelete,
@@ -54,14 +57,7 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
   } = useChat({ noteId, noteTitle, noteContent })
 
   const { config, setActiveSource } = useAIConfig()
-  const [showSourcePicker, setShowSourcePicker] = useState(false)
-  const [showConversationList, setShowConversationList] = useState(false)
   const [attachedImages, setAttachedImages] = useState<string[]>([])
-  const sourcePickerRef = useRef<HTMLDivElement>(null)
-  const conversationListRef = useRef<HTMLDivElement>(null)
-
-  const activeSource = config.sources.find(s => s.id === config.activeSourceId)
-  const activeConversation = conversations.find(c => c.id === activeConversationId)
 
   // 智能粘底：用户在底部才跟随流式输出，翻阅历史不打扰
   const { containerRef, isAtBottom, scrollToBottom, handleScroll } = useStickToBottom([
@@ -89,33 +85,34 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
     }
   }
 
-  // 点击外部关闭弹出层
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sourcePickerRef.current && !sourcePickerRef.current.contains(event.target as Node)) {
-        setShowSourcePicker(false)
-      }
-      if (conversationListRef.current && !conversationListRef.current.contains(event.target as Node)) {
-        setShowConversationList(false)
-      }
-    }
-    if (showSourcePicker || showConversationList) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showSourcePicker, showConversationList])
-
   const handleCopy = useCallback((content: string) => {
     navigator.clipboard.writeText(content)
   }, [])
 
-  if (!isOpen) return null
+  // 新建对话后直接把光标放进输入框（下一帧，等切换渲染完成）
+  const handleCreateConversation = useCallback(async () => {
+    await createConversation()
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('.ai-chat-sidebar .input-pill textarea')?.focus()
+    })
+  }, [createConversation])
 
   const hasStreamingSegments = streamingSegments.length > 0
   const isWaitingForResponse = isStreamingActive && !hasStreamingSegments
   const isEmpty = (messages?.length ?? 0) === 0 && !pendingUserMessage
 
   return (
+    <AnimatePresence>
+      {isOpen && (
+    <motion.div
+      key="ai-chat-sidebar"
+      // 宽度滑入滑出；内容固定 350px 宽，动画期间只裁切不挤压
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: 350, opacity: 1 }}
+      exit={{ width: 0, opacity: 0 }}
+      transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+      className="h-full flex-shrink-0 overflow-hidden"
+    >
     <div
       className="w-[350px] ai-sidebar-glass border-l border-black/[0.03] dark:border-white/[0.06] flex flex-col h-full ai-chat-sidebar"
       // 侧栏内任意位置按 Esc 停止生成（不聚焦输入框也能停；不动全局，避免与图片预览等 Esc 冲突）
@@ -130,60 +127,24 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.03] dark:border-white/[0.06]">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Sparkles className="h-4 w-4 text-[#5E6AD2] flex-shrink-0" strokeWidth={1.5} />
-          {/* 对话切换器 */}
-          <div ref={conversationListRef} className="relative min-w-0">
-            <button
-              onClick={() => setShowConversationList(!showConversationList)}
-              className="flex items-center gap-1 text-[14px] font-medium text-slate-900 dark:text-slate-100 tracking-tight hover:text-[#5E6AD2] transition-colors max-w-[180px]"
-            >
-              <span className="truncate">{activeConversation?.title || '对话'}</span>
-              <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${showConversationList ? 'rotate-180' : ''}`} />
-            </button>
-            {showConversationList && (
-              <div className="absolute top-full left-0 mt-1 w-56 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
-                {conversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                      conv.id === activeConversationId
-                        ? 'bg-[#5E6AD2]/10 text-[#5E6AD2]'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <button
-                      onClick={() => {
-                        switchConversation(conv.id)
-                        setShowConversationList(false)
-                      }}
-                      className="flex-1 text-left truncate"
-                    >
-                      {conv.title}
-                    </button>
-                    {conversations.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteConversation(conv.id)
-                        }}
-                        className="p-0.5 text-slate-400 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ConversationSwitcher
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            onSwitch={switchConversation}
+            onCreate={handleCreateConversation}
+            onDelete={deleteConversation}
+            onRename={renameConversation}
+          />
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={() => createConversation()}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={handleCreateConversation}
             className="p-1.5 text-slate-400 hover:text-[#5E6AD2] hover:bg-[#5E6AD2]/10 rounded-lg transition-colors"
             title="新建对话"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-          </button>
+          </motion.button>
           {canCompact && (
             <button
               onClick={handleCompact}
@@ -204,12 +165,14 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
               清空
             </button>
           )}
-          <button
+          <motion.button
+            whileTap={{ scale: 0.85 }}
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
+            title="收起侧栏 (Ctrl+L)"
           >
             <X className="h-4 w-4" strokeWidth={1.5} />
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -329,75 +292,8 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
         <ScrollToBottomButton visible={!isAtBottom} onClick={() => scrollToBottom()} />
       </div>
 
-      {/* Input Area */}
+      {/* Input Area：模型选择器与上下文占用并入输入卡底行 */}
       <div className="p-4 pt-2">
-        {/* 模型选择器 + 上下文占用 */}
-        <div ref={sourcePickerRef} className="relative mb-2 flex items-center justify-between gap-2">
-          <button
-            onClick={() => setShowSourcePicker(!showSourcePicker)}
-            className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 hover:text-[#5E6AD2] transition-colors min-w-0"
-          >
-            <span className="truncate">{activeSource?.name || 'AI'}</span>
-            <span className="text-slate-400 dark:text-slate-500">·</span>
-            <span className="text-slate-400 dark:text-slate-500 truncate">{activeSource?.model || ''}</span>
-            <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-transform ${showSourcePicker ? 'rotate-180' : ''}`} />
-          </button>
-          {contextUsage.ratio >= 0.05 && (
-            <span
-              className="flex-shrink-0 flex items-center gap-1.5"
-              title={`预计上下文占用 ${(contextUsage.tokens / 1000).toFixed(1)}k / ${contextUsage.limit >= 1_000_000 ? `${contextUsage.limit / 1_000_000}M` : `${Math.round(contextUsage.limit / 1000)}k`} tokens（模型窗口，可在设置中手填），超过 ${Math.round(AUTO_COMPACT_RATIO * 100)}% 发送时自动压缩`}
-            >
-              <span className="w-10 h-[3px] rounded-full bg-black/[0.08] dark:bg-white/[0.12] overflow-hidden">
-                <span
-                  className={`block h-full rounded-full transition-all duration-300 ${
-                    contextUsage.ratio >= 0.9
-                      ? 'bg-red-500'
-                      : contextUsage.ratio >= AUTO_COMPACT_RATIO
-                        ? 'bg-amber-500'
-                        : 'bg-slate-400/80 dark:bg-slate-500'
-                  }`}
-                  style={{ width: `${Math.max(4, Math.round(contextUsage.ratio * 100))}%` }}
-                />
-              </span>
-              <span
-                className={`text-[10px] tabular-nums ${
-                  contextUsage.ratio >= 0.9
-                    ? 'text-red-500'
-                    : contextUsage.ratio >= AUTO_COMPACT_RATIO
-                      ? 'text-amber-500'
-                      : 'text-slate-400 dark:text-slate-500'
-                }`}
-              >
-                {Math.round(contextUsage.ratio * 100)}%
-              </span>
-            </span>
-          )}
-          {showSourcePicker && config.sources.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-1 w-56 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50">
-              {config.sources.map((source) => (
-                <button
-                  key={source.id}
-                  onClick={() => {
-                    setActiveSource(source.id)
-                    setShowSourcePicker(false)
-                  }}
-                  className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition-colors ${
-                    source.id === config.activeSourceId
-                      ? 'bg-[#5E6AD2]/10 text-[#5E6AD2]'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate font-medium">{source.name}</div>
-                    <div className="text-xs text-slate-400 truncate">{source.model}</div>
-                  </div>
-                  {source.id === config.activeSourceId && <Check className="h-4 w-4 flex-shrink-0" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         <ChatInput
           value={input}
           onChange={setInput}
@@ -407,8 +303,50 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
           attachedImages={attachedImages}
           onAttachImages={(images) => setAttachedImages((prev) => [...prev, ...images])}
           onRemoveImage={(index) => setAttachedImages((prev) => prev.filter((_, i) => i !== index))}
+          footerLeft={
+            <>
+              <ModelPicker
+                sources={config.sources}
+                activeSourceId={config.activeSourceId}
+                onSelect={setActiveSource}
+              />
+              {contextUsage.ratio >= 0.05 && (
+                <span
+                  className="flex-shrink-0 flex items-center gap-1.5"
+                  title={`预计上下文占用 ${(contextUsage.tokens / 1000).toFixed(1)}k / ${contextUsage.limit >= 1_000_000 ? `${contextUsage.limit / 1_000_000}M` : `${Math.round(contextUsage.limit / 1000)}k`} tokens（模型窗口，可在设置中手填），超过 ${Math.round(AUTO_COMPACT_RATIO * 100)}% 发送时自动压缩`}
+                >
+                  <span className="w-9 h-[3px] rounded-full bg-black/[0.08] dark:bg-white/[0.12] overflow-hidden">
+                    <span
+                      className={`block h-full rounded-full transition-all duration-300 ${
+                        contextUsage.ratio >= 0.9
+                          ? 'bg-red-500'
+                          : contextUsage.ratio >= AUTO_COMPACT_RATIO
+                            ? 'bg-amber-500'
+                            : 'bg-slate-400/80 dark:bg-slate-500'
+                      }`}
+                      style={{ width: `${Math.max(4, Math.round(contextUsage.ratio * 100))}%` }}
+                    />
+                  </span>
+                  <span
+                    className={`text-[10px] tabular-nums ${
+                      contextUsage.ratio >= 0.9
+                        ? 'text-red-500'
+                        : contextUsage.ratio >= AUTO_COMPACT_RATIO
+                          ? 'text-amber-500'
+                          : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                  >
+                    {Math.round(contextUsage.ratio * 100)}%
+                  </span>
+                </span>
+              )}
+            </>
+          }
         />
       </div>
     </div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
