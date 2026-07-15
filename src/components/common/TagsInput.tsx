@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
+import { tagColor } from '../../lib/tagColor'
 
 interface TagsInputProps {
   tags: string[]
@@ -37,27 +38,31 @@ export function TagsInput({ tags, onChange, disabled = false }: TagsInputProps) 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <AnimatePresence mode="popLayout">
-        {tags.map((tag) => (
-          <motion.span
-            key={tag}
-            layout
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.15 }}
-            className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-dark-card text-gray-600 dark:text-gray-300 text-xs rounded-md border border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
-          >
-            {tag}
-            {!disabled && (
-              <button
-                onClick={() => removeTag(tag)}
-                className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </motion.span>
-        ))}
+        {tags.map((tag) => {
+          const color = tagColor(tag)
+          return (
+            <motion.span
+              key={tag}
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              style={{ backgroundColor: color.bg, color: color.base, borderColor: color.border }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border transition-colors"
+            >
+              {tag}
+              {!disabled && (
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </motion.span>
+          )
+        })}
       </AnimatePresence>
       {!disabled && (
         <input

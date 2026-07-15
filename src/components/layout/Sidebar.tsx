@@ -10,19 +10,22 @@ import {
   LayoutDashboard,
 } from 'lucide-react'
 import { SidebarItem } from '../common/SidebarItem'
+import { tagColor } from '../../lib/tagColor'
+import type { Note } from '../../lib/db'
+import type { ViewType } from '../../App'
 
 export type SidebarState = 'expanded' | 'collapsed' | 'hidden'
 
 interface SidebarProps {
   currentView: string
-  onViewChange: (view: any) => void
+  onViewChange: (view: ViewType) => void
   counts: {
     inbox: number
     favorites: number
     trash: number
   }
   allTags: string[]
-  allNotes: any[]
+  allNotes: Note[]
   onOpenSettings: () => void
   sidebarState: SidebarState
 }
@@ -141,7 +144,7 @@ export function Sidebar({
                       }`}
                     >
                       {isActive && <span className="w-0.5 h-3.5 bg-[#5E6AD2] rounded-full -ml-1 mr-0.5" />}
-                      <Tag className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      <Tag className="h-3.5 w-3.5" strokeWidth={1.5} style={{ color: tagColor(tag).base }} />
                       <span>{tag}</span>
                       <span className="ml-auto text-[11px] text-slate-400 dark:text-slate-500">
                         {tagCount}
@@ -175,7 +178,7 @@ export function Sidebar({
                         : 'text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-white/[0.02]'
                     }`}
                   >
-                    <Tag className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} />
+                    <Tag className="h-3.5 w-3.5 flex-shrink-0" strokeWidth={1.5} style={{ color: tagColor(tag).base }} />
                   </button>
                   {tagTooltip === tag && (
                     <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 px-2.5 py-1.5 bg-slate-800 dark:bg-slate-700 text-white text-[12px] rounded-md shadow-lg whitespace-nowrap pointer-events-none">

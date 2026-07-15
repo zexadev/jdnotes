@@ -19,7 +19,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { useUpdater } from './hooks/useUpdater'
 
 // 视图类型
-type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'settings' | `tag-${string}`
+export type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'settings' | `tag-${string}`
 
 // 侧栏状态循环顺序
 const SIDEBAR_CYCLE: SidebarState[] = ['expanded', 'collapsed', 'hidden']
