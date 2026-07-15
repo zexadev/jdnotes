@@ -54,6 +54,12 @@
 | `src/lib/pairing.ts` | 配对码工具（SHA256 派生 + localStorage 白名单） |
 | `src/hooks/useSettings.ts` | AI 多来源配置 Hook（useAIConfig / useSettings） |
 | `src/components/modals/ChangelogModal.tsx` | 应用内更新日志（CHANGELOG_DATA 数组） |
+| `src/components/ai/chat/` | AI 侧栏组件族（分块 memo 流式 Markdown、ThinkingBlock 思考折叠、ToolCallCard、ChatInput 发送↔停止、CompactDivider 压缩点分隔线、useStickToBottom 粘底、字符级平滑排字在 useChat） |
+| `src/hooks/useChat.ts` | 聊天状态机（thinking/text/tool 段、完成/停止/出错统一落库到流开始时捕获的 streamTargetRef、skipPersistRef 竞态防护、平滑排字 drain 循环、上下文压缩 runCompaction/自动压缩/contextUsage 指示、切笔记/切对话统一中断保存 interruptStreamAndSavePartial、对话自动命名 maybeAutoTitleConversation——仅默认「对话 N」标题才起名） |
+| `src/hooks/useAIStream.ts` | 模型调用层（4 provider 流式+工具循环、429/5xx 指数退避重试 callWithRetry、旧工具结果 microcompact 折叠、Anthropic prompt cache + 旧模型 max_tokens 400 回退、generateOnce 单次生成供压缩用） |
+| `src/lib/contextBudget.ts` | 上下文预算（token 估算 CJK=1/字·其他/3.5、每模型真实窗口表 inferContextWindow、手填 contextWindow 优先、64k 兜底、自动压缩阈值 0.7、图片/工具 schema 开销、压缩器系统提示） |
+| `src/lib/aiTools.ts` | AI 工具层（结果必须带 id、读取带截断分页 offset、append_note/list_notes、Gemini 空 schema 兼容） |
+| `src/lib/chatParts.ts` | assistant 消息 parts JSON 解析（UI 渲染与回传模型共用，回传只取 text 段） |
 | `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
 | `src/components/editor/Editor.tsx` | Tiptap 编辑器主组件 |
 | `src/components/editor/EditorToolbar.tsx` | 编辑器固定工具栏（格式/列表/待办/图片） |
