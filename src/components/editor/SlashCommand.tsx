@@ -5,6 +5,7 @@ import {
   Heading1, Heading2, Heading3, List, ListOrdered, Quote, Minus,
   Table, CodeSquare, Highlighter, AlignCenter,
   Info, AlertTriangle, AlertCircle, ChevronDown,
+  Type, ImagePlus, Link2,
 } from 'lucide-react'
 
 export type SlashCommandGroup = 'basic' | 'format' | 'advanced' | 'ai'
@@ -15,6 +16,8 @@ export interface SlashCommandItem {
   title: string
   description: string
   group: SlashCommandGroup
+  // 搜索别名（英文/拼音），让 /h1、/img、/biaoge 都能命中
+  keywords?: string[]
   action: (editor: Editor) => void
 }
 
@@ -22,6 +25,8 @@ interface SlashCommandProps {
   editor: Editor
   items: SlashCommandItem[]
   position: { top: number; left: number }
+  // 过滤词 = 编辑器里 '/' 之后的真实文本（单一事实来源，IME/中文天然支持）
+  query: string
   onSelect: (item: SlashCommandItem) => void
   onClose: () => void
 }
@@ -33,56 +38,59 @@ const groupLabels: Record<SlashCommandGroup, string> = {
   ai: 'AI 命令',
 }
 
-export function SlashCommand({ items, position, onSelect, onClose }: SlashCommandProps) {
+export function SlashCommand({ items, position, query, onSelect, onClose }: SlashCommandProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [filterText, setFilterText] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const selectedItemRef = useRef<HTMLButtonElement>(null)
 
-  // 过滤命令
-  const filteredItems = filterText
+  // 过滤命令：标题/描述/别名
+  const q = query.trim().toLowerCase()
+  const filteredItems = q
     ? items.filter(item =>
-        item.title.toLowerCase().includes(filterText.toLowerCase()) ||
-        item.description.toLowerCase().includes(filterText.toLowerCase())
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.keywords?.some(k => k.includes(q))
       )
     : items
 
-  // 重置选中索引
-  useEffect(() => {
+  // 过滤词变化时重置选中索引（渲染期调整，避免 effect 级联渲染）
+  const [lastQuery, setLastQuery] = useState(query)
+  if (lastQuery !== query) {
+    setLastQuery(query)
     setSelectedIndex(0)
-  }, [filterText])
+  }
 
-  // 键盘导航
+  // 键盘导航：capture 阶段拦截，别让 ProseMirror 先吃掉 Enter/方向键
+  // （之前在冒泡阶段监听，Enter 选命令的同时正文里也换了行）
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // IME 组合期（Windows WebView2 报 key='Process'）不接管，避免误选
+      if (e.isComposing || e.key === 'Process') return
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedIndex((prev) => (prev + 1) % filteredItems.length)
+        e.stopPropagation()
+        setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredItems.length))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setSelectedIndex((prev) => (prev - 1 + filteredItems.length) % filteredItems.length)
-      } else if (e.key === 'Enter') {
+        e.stopPropagation()
+        setSelectedIndex((prev) => (prev - 1 + Math.max(1, filteredItems.length)) % Math.max(1, filteredItems.length))
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault()
+        e.stopPropagation()
         if (filteredItems[selectedIndex]) {
           onSelect(filteredItems[selectedIndex])
         }
       } else if (e.key === 'Escape') {
         e.preventDefault()
+        e.stopPropagation()
         onClose()
-      } else if (e.key === 'Backspace') {
-        if (filterText.length > 0) {
-          setFilterText(prev => prev.slice(0, -1))
-        } else {
-          onClose()
-        }
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        setFilterText(prev => prev + e.key)
       }
+      // 其余按键放行：字符进编辑器，过滤词由编辑器文本驱动
     }
 
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [filteredItems, selectedIndex, onSelect, onClose, filterText])
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [filteredItems, selectedIndex, onSelect, onClose])
 
   // 自动滚动到选中项
   useEffect(() => {
@@ -111,10 +119,10 @@ export function SlashCommand({ items, position, onSelect, onClose }: SlashComman
       }}
     >
       {/* 搜索提示 */}
-      {filterText && (
+      {q && (
         <div className="px-3 py-1.5 text-[11px] text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5">
           <span>搜索:</span>
-          <span className="text-indigo-500 font-medium">{filterText}</span>
+          <span className="text-indigo-500 font-medium">{query.trim()}</span>
         </div>
       )}
 
@@ -178,6 +186,7 @@ export function SlashCommand({ items, position, onSelect, onClose }: SlashComman
 }
 
 // 默认的斜杠命令项
+// eslint-disable-next-line react-refresh/only-export-components
 export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: string) => void): SlashCommandItem[] {
   return [
     // === 基础块 ===
@@ -187,6 +196,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '一级标题',
       description: '大标题',
       group: 'basic',
+      keywords: ["h1","biaoti","yijibiaoti","head"],
       action: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
     },
     {
@@ -195,6 +205,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '二级标题',
       description: '中标题',
       group: 'basic',
+      keywords: ["h2","erjibiaoti","head"],
       action: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
     },
     {
@@ -203,6 +214,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '三级标题',
       description: '小标题',
       group: 'basic',
+      keywords: ["h3","sanjibiaoti","head"],
       action: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
     },
     {
@@ -211,6 +223,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '无序列表',
       description: '项目符号列表',
       group: 'basic',
+      keywords: ["ul","list","wuxu","liebiao"],
       action: (editor) => editor.chain().focus().toggleBulletList().run(),
     },
     {
@@ -219,6 +232,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '有序列表',
       description: '数字编号列表',
       group: 'basic',
+      keywords: ["ol","ordered","youxu","liebiao","shuzi"],
       action: (editor) => editor.chain().focus().toggleOrderedList().run(),
     },
     {
@@ -227,6 +241,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '待办列表',
       description: '带复选框的待办清单',
       group: 'basic',
+      keywords: ["todo","task","checkbox","daiban","qingdan"],
       action: (editor) => editor.chain().focus().toggleTaskList().run(),
     },
     {
@@ -235,16 +250,71 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '引用',
       description: '引用块',
       group: 'basic',
+      keywords: ["quote","yinyong","yinwen"],
       action: (editor) => editor.chain().focus().toggleBlockquote().run(),
     },
 
+    {
+      id: 'paragraph',
+      icon: <Type className="h-4 w-4" />,
+      title: '正文',
+      description: '普通段落文本',
+      group: 'basic',
+      keywords: ["p", "text", "paragraph", "zhengwen", "putong"],
+      action: (editor) => editor.chain().focus().setParagraph().run(),
+    },
+    {
+      id: 'note-ref',
+      icon: <Link2 className="h-4 w-4" />,
+      title: '笔记引用',
+      description: '链接到另一篇笔记（双向链接）',
+      group: 'basic',
+      keywords: ["ref", "link", "wiki", "biji", "yinyong", "[["],
+      action: (editor) => editor.chain().focus().insertContent('[[').run(),
+    },
+
     // === 格式 ===
+    {
+      id: 'image',
+      icon: <ImagePlus className="h-4 w-4" />,
+      title: '图片',
+      description: '从本地选择图片插入',
+      group: 'format',
+      keywords: ["img", "image", "tupian", "pic", "photo"],
+      action: (editor) => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.multiple = true
+        input.onchange = async () => {
+          const files = Array.from(input.files ?? []).filter((f) => f.type.startsWith('image/'))
+          if (files.length === 0) return
+          const results = await Promise.allSettled(
+            files.map(
+              (file) =>
+                new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader()
+                  reader.onload = () => resolve(reader.result as string)
+                  reader.onerror = reject
+                  reader.readAsDataURL(file)
+                })
+            )
+          )
+          const srcs = results.filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled').map((r) => r.value)
+          if (srcs.length > 0) {
+            editor.chain().focus().insertContent(srcs.map((src) => ({ type: 'image', attrs: { src } }))).run()
+          }
+        }
+        input.click()
+      },
+    },
     {
       id: 'divider',
       icon: <Minus className="h-4 w-4" />,
       title: '分割线',
       description: '水平分隔线',
       group: 'format',
+      keywords: ["hr","divider","fengexian","line"],
       action: (editor) => editor.chain().focus().setHorizontalRule().run(),
     },
     {
@@ -253,6 +323,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '代码块',
       description: '语法高亮代码块',
       group: 'format',
+      keywords: ["code","codeblock","daima","daimakuai"],
       action: (editor) => editor.chain().focus().toggleCodeBlock().run(),
     },
     {
@@ -261,6 +332,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '表格',
       description: '插入 3x3 表格',
       group: 'format',
+      keywords: ["table","biaoge"],
       action: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
     },
     {
@@ -269,6 +341,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '高亮',
       description: '高亮选中文本',
       group: 'format',
+      keywords: ["highlight","mark","gaoliang"],
       action: (editor) => editor.chain().focus().toggleHighlight().run(),
     },
     {
@@ -277,6 +350,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '居中对齐',
       description: '文本居中',
       group: 'format',
+      keywords: ["center","juzhong","align","duiqi"],
       action: (editor) => editor.chain().focus().setTextAlign('center').run(),
     },
 
@@ -287,6 +361,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '信息提示',
       description: '蓝色信息提示框',
       group: 'advanced',
+      keywords: ["info","callout","xinxi","tishi"],
       action: (editor) => editor.chain().focus().insertContent({
         type: 'callout',
         attrs: { type: 'info' },
@@ -299,6 +374,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '警告提示',
       description: '黄色警告提示框',
       group: 'advanced',
+      keywords: ["warning","callout","jinggao"],
       action: (editor) => editor.chain().focus().insertContent({
         type: 'callout',
         attrs: { type: 'warning' },
@@ -311,6 +387,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '小贴士',
       description: '绿色提示框',
       group: 'advanced',
+      keywords: ["tip","callout","tieshi","tips"],
       action: (editor) => editor.chain().focus().insertContent({
         type: 'callout',
         attrs: { type: 'tip' },
@@ -323,6 +400,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '错误提示',
       description: '红色错误提示框',
       group: 'advanced',
+      keywords: ["error","callout","cuowu","danger"],
       action: (editor) => editor.chain().focus().insertContent({
         type: 'callout',
         attrs: { type: 'error' },
@@ -335,6 +413,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '折叠区块',
       description: '可展开/折叠的内容',
       group: 'advanced',
+      keywords: ["toggle","collapse","details","zhedie"],
       action: (editor) => {
         // Insert a simple toggle using blockquote as placeholder
         editor.chain().focus().insertContent({
@@ -351,6 +430,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: 'AI 续写',
       description: '根据上文继续写作',
       group: 'ai',
+      keywords: ["ai","continue","xuxie"],
       action: () => onAIAction('continue'),
     },
     {
@@ -359,6 +439,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '会议纪要',
       description: '生成结构化会议模板',
       group: 'ai',
+      keywords: ["meeting","huiyi","jiyao"],
       action: () => onAIAction('template', 'meeting'),
     },
     {
@@ -367,6 +448,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '脑暴大纲',
       description: '生成5点思维大纲',
       group: 'ai',
+      keywords: ["brainstorm","naobao","dagang","outline"],
       action: () => onAIAction('template', 'brainstorm'),
     },
     {
@@ -375,6 +457,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '代码实现',
       description: '根据描述生成代码',
       group: 'ai',
+      keywords: ["ai","code","daima","shixian"],
       action: () => onAIAction('template', 'code'),
     },
     {
@@ -383,6 +466,7 @@ export function getDefaultSlashCommands(onAIAction: (action: string, prompt?: st
       title: '自由提问',
       description: '输入自定义 AI 指令',
       group: 'ai',
+      keywords: ["ai","ask","prompt","tiwen","ziyou"],
       action: () => onAIAction('show-inline-prompt'),
     },
   ]

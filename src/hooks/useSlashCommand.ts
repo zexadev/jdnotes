@@ -16,11 +16,14 @@ export function useSlashCommand({
   diffStateActive,
 }: UseSlashCommandProps) {
   const [slashMenuPos, setSlashMenuPos] = useState<{ top: number; left: number } | null>(null)
+  // 过滤词 = 编辑器里 '/' 之后的真实文本（单一事实来源，中文/IME 天然支持）
+  const [slashQuery, setSlashQuery] = useState('')
   const slashStartPosRef = useRef<number | null>(null)
 
   // 关闭斜杠菜单
   const closeSlashMenu = useCallback(() => {
     setSlashMenuPos(null)
+    setSlashQuery('')
     slashStartPosRef.current = null
   }, [])
 
@@ -50,6 +53,7 @@ export function useSlashCommand({
 
   // 获取菜单项，包装编辑器命令使其也删除斜杠
   const slashCommands = useMemo(() => {
+    // eslint-disable-next-line react-hooks/refs -- handleAISlashSelect 是 useCallback 回调，非 ref
     const commands = getDefaultSlashCommands(handleAISlashSelect)
     return commands.map((cmd) => {
       if (cmd.group !== 'ai') {
@@ -128,30 +132,45 @@ export function useSlashCommand({
         if (left < 0) left = 4
 
         setSlashMenuPos({ top, left })
+        setSlashQuery('')
         slashStartPosRef.current = from - 1
       } else if (slashMenuPos) {
-        // 如果输入了其他字符，关闭菜单
+        // 菜单开着：'/' 之后的文本就是过滤词；'/' 被删或输入空格则关闭
         const textFromSlash = editor.state.doc.textBetween(
           slashStartPosRef.current || 0,
           from
         )
-        if (!textFromSlash.startsWith('/') || textFromSlash.includes(' ')) {
+        if (!textFromSlash.startsWith('/') || textFromSlash.includes(' ') || textFromSlash.length > 24) {
           closeSlashMenu()
+        } else {
+          setSlashQuery(textFromSlash.slice(1))
         }
       }
     }
 
+    // 光标移出 '/' 区域（点击别处/方向键跳走）即关闭
+    const handleSelectionChange = () => {
+      if (!slashMenuPos || slashStartPosRef.current === null || !editor) return
+      const { from, to } = editor.state.selection
+      if (from !== to || from <= slashStartPosRef.current || from > slashStartPosRef.current + 25) {
+        closeSlashMenu()
+      }
+    }
+
     editor.on('update', handleInput)
+    editor.on('selectionUpdate', handleSelectionChange)
     document.addEventListener('keydown', handleKeyDown)
 
     return () => {
       editor.off('update', handleInput)
+      editor.off('selectionUpdate', handleSelectionChange)
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [editor, editorContainerRef, slashMenuPos, closeSlashMenu, diffStateActive])
 
   return {
     slashMenuPos,
+    slashQuery,
     slashCommands,
     closeSlashMenu,
   }

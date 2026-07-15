@@ -299,24 +299,32 @@ export function Editor({
     title,
   })
 
+  const [inlinePromptPos, setInlinePromptPos] = useState<{ top: number; left: number } | null>(null)
+  const [inlineHasSelection, setInlineHasSelection] = useState(false)
+
+  // 统一的 AI 输入条入口：Ctrl+J / 气泡菜单 AI 按钮 / 斜杠「自由提问」共用
+  const openInlinePrompt = useCallback(() => {
+    if (!editor || !editorContainerRef.current || diffState.isActive) return
+    const { from, to } = editor.state.selection
+    const coords = editor.view.coordsAtPos(from)
+    const containerRect = editorContainerRef.current.getBoundingClientRect()
+    setInlineHasSelection(from !== to)
+    setInlinePromptPos({
+      top: coords.bottom - containerRect.top + 4,
+      left: Math.max(0, coords.left - containerRect.left),
+    })
+  }, [editor, editorContainerRef, diffState.isActive])
+
   // 包装斜杠命令回调，拦截 show-inline-prompt
   const handleSlashAction = useCallback((action: string, templateType?: string) => {
     if (action === 'show-inline-prompt') {
-      if (!editor || !editorContainerRef.current) return
-      const { from, to } = editor.state.selection
-      const coords = editor.view.coordsAtPos(from)
-      const containerRect = editorContainerRef.current.getBoundingClientRect()
-      setInlineHasSelection(from !== to)
-      setInlinePromptPos({
-        top: coords.bottom - containerRect.top + 4,
-        left: Math.max(0, coords.left - containerRect.left),
-      })
+      openInlinePrompt()
       return
     }
     startAIFromSlashCommand(action, templateType)
-  }, [editor, editorContainerRef, startAIFromSlashCommand])
+  }, [openInlinePrompt, startAIFromSlashCommand])
 
-  const { slashMenuPos, slashCommands, closeSlashMenu } = useSlashCommand({
+  const { slashMenuPos, slashQuery, slashCommands, closeSlashMenu } = useSlashCommand({
     editor,
     editorContainerRef,
     onAIAction: handleSlashAction,
@@ -583,6 +591,7 @@ export function Editor({
               editor={editor}
               items={slashCommands}
               position={slashMenuPos}
+              query={slashQuery}
               onSelect={(item) => item.action(editor)}
               onClose={closeSlashMenu}
             />
