@@ -4,6 +4,14 @@ import { useAIConfig, PROVIDER_PRESETS, OPENAI_COMPATIBLE_PRESETS } from '../../
 import type { AIProvider, AISource } from '../../hooks/useSettings'
 import { Select } from '../../components/common/Select'
 import type { SelectOption } from '../../components/common/Select'
+import { SearchApiSettings } from '../../components/settings/SearchApiSettings'
+import { inferContextWindow } from '../../lib/contextBudget'
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${n / 1_000_000}M`
+  if (n >= 1000) return `${Math.round(n / 1000)}k`
+  return String(n)
+}
 
 const PROVIDER_OPTIONS: SelectOption<AIProvider>[] = [
   { value: 'openai', label: 'OpenAI 兼容', description: '支持 OpenAI、DeepSeek、智谱、通义、Moonshot 等' },
@@ -265,6 +273,33 @@ export function AISettings() {
                   className="w-full px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-[#5E6AD2] focus:border-transparent outline-none transition-all"
                 />
               </div>
+
+              {/* 上下文窗口 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  上下文窗口
+                  <span className="ml-1 text-gray-400 font-normal">（tokens，可选）</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={selected.contextWindow ?? ''}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10)
+                    updateSource(selected.id, { contextWindow: Number.isFinite(v) && v > 0 ? v : undefined })
+                  }}
+                  onBlur={() => {
+                    // 填「128」按 128k 理解（没有窗口小于 1000 token 的模型）
+                    const v = selected.contextWindow
+                    if (v && v < 1000) updateSource(selected.id, { contextWindow: v * 1000 })
+                  }}
+                  placeholder={`自动：${formatTokens(inferContextWindow(selected.model))}（按模型名识别）`}
+                  className="w-full px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-[#5E6AD2] focus:border-transparent outline-none transition-all"
+                />
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  影响 AI 对话的占用指示与自动压缩时机。不填按模型真实窗口自动识别；本地 Ollama 建议按实际 num_ctx 填写。
+                </p>
+              </div>
             </div>
           ) : (
             <div className="text-center py-12 text-sm text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
@@ -280,6 +315,9 @@ export function AISettings() {
           更改设置后会立即生效，无需重启应用。点击来源左侧圆圈或右上角"设为激活"切换当前使用的来源。
         </p>
       </div>
+
+      {/* 联网搜索 API 配置 */}
+      <SearchApiSettings />
     </div>
   )
 }

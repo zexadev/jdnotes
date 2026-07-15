@@ -197,6 +197,36 @@ pub async fn get_config_path(app: tauri::AppHandle) -> Result<String, String> {
     db::get_config_file_path(&app)
 }
 
+/// 获取联网搜索 API 配置（提供商列表）
+#[tauri::command]
+pub async fn get_search_api_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let cfg = db::get_search_api(&app)?;
+    // 归一化返回列表：把旧版单字段迁移进来，前端只需处理列表
+    let mut providers = cfg.providers.clone();
+    if providers.is_empty() && !cfg.provider.is_empty() && !cfg.api_key.is_empty() {
+        providers.push(db::SearchProviderEntry {
+            provider: cfg.provider.clone(),
+            api_key: cfg.api_key.clone(),
+            enabled: true,
+        });
+    }
+    let list: Vec<serde_json::Value> = providers.iter().map(|p| {
+        serde_json::json!({ "provider": p.provider, "apiKey": p.api_key, "enabled": p.enabled })
+    }).collect();
+    Ok(serde_json::json!({ "providers": list }))
+}
+
+/// 保存联网搜索 API 配置（提供商列表）
+#[tauri::command]
+pub async fn save_search_api_config(app: tauri::AppHandle, providers: Vec<serde_json::Value>) -> Result<(), String> {
+    let entries: Vec<db::SearchProviderEntry> = providers.iter().map(|p| db::SearchProviderEntry {
+        provider: p.get("provider").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        api_key: p.get("apiKey").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        enabled: p.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true),
+    }).collect();
+    db::set_search_api(&app, entries)
+}
+
 /// 获取本设备名称
 #[tauri::command]
 pub async fn get_device_name(app: tauri::AppHandle) -> Result<String, String> {
@@ -443,69 +473,357 @@ pub async fn sync_gc_attachments(app: tauri::AppHandle) -> Result<serde_json::Va
 
 // ============= 联网功能 =============
 
-/// 搜索网页（通过 DuckDuckGo HTML 搜索）
-#[tauri::command]
-pub async fn web_search(query: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+/// 构造带完整浏览器头的 HTTP 客户端（搜索引擎会对裸头/裸指纹请求返回无结果的挑战页）
+fn search_client() -> Result<reqwest::Client, String> {
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        reqwest::header::ACCEPT,
+        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8".parse().unwrap(),
+    );
+    headers.insert(reqwest::header::ACCEPT_LANGUAGE, "zh-CN,zh;q=0.9,en;q=0.8".parse().unwrap());
+    reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+        .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))
+}
 
-    let response = client
-        .post("https://html.duckduckgo.com/html/")
-        .form(&[("q", &query)])
+struct SearchHit {
+    title: String,
+    url: String,
+    snippet: String,
+}
+
+fn format_hits(hits: &[SearchHit]) -> String {
+    hits.iter()
+        .enumerate()
+        .map(|(i, h)| format!("{}. {}\n   {}\n   {}", i + 1, h.title.trim(), h.url.trim(), h.snippet.trim()))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+// 相关性过滤：抓取引擎反爬后常整页返回不相关站点（"渭南天气"→Netflix）。
+// 提取查询里的 latin 词（≥2 字符）与 CJK 二元组，任一命中标题/摘要即保留。
+// 全部被过滤掉时返回空 → 触发下一引擎回退，好过把垃圾喂给模型。
+fn query_terms(query: &str) -> Vec<String> {
+    let mut terms: Vec<String> = Vec::new();
+    // latin 单词
+    for w in query.split(|c: char| !c.is_alphanumeric()) {
+        let w = w.to_lowercase();
+        if w.len() >= 2 && w.is_ascii() {
+            terms.push(w);
+        }
+    }
+    // CJK 二元组（连续汉字滑窗）
+    let cjk: Vec<char> = query.chars().filter(|c| ('\u{4e00}'..='\u{9fff}').contains(c)).collect();
+    for pair in cjk.windows(2) {
+        terms.push(pair.iter().collect());
+    }
+    // 单字兜底（查询只有一两个汉字时）
+    if terms.is_empty() {
+        for c in cjk {
+            terms.push(c.to_string());
+        }
+    }
+    terms
+}
+
+fn filter_relevant(hits: Vec<SearchHit>, query: &str) -> Vec<SearchHit> {
+    let terms = query_terms(query);
+    if terms.is_empty() {
+        return hits;
+    }
+    hits.into_iter()
+        .filter(|h| {
+            let hay = format!("{} {}", h.title, h.snippet).to_lowercase();
+            terms.iter().any(|t| hay.contains(t.as_str()))
+        })
+        .collect()
+}
+
+/// 从 HTML 里按选择器提取搜索结果（title/url/snippet 选择器相对结果块）
+fn scrape_hits(html: &str, block_sel: &str, title_sel: &str, url_sel: &str, snippet_sel: &str) -> Vec<SearchHit> {
+    let document = scraper::Html::parse_document(html);
+    let block = match scraper::Selector::parse(block_sel) { Ok(s) => s, Err(_) => return vec![] };
+    let title = scraper::Selector::parse(title_sel).unwrap();
+    let url = scraper::Selector::parse(url_sel).unwrap();
+    let snippet = scraper::Selector::parse(snippet_sel).unwrap();
+
+    let mut hits = Vec::new();
+    for result in document.select(&block).take(8) {
+        let t: String = result.select(&title).next().map(|e| e.text().collect()).unwrap_or_default();
+        // url 选择器优先取 href（lite/bing 的可读 URL 就是链接本身）
+        let u: String = result
+            .select(&url)
+            .next()
+            .map(|e| {
+                let text: String = e.text().collect();
+                let text = text.trim().to_string();
+                if text.is_empty() { e.value().attr("href").unwrap_or_default().to_string() } else { text }
+            })
+            .unwrap_or_default();
+        let s: String = result.select(&snippet).next().map(|e| e.text().collect()).unwrap_or_default();
+        if !t.trim().is_empty() {
+            hits.push(SearchHit { title: t, url: u, snippet: s });
+        }
+    }
+    hits
+}
+
+/// 从 RSS XML 里提取 item 的 title/link/description（RSS 结构简单，字符串切片即可，不引 XML 依赖）
+fn parse_rss_hits(xml: &str) -> Vec<SearchHit> {
+    fn tag_text(chunk: &str, tag: &str) -> String {
+        let open = format!("<{}>", tag);
+        let close = format!("</{}>", tag);
+        let Some(s) = chunk.find(&open) else { return String::new() };
+        let rest = &chunk[s + open.len()..];
+        let Some(e) = rest.find(&close) else { return String::new() };
+        decode_entities(rest[..e].trim())
+    }
+    fn decode_entities(s: &str) -> String {
+        s.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&amp;", "&")
+    }
+    xml.split("<item>")
+        .skip(1)
+        .take(8)
+        .map(|chunk| {
+            let chunk = chunk.split("</item>").next().unwrap_or(chunk);
+            SearchHit {
+                title: tag_text(chunk, "title"),
+                url: tag_text(chunk, "link"),
+                snippet: tag_text(chunk, "description"),
+            }
+        })
+        .filter(|h| !h.title.trim().is_empty())
+        .collect()
+}
+
+// Bing RSS：结构化输出、编码安全、结果相关性好——作为首选引擎
+async fn search_bing_rss(client: &reqwest::Client, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .get("https://www.bing.com/search")
+        .query(&[("q", query), ("format", "rss"), ("count", "8")])
         .send()
         .await
-        .map_err(|e| format!("搜索请求失败: {}", e))?;
+        .map_err(|e| format!("Bing: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Bing HTTP {}", resp.status()));
+    }
+    let xml = resp.text().await.map_err(|e| format!("Bing 读取失败: {}", e))?;
+    Ok(filter_relevant(parse_rss_hits(&xml), query))
+}
 
-    if !response.status().is_success() {
-        return Err(format!("搜索失败: HTTP {}", response.status()));
+// DuckDuckGo Lite：表格布局，作为 Bing 不可用时的兜底
+async fn search_ddg_lite(client: &reqwest::Client, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .post("https://lite.duckduckgo.com/lite/")
+        .form(&[("q", query)])
+        .send()
+        .await
+        .map_err(|e| format!("DDG lite: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("DDG lite HTTP {}", resp.status()));
+    }
+    let html = resp.text().await.map_err(|e| format!("DDG lite 读取失败: {}", e))?;
+    let document = scraper::Html::parse_document(&html);
+    let link_sel = scraper::Selector::parse("a.result-link").unwrap();
+    let snip_sel = scraper::Selector::parse("td.result-snippet").unwrap();
+    let links: Vec<_> = document.select(&link_sel).take(8).collect();
+    let snippets: Vec<String> = document.select(&snip_sel).take(8).map(|e| e.text().collect()).collect();
+    let hits: Vec<SearchHit> = links
+        .iter()
+        .enumerate()
+        .map(|(i, a)| SearchHit {
+            title: a.text().collect(),
+            url: a.value().attr("href").unwrap_or_default().to_string(),
+            snippet: snippets.get(i).cloned().unwrap_or_default(),
+        })
+        .filter(|h| !h.title.trim().is_empty())
+        .collect();
+    Ok(filter_relevant(hits, query))
+}
+
+// DuckDuckGo HTML：反爬后常返回不相关结果，作为最后兜底
+async fn search_ddg_html(client: &reqwest::Client, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .post("https://html.duckduckgo.com/html/")
+        .form(&[("q", query)])
+        .send()
+        .await
+        .map_err(|e| format!("DDG html: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("DDG html HTTP {}", resp.status()));
+    }
+    let html = resp.text().await.map_err(|e| format!("DDG html 读取失败: {}", e))?;
+    let hits = scrape_hits(&html, ".result.results_links", ".result__a", ".result__url", ".result__snippet");
+    Ok(filter_relevant(hits, query))
+}
+
+// Tavily：专为 LLM 设计的搜索 API，返回干净的标题/URL/正文摘要，中英文都好
+async fn search_tavily(client: &reqwest::Client, api_key: &str, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .post("https://api.tavily.com/search")
+        .json(&serde_json::json!({
+            "api_key": api_key,
+            "query": query,
+            "max_results": 8,
+            "search_depth": "basic",
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Tavily: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Tavily HTTP {}（检查 API Key）", resp.status()));
+    }
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("Tavily 解析失败: {}", e))?;
+    let hits = json["results"].as_array().map(|arr| {
+        arr.iter().map(|r| SearchHit {
+            title: r["title"].as_str().unwrap_or("").to_string(),
+            url: r["url"].as_str().unwrap_or("").to_string(),
+            snippet: r["content"].as_str().unwrap_or("").to_string(),
+        }).filter(|h| !h.title.trim().is_empty()).collect()
+    }).unwrap_or_default();
+    Ok(hits)
+}
+
+// Brave Search API：独立索引，返回标准 web 结果
+async fn search_brave(client: &reqwest::Client, api_key: &str, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .get("https://api.search.brave.com/res/v1/web/search")
+        .header("X-Subscription-Token", api_key)
+        .header("Accept", "application/json")
+        .query(&[("q", query), ("count", "8")])
+        .send()
+        .await
+        .map_err(|e| format!("Brave: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Brave HTTP {}（检查 API Key）", resp.status()));
+    }
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("Brave 解析失败: {}", e))?;
+    let hits = json["web"]["results"].as_array().map(|arr| {
+        arr.iter().map(|r| SearchHit {
+            title: r["title"].as_str().unwrap_or("").to_string(),
+            url: r["url"].as_str().unwrap_or("").to_string(),
+            snippet: r["description"].as_str().unwrap_or("").to_string(),
+        }).filter(|h| !h.title.trim().is_empty()).collect()
+    }).unwrap_or_default();
+    Ok(hits)
+}
+
+// Serper.dev：Google 结果，2500 次免费额度
+async fn search_serper(client: &reqwest::Client, api_key: &str, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .post("https://google.serper.dev/search")
+        .header("X-API-KEY", api_key)
+        .json(&serde_json::json!({ "q": query, "num": 8 }))
+        .send()
+        .await
+        .map_err(|e| format!("Serper: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Serper HTTP {}（检查 API Key）", resp.status()));
+    }
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("Serper 解析失败: {}", e))?;
+    let hits = json["organic"].as_array().map(|arr| {
+        arr.iter().take(8).map(|r| SearchHit {
+            title: r["title"].as_str().unwrap_or("").to_string(),
+            url: r["link"].as_str().unwrap_or("").to_string(),
+            snippet: r["snippet"].as_str().unwrap_or("").to_string(),
+        }).filter(|h| !h.title.trim().is_empty()).collect()
+    }).unwrap_or_default();
+    Ok(hits)
+}
+
+// Jina AI Search（s.jina.ai）：返回结果列表，X-Respond-With: no-content 只要标题/链接/摘要
+async fn search_jina(client: &reqwest::Client, api_key: &str, query: &str) -> Result<Vec<SearchHit>, String> {
+    let resp = client
+        .get(format!("https://s.jina.ai/{}", urlencoding::encode(query)))
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Accept", "application/json")
+        .header("X-Respond-With", "no-content")
+        .send()
+        .await
+        .map_err(|e| format!("Jina: {}", e))?;
+    if !resp.status().is_success() {
+        return Err(format!("Jina HTTP {}（检查 API Key）", resp.status()));
+    }
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("Jina 解析失败: {}", e))?;
+    let hits = json["data"].as_array().map(|arr| {
+        arr.iter().take(8).map(|r| SearchHit {
+            title: r["title"].as_str().unwrap_or("").to_string(),
+            url: r["url"].as_str().unwrap_or("").to_string(),
+            snippet: r["description"].as_str().unwrap_or("").to_string(),
+        }).filter(|h| !h.title.trim().is_empty()).collect()
+    }).unwrap_or_default();
+    Ok(hits)
+}
+
+async fn call_search_provider(
+    client: &reqwest::Client,
+    provider: &str,
+    api_key: &str,
+    query: &str,
+) -> Result<Vec<SearchHit>, String> {
+    match provider {
+        "tavily" => search_tavily(client, api_key, query).await,
+        "brave" => search_brave(client, api_key, query).await,
+        "serper" => search_serper(client, api_key, query).await,
+        "jina" => search_jina(client, api_key, query).await,
+        other => Err(format!("未知搜索提供商: {}", other)),
+    }
+}
+
+// 轮换起点计数器：每次搜索换一个起始提供商，把各家月额度摊平使用
+static SEARCH_ROTATION: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// 搜索网页：优先用配置的专业 API（Tavily/Brave，结果远优于抓取）；
+/// 未配置时回退 Bing RSS → DuckDuckGo Lite → DuckDuckGo HTML 抓取。
+/// 抓取对中文/生僻查询不可靠、反爬后常吐不相关结果，故推荐配置 API key。
+#[tauri::command]
+pub async fn web_search(app: tauri::AppHandle, query: String) -> Result<String, String> {
+    let client = search_client()?;
+    let mut errors: Vec<String> = Vec::new();
+
+    macro_rules! try_engine {
+        ($name:expr, $call:expr) => {
+            match $call.await {
+                Ok(hits) if !hits.is_empty() => return Ok(format_hits(&hits)),
+                Ok(_) => errors.push(format!("{} 返回空结果", $name)),
+                Err(e) => errors.push(e),
+            }
+        };
     }
 
-    let html = response
-        .text()
-        .await
-        .map_err(|e| format!("读取搜索结果失败: {}", e))?;
-
-    // 解析 DuckDuckGo HTML 搜索结果
-    let document = scraper::Html::parse_document(&html);
-    let result_selector = scraper::Selector::parse(".result.results_links").unwrap();
-    let title_selector = scraper::Selector::parse(".result__a").unwrap();
-    let snippet_selector = scraper::Selector::parse(".result__snippet").unwrap();
-    let url_selector = scraper::Selector::parse(".result__url").unwrap();
-
-    let mut results = Vec::new();
-    for (i, result) in document.select(&result_selector).enumerate() {
-        if i >= 8 { break; } // 最多 8 条结果
-
-        let title = result
-            .select(&title_selector)
-            .next()
-            .map(|e| e.text().collect::<String>())
-            .unwrap_or_default();
-
-        let snippet = result
-            .select(&snippet_selector)
-            .next()
-            .map(|e| e.text().collect::<String>())
-            .unwrap_or_default();
-
-        let url = result
-            .select(&url_selector)
-            .next()
-            .map(|e| e.text().collect::<String>().trim().to_string())
-            .unwrap_or_default();
-
-        if !title.is_empty() {
-            results.push(format!("{}. {}\n   {}\n   {}", i + 1, title.trim(), url.trim(), snippet.trim()));
+    // 优先用配置的搜索 API：多提供商轮换，某个限流/失效自动切下一个，摊平各家免费额度。
+    // 起点每次搜索递增（round-robin），避免总是先打爆同一家。
+    if let Ok(cfg) = db::get_search_api(&app) {
+        let providers = cfg.active_providers();
+        if !providers.is_empty() {
+            let start = SEARCH_ROTATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            for i in 0..providers.len() {
+                let p = &providers[(start + i) % providers.len()];
+                match call_search_provider(&client, &p.provider, &p.api_key, &query).await {
+                    Ok(hits) if !hits.is_empty() => return Ok(format_hits(&hits)),
+                    Ok(_) => errors.push(format!("{} 返回空结果", p.provider)),
+                    Err(e) => errors.push(e),
+                }
+            }
         }
     }
 
-    if results.is_empty() {
-        Ok(format!("没有找到关于「{}」的搜索结果", query))
-    } else {
-        Ok(results.join("\n\n"))
-    }
+    try_engine!("Bing", search_bing_rss(&client, &query));
+    try_engine!("DDG lite", search_ddg_lite(&client, &query));
+    try_engine!("DDG html", search_ddg_html(&client, &query));
+
+    Ok(format!(
+        "没有找到关于「{}」的搜索结果（{}）。若经常搜不到，建议在「设置 → AI」配置 Tavily/Brave 搜索 API Key。",
+        query,
+        errors.join("；")
+    ))
 }
 
 /// 读取网页内容（直接抓取并提取正文）

@@ -72,6 +72,57 @@ pub struct AppConfig {
     /// 后端权威，杜绝前端篡改把分享对象升格成全量同步。
     #[serde(default)]
     pub mine_fingerprints: Vec<String>,
+    /// 联网搜索 API 配置。填了 key 就走专业 API（结果远优于抓取），留空回退抓取 Bing/DDG。
+    #[serde(default)]
+    pub search_api: SearchApiConfig,
+}
+
+/// 单个搜索 API 提供商配置
+#[derive(serde::Serialize, serde::Deserialize, Default, Clone)]
+pub struct SearchProviderEntry {
+    /// 提供商："tavily" | "brave" | "serper" | "jina"
+    pub provider: String,
+    /// API Key
+    #[serde(default)]
+    pub api_key: String,
+    /// 是否启用（关掉后轮换时跳过，但保留 Key）
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// 联网搜索 API 配置：多提供商轮换，摊开各家免费额度
+#[derive(serde::Serialize, serde::Deserialize, Default, Clone)]
+pub struct SearchApiConfig {
+    /// 旧版单提供商字段（仅用于向后兼容迁移，新代码读 providers）
+    #[serde(default)]
+    pub provider: String,
+    #[serde(default)]
+    pub api_key: String,
+    /// 提供商列表，按轮换顺序使用
+    #[serde(default)]
+    pub providers: Vec<SearchProviderEntry>,
+}
+
+impl SearchApiConfig {
+    /// 归一化：把旧版单字段迁移进 providers 列表，返回启用且有 key 的提供商
+    pub fn active_providers(&self) -> Vec<SearchProviderEntry> {
+        let mut list = self.providers.clone();
+        // 兼容旧配置：只有单字段没有列表时，迁移进来
+        if list.is_empty() && !self.provider.is_empty() && !self.api_key.is_empty() {
+            list.push(SearchProviderEntry {
+                provider: self.provider.clone(),
+                api_key: self.api_key.clone(),
+                enabled: true,
+            });
+        }
+        list.into_iter()
+            .filter(|p| p.enabled && !p.api_key.trim().is_empty() && !p.provider.is_empty())
+            .collect()
+    }
 }
 
 fn default_ai_sources() -> Vec<AISource> {
@@ -426,6 +477,24 @@ pub fn save_ai_config(app: &tauri::AppHandle, sources: Vec<AISource>, active_sou
 pub fn get_config_file_path(app: &tauri::AppHandle) -> Result<String, String> {
     let config_path = get_config_path(app)?;
     Ok(config_path.to_string_lossy().to_string())
+}
+
+/// 获取联网搜索 API 配置
+pub fn get_search_api(app: &tauri::AppHandle) -> Result<SearchApiConfig, String> {
+    Ok(load_config(app)?.search_api)
+}
+
+/// 保存联网搜索 API 提供商列表
+pub fn set_search_api(app: &tauri::AppHandle, providers: Vec<SearchProviderEntry>) -> Result<(), String> {
+    let mut config = load_config(app)?;
+    // 写入新列表，清掉旧版单字段避免迁移逻辑重复叠加
+    config.search_api = SearchApiConfig {
+        provider: String::new(),
+        api_key: String::new(),
+        providers,
+    };
+    save_config(app, &config)?;
+    Ok(())
 }
 
 /// 获取本设备名称

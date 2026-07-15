@@ -182,6 +182,8 @@ pub fn run() {
             commands::get_ai_config,
             commands::save_ai_config,
             commands::get_config_path,
+            commands::get_search_api_config,
+            commands::save_search_api_config,
             commands::get_device_name,
             commands::set_device_name,
             // 联网功能
