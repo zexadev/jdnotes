@@ -564,7 +564,7 @@ body {
   }
 }
 
-/* AI 审查工具栏 - 圆润浮动条风格 */
+/* AI 审查工具栏 - 与 Ctrl+J 输入条/气泡菜单/斜杠菜单同一套浮动卡片语言 */
 .ai-review-toolbar {
   animation: ai-toolbar-appear 0.3s cubic-bezier(0, -0.02, 0.4, 1.25);
 }
@@ -573,22 +573,20 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
-  background: #f0f1f4;
-  border-radius: 100px;
-  box-shadow:
-    0 -1px 1px rgba(0, 0, 0, 0.08),
-    0 2px 6px rgba(0, 0, 0, 0.12),
-    inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(229, 231, 235, 0.5);
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   transition: 0.3s cubic-bezier(0, -0.02, 0.4, 1.25);
 }
 
 .dark .ai-review-toolbar__container {
-  background: #1D1F2C;
-  box-shadow:
-    0 -1px 1px rgba(0, 0, 0, 0.25),
-    0 2px 8px rgba(0, 0, 0, 0.4),
-    inset 0 1px 2px rgba(255, 255, 255, 0.05);
+  background: rgba(28, 28, 31, 0.95);
+  border-color: rgba(55, 65, 81, 0.5);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 .ai-review-toolbar__sparkle {
@@ -640,7 +638,7 @@ body {
   font-size: 12px;
   font-weight: 500;
   border: none;
-  border-radius: 100px;
+  border-radius: 0.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
