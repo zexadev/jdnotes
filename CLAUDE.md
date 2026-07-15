@@ -59,6 +59,7 @@
 | `src/hooks/useAIStream.ts` | 模型调用层（4 provider 流式+工具循环、429/5xx 指数退避重试 callWithRetry、旧工具结果 microcompact 折叠、Anthropic prompt cache + 旧模型 max_tokens 400 回退、generateOnce 单次生成供压缩用） |
 | `src/lib/contextBudget.ts` | 上下文预算（token 估算 CJK=1/字·其他/3.5、每模型真实窗口表 inferContextWindow、手填 contextWindow 优先、64k 兜底、自动压缩阈值 0.7、图片/工具 schema 开销、压缩器系统提示） |
 | `src/lib/tagColor.ts` | 标签颜色（标签名 djb2 哈希 → 12 色盘，零存储、处处一致；侧栏图标与 TagsInput chip 共用） |
+| `src/components/layout/Sidebar.tsx` | 左侧导航（标签区按使用数降序、默认 Top8+激活钉住、展开全部带筛选——标签上百平铺列表失控） |
 | `src/hooks/useEditorAI.ts` | 编辑器内联 AI（Cursor 式就地 diff：原文标 aiOld 红删除线保留、新文本 aiHighlight 绿标紧随流式生长、接受/放弃/重试/追加指令按范围操作；插入必须用显式 marks 建文本节点——tr.insertText 会继承插入点 marks 导致红标漏进正文；换行语义：开头 \n 丢弃、\n\n 用 tr.split 真分段（range.to +2）、单 \n 硬换行、尾部换行悬挂跨 chunk） |
 | `src/components/ai/AIReviewToolbar.tsx`·`AIInlinePrompt.tsx`·`AIOldMark.ts` | 浮动审查条（跟随生成位置，Tab/Ctrl+Enter 接受、Esc 放弃、重试、追加指令）·Ctrl+J 输入条（快捷动作 chips，为唯一 AI 面板——气泡菜单/斜杠「自由提问」都只是它的入口）·原文红标 mark |
 | `src/lib/aiTools.ts` | AI 工具层（结果必须带 id、读取带截断分页 offset、append_note/list_notes、Gemini 空 schema 兼容） |
