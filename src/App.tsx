@@ -565,30 +565,52 @@ function App() {
       />
 
       <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
-        {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区；沉浸模式整列隐藏 */}
-        {!isImmersive && (
-          <Sidebar
-            currentView={currentView}
-            onViewChange={setCurrentView}
-            counts={counts}
-            allTags={allTags}
-            allNotes={allNotes || []}
-            onOpenSettings={() => setCurrentView('settings')}
-            sidebarState={sidebarState}
-          />
-        )}
+        {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区；沉浸模式整列收拢 */}
+        <AnimatePresence initial={false}>
+          {!isImmersive && (
+            <motion.div
+              key="app-sidebar"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 'auto', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+              className="h-full flex-shrink-0 overflow-hidden flex"
+            >
+              <Sidebar
+                currentView={currentView}
+                onViewChange={setCurrentView}
+                counts={counts}
+                allTags={allTags}
+                allNotes={allNotes || []}
+                onOpenSettings={() => setCurrentView('settings')}
+                sidebarState={sidebarState}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* 右列：顶栏（只压内容区）+ 内容 */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {!isImmersive && (
-            <TitleBar
-              searchQuery={searchQuery}
-              onSearchChange={handleSearchChange}
-              sidebarState={sidebarState}
-              onToggleSidebar={cycleSidebar}
-              showBrandFallback={sidebarState === 'hidden'}
-            />
-          )}
+          <AnimatePresence initial={false}>
+            {!isImmersive && (
+              <motion.div
+                key="app-titlebar"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                className="flex-shrink-0 overflow-hidden"
+              >
+                <TitleBar
+                  searchQuery={searchQuery}
+                  onSearchChange={handleSearchChange}
+                  sidebarState={sidebarState}
+                  onToggleSidebar={cycleSidebar}
+                  showBrandFallback={sidebarState === 'hidden'}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="flex-1 flex overflow-hidden">
             <AnimatePresence mode="wait">
@@ -645,28 +667,39 @@ function App() {
                 transition={{ duration: 0.12 }}
                 className="flex-1 flex h-full overflow-hidden"
               >
-                {!isImmersive && (
-                <NoteList
-                  searchQuery={searchQuery}
-                  onClearSearch={() => {
-                    // 列表内「清空搜索」：只清过滤、留在当前笔记列表，
-                    // 不走标题栏 × 的「回到搜索前视图」逻辑，避免把人弹回仪表盘
-                    setSearchQuery('')
-                    viewBeforeSearchRef.current = null
-                  }}
-                  currentView={currentView}
-                  notes={notes}
-                  activeNoteId={activeNoteId}
-                  onSelectNote={handleSelectNote}
-                  onCreateNote={handleCreateNote}
-                  onDeleteNote={handleDeleteNote}
-                  onRestoreNote={handleRestoreNote}
-                  onPermanentDelete={handlePermanentDelete}
-                  onBatchDelete={handleDeleteNotes}
-                  onBatchRestore={handleRestoreNotes}
-                  onBatchPermanentDelete={handlePermanentDeleteNotes}
-                />
-                )}
+                <AnimatePresence initial={false}>
+                  {!isImmersive && (
+                    <motion.div
+                      key="app-notelist"
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: 'auto', opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                      className="h-full flex-shrink-0 overflow-hidden flex"
+                    >
+                      <NoteList
+                        searchQuery={searchQuery}
+                        onClearSearch={() => {
+                          // 列表内「清空搜索」：只清过滤、留在当前笔记列表，
+                          // 不走标题栏 × 的「回到搜索前视图」逻辑，避免把人弹回仪表盘
+                          setSearchQuery('')
+                          viewBeforeSearchRef.current = null
+                        }}
+                        currentView={currentView}
+                        notes={notes}
+                        activeNoteId={activeNoteId}
+                        onSelectNote={handleSelectNote}
+                        onCreateNote={handleCreateNote}
+                        onDeleteNote={handleDeleteNote}
+                        onRestoreNote={handleRestoreNote}
+                        onPermanentDelete={handlePermanentDelete}
+                        onBatchDelete={handleDeleteNotes}
+                        onBatchRestore={handleRestoreNotes}
+                        onBatchPermanentDelete={handlePermanentDeleteNotes}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* 右侧编辑器 + AI 侧栏 */}
                 <div className="flex-1 flex h-full overflow-hidden">
