@@ -29,15 +29,15 @@ export function SidebarItem({
           collapsed ? 'justify-center px-0 py-2' : 'gap-2 px-3 py-2'
         } ${
           active
-            ? 'bg-white dark:bg-white/[0.03] text-slate-900 dark:text-slate-100 font-medium shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]'
+            ? 'bg-[#5E6AD2]/10 text-[#5E6AD2] font-medium'
             : 'text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-white/[0.02]'
         }`}
       >
-        {active && !collapsed && <span className="w-0.5 h-4 bg-[#5E6AD2] rounded-full -ml-1 mr-1" />}
-        <Icon className={`h-4 w-4 flex-shrink-0 ${active && collapsed ? 'text-[#5E6AD2]' : ''}`} strokeWidth={1.5} />
+        {active && !collapsed && <span className="w-[3px] h-4 bg-[#5E6AD2] rounded-full -ml-1 mr-1 flex-shrink-0" />}
+        <Icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-[#5E6AD2]' : ''}`} strokeWidth={active ? 2 : 1.5} />
         {!collapsed && <span>{label}</span>}
         {!collapsed && count !== undefined && count > 0 && (
-          <span className="ml-auto text-[11px] text-slate-400 dark:text-slate-500">{count}</span>
+          <span className={`ml-auto text-[11px] tabular-nums ${active ? 'text-[#5E6AD2]/70' : 'text-slate-400 dark:text-slate-500'}`}>{count}</span>
         )}
       </button>
 
