@@ -59,14 +59,16 @@
 | `src/hooks/useAIStream.ts` | 模型调用层（4 provider 流式+工具循环、429/5xx 指数退避重试 callWithRetry、旧工具结果 microcompact 折叠、Anthropic prompt cache + 旧模型 max_tokens 400 回退、generateOnce 单次生成供压缩用） |
 | `src/lib/contextBudget.ts` | 上下文预算（token 估算 CJK=1/字·其他/3.5、每模型真实窗口表 inferContextWindow、手填 contextWindow 优先、64k 兜底、自动压缩阈值 0.7、图片/工具 schema 开销、压缩器系统提示） |
 | `src/lib/tagColor.ts` | 标签颜色（标签名 djb2 哈希 → 12 色盘，零存储、处处一致；侧栏图标与 TagsInput chip 共用） |
+| `src/hooks/useEditorAI.ts` | 编辑器内联 AI（Cursor 式就地 diff：原文标 aiOld 红删除线保留、新文本 aiHighlight 绿标紧随流式生长、接受/放弃/重试/追加指令按范围操作；插入必须用显式 marks 建文本节点——tr.insertText 会继承插入点 marks 导致红标漏进正文；换行语义：开头 \n 丢弃、\n\n 用 tr.split 真分段（range.to +2）、单 \n 硬换行、尾部换行悬挂跨 chunk） |
+| `src/components/ai/AIReviewToolbar.tsx`·`AIInlinePrompt.tsx`·`AIOldMark.ts` | 浮动审查条（跟随生成位置，Tab/Ctrl+Enter 接受、Esc 放弃、重试、追加指令）·Ctrl+J 输入条（快捷动作 chips，为唯一 AI 面板——气泡菜单/斜杠「自由提问」都只是它的入口）·原文红标 mark |
 | `src/lib/aiTools.ts` | AI 工具层（结果必须带 id、读取带截断分页 offset、append_note/list_notes、Gemini 空 schema 兼容） |
 | `src/lib/chatParts.ts` | assistant 消息 parts JSON 解析（UI 渲染与回传模型共用，回传只取 text 段） |
 | `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
 | `src/components/editor/Editor.tsx` | Tiptap 编辑器主组件 |
 | `src/components/editor/EditorToolbar.tsx` | 编辑器固定工具栏（格式/列表/待办/图片） |
 | `src/components/editor/ResizableImage.tsx` | 图片节点组件（预览/缩放/删除） |
-| `src/components/editor/SlashCommand.tsx` | 斜杠命令菜单（编辑器命令 + AI 命令） |
-| `src/hooks/useSlashCommand.ts` | 斜杠命令逻辑（位置计算/命令执行） |
+| `src/components/editor/SlashCommand.tsx` | 斜杠命令菜单（编辑器命令 + AI 命令；过滤词=编辑器里 / 后的真实文本——中文/IME 天然支持，keywords 拼音/英文别名，键盘 capture 拦截防 Enter 漏进编辑器换行） |
+| `src/hooks/useSlashCommand.ts` | 斜杠命令逻辑（位置计算/命令执行/slashQuery 产出/光标移出即关） |
 | `src/components/editor/NoteRefMenu.tsx`·`src/hooks/useNoteRefMenu.ts` | 笔记引用选择弹窗（输入 `[[` 触发，选中插入 `note://<uuid>` 链接） |
 | `src/components/editor/WikiRef.ts` | 字面 `[[标题]]` 渲染扩展（ProseMirror 装饰：常态藏中括号显 chip、选区移入显括号；Backspace/Delete 整体删；点击跳转在 Editor 的 mousedown 处理） |
 | `src/components/editor/SafeHtmlBlock.ts` | Markdown 解析防吞扩展（html:true 下未闭合 `<style>`/`<script>`/注释会把后文连同图片引用吞到文末：markdown-it html_block 有界化到空行 + raw-text 标签转义防 DOMParser 二次吞） |
