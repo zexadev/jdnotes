@@ -30,6 +30,9 @@ pub struct AISource {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    /// 上下文窗口（tokens）。None = 前端按模型名推断内置真实值
+    #[serde(default)]
+    pub context_window: Option<u32>,
 }
 
 impl Default for AISource {
@@ -41,6 +44,7 @@ impl Default for AISource {
             base_url: "https://api.deepseek.com/v1".to_string(),
             api_key: String::new(),
             model: "deepseek-chat".to_string(),
+            context_window: None,
         }
     }
 }

@@ -149,7 +149,8 @@ pub async fn get_ai_config(app: tauri::AppHandle) -> Result<serde_json::Value, S
             "provider": provider_str,
             "baseUrl": s.base_url,
             "apiKey": s.api_key,
-            "model": s.model
+            "model": s.model,
+            "contextWindow": s.context_window
         })
     }).collect();
 
@@ -182,6 +183,7 @@ pub async fn save_ai_config(
             base_url: s.get("baseUrl").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             api_key: s.get("apiKey").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             model: s.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            context_window: s.get("contextWindow").and_then(|v| v.as_u64()).map(|v| v as u32),
         }
     }).collect();
 

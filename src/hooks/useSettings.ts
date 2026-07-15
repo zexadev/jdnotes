@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { inferContextWindow } from '../lib/contextBudget'
 
 // AI 提供商类型
 export type AIProvider = 'openai' | 'anthropic' | 'google' | 'ollama' | 'responses'
@@ -12,6 +13,8 @@ export interface AISource {
   baseUrl: string
   apiKey: string
   model: string
+  // 上下文窗口（tokens）。不填按模型名内置真实值推断（inferContextWindow）
+  contextWindow?: number
 }
 
 // AI 配置（多来源）
@@ -26,6 +29,8 @@ export interface Settings {
   aiBaseUrl: string
   aiApiKey: string
   aiModel: string
+  // 已解析的上下文窗口：手填值 > 按模型名推断
+  aiContextWindow: number
 }
 
 // 提供商预设配置
@@ -97,6 +102,7 @@ const defaultSettings: Settings = {
   aiBaseUrl: 'https://api.deepseek.com/v1',
   aiApiKey: '',
   aiModel: 'deepseek-chat',
+  aiContextWindow: inferContextWindow('deepseek-chat'),
 }
 
 // 缓存
@@ -128,6 +134,7 @@ async function loadConfigFromBackend(): Promise<AIConfig> {
           baseUrl: string
           apiKey: string
           model: string
+          contextWindow?: number | null
         }>
         activeSourceId: string
       }>('get_ai_config')
@@ -140,6 +147,7 @@ async function loadConfigFromBackend(): Promise<AIConfig> {
           provider: validProviders.includes(s.provider as AIProvider)
             ? (s.provider as AIProvider)
             : 'openai',
+          contextWindow: s.contextWindow ?? undefined,
         })),
         activeSourceId: result.activeSourceId,
       }
@@ -190,6 +198,7 @@ function configToSettings(config: AIConfig): Settings {
       aiBaseUrl: active.baseUrl,
       aiApiKey: active.apiKey,
       aiModel: active.model,
+      aiContextWindow: active.contextWindow || inferContextWindow(active.model),
     }
   }
   return defaultSettings
@@ -282,6 +291,7 @@ export function useSettings() {
       aiBaseUrl: 'baseUrl',
       aiApiKey: 'apiKey',
       aiModel: 'model',
+      aiContextWindow: 'contextWindow',
     }
     updateSource(active.id, { [fieldMap[key]]: value })
   }, [config, updateSource])
@@ -295,6 +305,7 @@ export function useSettings() {
     if (newSettings.aiBaseUrl !== undefined) updates.baseUrl = newSettings.aiBaseUrl
     if (newSettings.aiApiKey !== undefined) updates.apiKey = newSettings.aiApiKey
     if (newSettings.aiModel !== undefined) updates.model = newSettings.aiModel
+    if (newSettings.aiContextWindow !== undefined) updates.contextWindow = newSettings.aiContextWindow
     updateSource(active.id, updates)
   }, [config, updateSource])
 
