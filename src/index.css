@@ -481,16 +481,32 @@ body {
 /* ===== AI Ghost Writing 样式 (Linear-grade) ===== */
 
 /* AI 内联高亮 - 未确认的 AI 生成内容 */
+/* AI 就地 diff：新文本绿、原文红删除线（Cursor 式对照） */
 .ai-highlight {
-  color: #5E6AD2;
-  background-color: rgba(94, 106, 210, 0.08);
+  color: #059669;
+  background-color: rgba(16, 185, 129, 0.09);
   border-radius: 2px;
   padding: 0 1px;
 }
 
 .dark .ai-highlight {
-  color: #818cf8;
-  background-color: rgba(129, 140, 248, 0.1);
+  color: #34d399;
+  background-color: rgba(52, 211, 153, 0.12);
+}
+
+.ai-old {
+  color: #dc2626;
+  background-color: rgba(239, 68, 68, 0.07);
+  text-decoration: line-through;
+  text-decoration-color: rgba(220, 38, 38, 0.5);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.dark .ai-old {
+  color: #f87171;
+  background-color: rgba(248, 113, 113, 0.09);
+  text-decoration-color: rgba(248, 113, 113, 0.5);
 }
 
 /* 原文样式 - 灰色半透明 */

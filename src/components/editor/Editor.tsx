@@ -35,6 +35,7 @@ import { AIBubbleMenu } from '../ai/AIBubbleMenu'
 import { TableBubbleMenu } from './TableBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 import { AIHighlight } from '../ai/AIHighlightMark'
+import { AIOld } from '../ai/AIOldMark'
 import { Callout } from './CalloutBlock'
 import { WikiRef } from './WikiRef'
 import { SafeHtmlBlock } from './SafeHtmlBlock'
@@ -61,7 +62,6 @@ interface EditorProps {
 export function Editor({
   title,
   content,
-  tags: _tags = [],
   isEditing,
   createdAt,
   updatedAt,
@@ -163,6 +163,7 @@ export function Editor({
       TableCell,
       TableHeader,
       AIHighlight,
+      AIOld,
       Callout,
       WikiRef,
       SafeHtmlBlock,
@@ -283,10 +284,13 @@ export function Editor({
   const {
     diffState,
     showError,
+    reviewAnchor,
     skipContentSyncRef,
     handleAIAction,
     handleAccept,
     handleDiscard,
+    handleRetry,
+    handleFollowUp,
     startAIFromSlashCommand,
   } = useEditorAI({
     editor,
@@ -327,32 +331,16 @@ export function Editor({
   })
 
   // Ctrl+K 内联提问
-  const [inlinePromptPos, setInlinePromptPos] = useState<{ top: number; left: number } | null>(null)
-  const [inlineHasSelection, setInlineHasSelection] = useState(false)
-
   useEffect(() => {
-    if (!editor || !editorContainerRef.current) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
         e.preventDefault()
-        if (diffState.isActive) return
-
-        const { from, to } = editor.state.selection
-        const coords = editor.view.coordsAtPos(from)
-        const containerRect = editorContainerRef.current!.getBoundingClientRect()
-
-        setInlineHasSelection(from !== to)
-        setInlinePromptPos({
-          top: coords.bottom - containerRect.top + 4,
-          left: Math.max(0, coords.left - containerRect.left),
-        })
+        openInlinePrompt()
       }
     }
-
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [editor, editorContainerRef, diffState.isActive])
+  }, [openInlinePrompt])
 
   // Ctrl 按住时链接显示手型光标
   useEffect(() => {
@@ -494,7 +482,10 @@ export function Editor({
     const sizeBefore = editor.state.doc.content.size
 
     editor.commands.focus('end')
-    editor.commands.insertContent('\n\n' + contentToInsert)
+    // 文末已是空段落就不再垫 '\n\n'，避免插入内容前多出一个空行
+    const lastNode = editor.state.doc.lastChild
+    const endsEmpty = lastNode?.type.name === 'paragraph' && lastNode.content.size === 0
+    editor.commands.insertContent(endsEmpty ? contentToInsert : '\n\n' + contentToInsert)
 
     // 更新内容（以 Markdown 格式保存）
     const newContent = editor.storage.markdown.getMarkdown()
@@ -582,7 +573,7 @@ export function Editor({
           ref={editorContainerRef}
           className="mt-6 relative"
         >
-          <AIBubbleMenu editor={editor} onAIAction={handleAIAction} />
+          <AIBubbleMenu editor={editor} onOpenAIPrompt={openInlinePrompt} />
           <TableBubbleMenu editor={editor} />
           <EditorContent editor={editor} />
 
@@ -609,7 +600,7 @@ export function Editor({
             />
           )}
 
-          {/* Ctrl+K 内联提问 */}
+          {/* Ctrl+J 内联提问 */}
           {inlinePromptPos && !diffState.isActive && (
             <AIInlinePrompt
               position={inlinePromptPos}
@@ -618,17 +609,26 @@ export function Editor({
                 handleAIAction('custom', prompt)
                 setInlinePromptPos(null)
               }}
+              onQuickAction={(action) => {
+                handleAIAction(action)
+                setInlinePromptPos(null)
+              }}
               onClose={() => setInlinePromptPos(null)}
             />
           )}
 
-          {/* AI 生成中/审查工具栏 - 固定在底部 */}
+          {/* AI 审查条：浮动在生成内容旁（拿不到锚点时兜底居中固定） */}
           {diffState.isActive && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+            <div
+              className={reviewAnchor ? 'absolute z-40' : 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50'}
+              style={reviewAnchor ?? undefined}
+            >
               <AIReviewToolbar
                 isStreaming={diffState.isStreaming}
                 onAccept={handleAccept}
                 onDiscard={handleDiscard}
+                onRetry={handleRetry}
+                onFollowUp={handleFollowUp}
               />
             </div>
           )}
