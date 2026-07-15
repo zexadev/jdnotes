@@ -9,6 +9,7 @@ import {
   executeToolCall,
   type AIToolContext,
 } from '../lib/aiTools'
+import { DEFAULT_CONTEXT_WINDOW, TOOL_DEFS_OVERHEAD, estimateMessagesTokens } from '../lib/contextBudget'
 
 export type AIAction = 'refine' | 'summarize' | 'translate' | 'continue' | 'custom' | 'template'
 
@@ -28,6 +29,7 @@ export interface AIMessage {
   tool_call_id?: string
   tool_calls?: AIToolCall[]
   images?: string[] // base64 图片
+  name?: string // tool 消息的工具名（Gemini functionResponse 严格要求与 functionCall.name 一致）
 }
 
 export interface AIContentBlock {
@@ -57,6 +59,12 @@ interface UseAIStreamOptions {
   onError?: (error: string) => void
   onToolCall?: (toolName: string, params: Record<string, unknown>) => void
   onToolResult?: (toolName: string, result: string) => void
+  // 思考/推理流（DeepSeek reasoning_content、Anthropic thinking、Gemini thought、Responses reasoning summary）
+  onReasoning?: (chunk: string) => void
+  // 用户主动停止：已流出的内容由调用方决定去留（不算错误也不算完成）
+  onAborted?: () => void
+  // 瞬态状态提示（自动重试等待中…），null 表示清除
+  onNotice?: (text: string | null) => void
 }
 
 interface UseAIStreamReturn {
@@ -200,7 +208,7 @@ async function* streamAnthropicSimple(
   userMessage: string,
   signal: AbortSignal
 ): AsyncGenerator<string> {
-  const response = await fetch(`${baseUrl}/v1/messages`, {
+  const doFetch = (maxTokens: number) => fetch(`${baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -210,7 +218,7 @@ async function* streamAnthropicSimple(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
       stream: true,
@@ -218,9 +226,18 @@ async function* streamAnthropicSimple(
     signal,
   })
 
+  let response = await doFetch(MAX_OUTPUT_TOKENS)
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
+    // 旧模型 max_tokens 硬上限 4096：换低值重试一次
+    if (response.status === 400 && /max_tokens/i.test(errorText)) {
+      response = await doFetch(4096)
+      if (!response.ok) {
+        throw new Error(`Anthropic API 错误: ${response.status} - ${await response.text()}`)
+      }
+    } else {
+      throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
+    }
   }
 
   yield* readAnthropicSSE(response)
@@ -243,7 +260,7 @@ async function* streamGoogleSimple(
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: userMessage }] }],
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { maxOutputTokens: 4096 },
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
     }),
     signal,
   })
@@ -305,8 +322,11 @@ async function* readGoogleSSE(response: Response): AsyncGenerator<string> {
     if (!data) continue
     try {
       const parsed = JSON.parse(data)
-      const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-      if (text) yield text
+      const parts = parsed.candidates?.[0]?.content?.parts || []
+      for (const part of parts) {
+        // thought=true 是 thinking 模型的思考 part，混入会把推理写进笔记正文
+        if (part.text && !part.thought) yield part.text
+      }
     } catch { /* ignore */ }
   }
 }
@@ -338,7 +358,8 @@ async function callOpenAIWithTools(
   messages: object[],
   tools: object[],
   signal: AbortSignal,
-  onChunk?: (chunk: string) => void
+  onChunk?: (chunk: string) => void,
+  onReasoning?: (chunk: string) => void
 ): Promise<OpenAIToolsResult> {
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -377,6 +398,12 @@ async function callOpenAIWithTools(
 
       const delta = choice?.delta
       if (!delta) continue
+
+      // 思考流：DeepSeek/GLM 系用 reasoning_content，OpenRouter 系用 reasoning
+      const reasoningChunk = delta.reasoning_content ?? delta.reasoning
+      if (typeof reasoningChunk === 'string' && reasoningChunk) {
+        onReasoning?.(reasoningChunk)
+      }
 
       // 文本内容
       if (delta.content) {
@@ -419,17 +446,41 @@ interface AnthropicToolsResult {
   stopReason: string | null
 }
 
+// Anthropic 缓存打点（每请求上限 4 个断点，这里用 3 个）：
+// ① tools 末尾——system 里的时间戳跨请求会变，单独保住工具定义的缓存；
+// ② system 块——一次发送内的工具循环里 system 恒定，轮轮命中；
+// ③ 最后一条消息——循环每轮消息都是上一轮的前缀延伸，断点随轮前移，
+//    旧轮的全部历史按缓存价（1 折）计费，这是工具循环省钱的大头
+function markAnthropicCache(messages: object[], tools: object[]): { messages: object[]; tools: object[] } {
+  const markedTools = tools.map((t, i) =>
+    i === tools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t
+  )
+  if (messages.length === 0) return { messages, tools: markedTools }
+  const last = messages[messages.length - 1] as { role: string; content: unknown }
+  let markedLast: object = last
+  if (typeof last.content === 'string' && last.content) {
+    markedLast = { ...last, content: [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral' } }] }
+  } else if (Array.isArray(last.content) && last.content.length > 0) {
+    const blocks = [...(last.content as object[])]
+    blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } }
+    markedLast = { ...last, content: blocks }
+  }
+  return { messages: [...messages.slice(0, -1), markedLast], tools: markedTools }
+}
+
 async function callAnthropicWithTools(
   baseUrl: string,
   apiKey: string,
   model: string,
   systemPrompt: string,
-  messages: object[],
-  tools: object[],
+  rawMessages: object[],
+  rawTools: object[],
   signal: AbortSignal,
-  onChunk?: (chunk: string) => void
+  onChunk?: (chunk: string) => void,
+  onReasoning?: (chunk: string) => void
 ): Promise<AnthropicToolsResult> {
-  const response = await fetch(`${baseUrl}/v1/messages`, {
+  const { messages, tools } = markAnthropicCache(rawMessages, rawTools)
+  const doFetch = (maxTokens: number) => fetch(`${baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -439,8 +490,10 @@ async function callAnthropicWithTools(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
-      system: systemPrompt,
+      max_tokens: maxTokens,
+      // system 块打缓存断点：tools + system 整个前缀命中 prompt cache，
+      // 工具循环第二轮起显著省时省钱
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages,
       tools,
       stream: true,
@@ -448,9 +501,18 @@ async function callAnthropicWithTools(
     signal,
   })
 
+  let response = await doFetch(MAX_OUTPUT_TOKENS)
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
+    // 旧模型（claude-3-opus/haiku）max_tokens 硬上限 4096：换低值重试一次
+    if (response.status === 400 && /max_tokens/i.test(errorText)) {
+      response = await doFetch(4096)
+      if (!response.ok) {
+        throw new Error(`Anthropic API 错误: ${response.status} - ${await response.text()}`)
+      }
+    } else {
+      throw new Error(`Anthropic API 错误: ${response.status} - ${errorText}`)
+    }
   }
 
   let text = ''
@@ -481,6 +543,9 @@ async function callAnthropicWithTools(
         if (parsed.delta?.type === 'text_delta' && parsed.delta?.text) {
           text += parsed.delta.text
           onChunk?.(parsed.delta.text)
+        }
+        if (parsed.delta?.type === 'thinking_delta' && parsed.delta?.thinking) {
+          onReasoning?.(parsed.delta.thinking)
         }
         if (parsed.delta?.type === 'input_json_delta' && parsed.delta?.partial_json && currentToolUse) {
           currentToolUse.inputJson += parsed.delta.partial_json
@@ -517,7 +582,8 @@ async function callGoogleWithTools(
   contents: object[],
   tools: object[],
   signal: AbortSignal,
-  onChunk?: (chunk: string) => void
+  onChunk?: (chunk: string) => void,
+  onReasoning?: (chunk: string) => void
 ): Promise<GoogleToolsResult> {
   const url = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
 
@@ -528,7 +594,7 @@ async function callGoogleWithTools(
       contents,
       systemInstruction: { parts: [{ text: systemPrompt }] },
       tools,
-      generationConfig: { maxOutputTokens: 4096 },
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
     }),
     signal,
   })
@@ -547,7 +613,10 @@ async function callGoogleWithTools(
       const parsed = JSON.parse(data)
       const parts = parsed.candidates?.[0]?.content?.parts || []
       for (const part of parts) {
-        if (part.text) {
+        if (part.text && part.thought) {
+          // Gemini thinking 模型的思考 part，不混入正文
+          onReasoning?.(part.text)
+        } else if (part.text) {
           text += part.text
           onChunk?.(part.text)
         }
@@ -579,7 +648,8 @@ async function callResponsesWithTools(
   input: object[],
   tools: object[],
   signal: AbortSignal,
-  onChunk?: (chunk: string) => void
+  onChunk?: (chunk: string) => void,
+  onReasoning?: (chunk: string) => void
 ): Promise<ResponsesToolsResult> {
   const response = await fetch(`${baseUrl}/responses`, {
     method: 'POST',
@@ -617,6 +687,11 @@ async function callResponsesWithTools(
       if (parsed.type === 'response.output_text.delta' && parsed.delta) {
         text += parsed.delta
         onChunk?.(parsed.delta)
+      }
+
+      // 推理摘要增量（o 系模型）
+      if (parsed.type === 'response.reasoning_summary_text.delta' && parsed.delta) {
+        onReasoning?.(parsed.delta)
       }
 
       // 函数调用参数增量
@@ -754,7 +829,8 @@ function aiMessagesToGoogle(messages: AIMessage[]): object[] {
         role: 'function',
         parts: [{
           functionResponse: {
-            name: 'tool_response',
+            // Gemini 校验 name 必须与对应 functionCall.name 一致，写死假名会 400
+            name: msg.name || 'tool_response',
             response: { result: msg.content },
           },
         }],
@@ -839,9 +915,85 @@ function getSimpleStreamGenerator(provider: AIProvider): typeof streamOpenAISimp
   }
 }
 
+// ============= 瞬态错误自动重试 =============
+
+// 限流/服务端故障/网络中断这类瞬态错误值得重试；4xx 业务错误（鉴权、参数）不重试
+const RETRYABLE_ERROR = /(^|\D)(408|429|500|502|503|504|529)(\D|$)|overloaded|rate.?limit|timeout|Failed to fetch|NetworkError|network error|fetch failed|ECONNRESET/i
+
+const RETRY_DELAYS_MS = [2000, 5000]
+
+function sleepUnlessAborted(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+interface StreamHandlers {
+  onChunk?: (chunk: string) => void
+  onReasoning?: (chunk: string) => void
+}
+
+// 包一层重试：只在「还没有任何内容流出」时重试（流出一半再重试会把文本发两遍），
+// 中断（AbortError）与不可重试错误直接抛出
+async function callWithRetry<T>(
+  make: (handlers: StreamHandlers) => Promise<T>,
+  signal: AbortSignal,
+  onChunk?: (chunk: string) => void,
+  onReasoning?: (chunk: string) => void,
+  onNotice?: (text: string | null) => void,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    let emitted = false
+    const handlers: StreamHandlers = {
+      onChunk: onChunk ? (c) => { emitted = true; onChunk(c) } : undefined,
+      onReasoning: onReasoning ? (c) => { emitted = true; onReasoning(c) } : undefined,
+    }
+    try {
+      return await make(handlers)
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') throw e
+      const msg = e instanceof Error ? e.message : String(e)
+      if (emitted || attempt >= RETRY_DELAYS_MS.length || !RETRYABLE_ERROR.test(msg)) throw e
+      onNotice?.(`请求失败，${RETRY_DELAYS_MS[attempt] / 1000} 秒后自动重试（第 ${attempt + 1}/${RETRY_DELAYS_MS.length} 次）…`)
+      try {
+        await sleepUnlessAborted(RETRY_DELAYS_MS[attempt], signal)
+      } finally {
+        onNotice?.(null)
+      }
+    }
+  }
+}
+
 // ============= Tools 循环执行 =============
 
-const MAX_TOOL_ITERATIONS = 10
+const MAX_TOOL_ITERATIONS = 24
+const MAX_OUTPUT_TOKENS = 8192
+
+// 工具循环里历史会带着每轮的工具原始输出滚雪球；总量逼近窗口时，
+// 把旧轮次的大结果折叠成开头片段。保留单位是「最近一轮」——最后一个 assistant
+// 消息之后的全部 tool 结果（一轮可能并行多个调用），模型还没读过它们的完整内容。
+// 只影响发出去的请求，UI 已通过回调拿到完整结果。
+function microcompactMessages(messages: AIMessage[], contextLimit: number): AIMessage[] {
+  if (estimateMessagesTokens(messages) + TOOL_DEFS_OVERHEAD <= contextLimit * 0.8) return messages
+  let lastAssistantIdx = -1
+  messages.forEach((m, i) => { if (m.role === 'assistant') lastAssistantIdx = i })
+  return messages.map((m, i) => {
+    if (m.role !== 'tool' || i > lastAssistantIdx || typeof m.content !== 'string' || m.content.length <= 600) return m
+    return { ...m, content: m.content.slice(0, 600) + '\n…（此前的工具结果已折叠以节省上下文，需要时可重新调用工具）' }
+  })
+}
 
 async function runToolLoop(
   provider: AIProvider,
@@ -854,23 +1006,28 @@ async function runToolLoop(
   onChunk?: (chunk: string) => void,
   onToolCall?: (toolName: string, params: Record<string, unknown>) => void,
   onToolResult?: (toolName: string, result: string) => void,
+  onReasoning?: (chunk: string) => void,
+  onNotice?: (text: string | null) => void,
+  contextLimit: number = DEFAULT_CONTEXT_WINDOW,
 ): Promise<string> {
   let fullText = ''
   const systemPrompt = messages.find(m => m.role === 'system')?.content as string || ''
   const workingMessages = [...messages]
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    if (signal.aborted) break
+    if (signal.aborted) return fullText
+    // 请求用折叠后的历史；workingMessages 本身保留完整结果，UI 不受影响
+    const sendable = microcompactMessages(workingMessages, contextLimit)
 
     if (provider === 'openai' || provider === 'ollama') {
-      const openaiMessages = aiMessagesToOpenAI(workingMessages)
       const tools = toOpenAITools()
-      const result = await callOpenAIWithTools(
-        baseUrl, apiKey, model, openaiMessages, tools, signal, onChunk
+      const result = await callWithRetry(
+        (h) => callOpenAIWithTools(baseUrl, apiKey, model, aiMessagesToOpenAI(sendable), tools, signal, h.onChunk, h.onReasoning),
+        signal, onChunk, onReasoning, onNotice,
       )
       fullText += result.text
 
-      if (result.toolCalls.length === 0) break
+      if (result.toolCalls.length === 0) return fullText
 
       // 添加 assistant 消息（带 tool_calls）
       workingMessages.push({
@@ -881,7 +1038,8 @@ async function runToolLoop(
 
       // 执行每个 tool call
       for (const tc of result.toolCalls) {
-        const params = JSON.parse(tc.function.arguments || '{}')
+        let params: Record<string, unknown> = {}
+        try { params = JSON.parse(tc.function.arguments || '{}') } catch { /* 模型吐了坏 JSON，按空参执行 */ }
         onToolCall?.(tc.function.name, params)
         const toolResult = await executeToolCall(tc.function.name, params, toolContext)
         onToolResult?.(tc.function.name, toolResult)
@@ -892,14 +1050,14 @@ async function runToolLoop(
         })
       }
     } else if (provider === 'anthropic') {
-      const anthropicMessages = aiMessagesToAnthropic(workingMessages)
       const tools = toAnthropicTools()
-      const result = await callAnthropicWithTools(
-        baseUrl, apiKey, model, systemPrompt, anthropicMessages, tools, signal, onChunk
+      const result = await callWithRetry(
+        (h) => callAnthropicWithTools(baseUrl, apiKey, model, systemPrompt, aiMessagesToAnthropic(sendable), tools, signal, h.onChunk, h.onReasoning),
+        signal, onChunk, onReasoning, onNotice,
       )
       fullText += result.text
 
-      if (result.toolUses.length === 0) break
+      if (result.toolUses.length === 0) return fullText
 
       // 添加 assistant 消息
       const assistantToolCalls: AIToolCall[] = result.toolUses.map(tu => ({
@@ -925,14 +1083,14 @@ async function runToolLoop(
         })
       }
     } else if (provider === 'google') {
-      const contents = aiMessagesToGoogle(workingMessages)
       const tools = toGeminiTools()
-      const result = await callGoogleWithTools(
-        baseUrl, apiKey, model, systemPrompt, contents, tools, signal, onChunk
+      const result = await callWithRetry(
+        (h) => callGoogleWithTools(baseUrl, apiKey, model, systemPrompt, aiMessagesToGoogle(sendable), tools, signal, h.onChunk, h.onReasoning),
+        signal, onChunk, onReasoning, onNotice,
       )
       fullText += result.text
 
-      if (result.functionCalls.length === 0) break
+      if (result.functionCalls.length === 0) return fullText
 
       // 添加 model response
       const toolCalls: AIToolCall[] = result.functionCalls.map((fc, idx) => ({
@@ -955,17 +1113,18 @@ async function runToolLoop(
           role: 'tool',
           content: toolResult,
           tool_call_id: `google_${result.functionCalls.indexOf(fc)}`,
+          name: fc.name,
         })
       }
     } else if (provider === 'responses') {
-      const input = aiMessagesToResponses(workingMessages)
       const tools = toResponsesTools()
-      const result = await callResponsesWithTools(
-        baseUrl, apiKey, model, systemPrompt, input, tools, signal, onChunk
+      const result = await callWithRetry(
+        (h) => callResponsesWithTools(baseUrl, apiKey, model, systemPrompt, aiMessagesToResponses(sendable), tools, signal, h.onChunk, h.onReasoning),
+        signal, onChunk, onReasoning, onNotice,
       )
       fullText += result.text
 
-      if (result.functionCalls.length === 0) break
+      if (result.functionCalls.length === 0) return fullText
 
       // 添加 assistant 输出到消息历史
       const toolCalls: AIToolCall[] = result.functionCalls.map(fc => ({
@@ -993,13 +1152,17 @@ async function runToolLoop(
     }
   }
 
+  // 循环耗尽（每一轮都还有新的工具调用）：明确告知而不是无声截断
+  const notice = `\n\n> 已达到单次回复的工具调用轮数上限（${MAX_TOOL_ITERATIONS} 轮），回复可能不完整；继续发消息可接着执行。`
+  fullText += notice
+  onChunk?.(notice)
   return fullText
 }
 
 // ============= Hook =============
 
 export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn {
-  const { onChunk, onLine, onFinish, onError, onToolCall, onToolResult } = options
+  const { onChunk, onLine, onFinish, onError, onToolCall, onToolResult, onReasoning, onAborted, onNotice } = options
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamText, setStreamText] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -1138,6 +1301,9 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
           chunkHandler,
           onToolCall,
           onToolResult,
+          onReasoning,
+          onNotice,
+          settings.aiContextWindow || DEFAULT_CONTEXT_WINDOW,
         )
 
         if (onLine && lineBufferRef.current) {
@@ -1148,14 +1314,18 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
         setIsStreaming(false)
         onFinish?.(fullText)
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return
+        if (err instanceof Error && err.name === 'AbortError') {
+          // 用户主动停止：交给调用方保留已流出的内容
+          onAborted?.()
+          return
+        }
         const errorMsg = err instanceof Error ? err.message : '发生未知错误'
         setError(errorMsg)
         onError?.(errorMsg)
         setIsStreaming(false)
       }
     },
-    [onChunk, onLine, onFinish, onError, onToolCall, onToolResult, stopStream]
+    [onChunk, onLine, onFinish, onError, onToolCall, onToolResult, onReasoning, onAborted, onNotice, stopStream]
   )
 
   return {
@@ -1166,4 +1336,28 @@ export function useAIStream(options: UseAIStreamOptions = {}): UseAIStreamReturn
     startStreamWithTools,
     stopStream,
   }
+}
+
+// ============= 单次生成（非流式聚合） =============
+
+// 内部任务（如上下文压缩摘要）用：走当前激活来源的简单模式，聚合全部输出后返回。
+// 带一次瞬态错误重试；AbortError 原样抛出
+export async function generateOnce(systemPrompt: string, userMessage: string, signal: AbortSignal): Promise<string> {
+  const settings = await getSettings()
+  if (settings.aiProvider !== 'ollama' && !settings.aiApiKey) {
+    throw new Error('请在设置中配置 API Key')
+  }
+  const streamGenerator = getSimpleStreamGenerator(settings.aiProvider)
+  return callWithRetry(
+    async () => {
+      let full = ''
+      for await (const chunk of streamGenerator(
+        settings.aiBaseUrl, settings.aiApiKey, settings.aiModel, systemPrompt, userMessage, signal
+      )) {
+        full += chunk
+      }
+      return full.trim()
+    },
+    signal,
+  )
 }

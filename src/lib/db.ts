@@ -46,7 +46,8 @@ export interface ChatMessage {
   id: number
   noteId: number
   conversationId: number | null
-  role: 'user' | 'assistant' | 'tool_call' | 'tool_result'
+  // summary：上下文压缩点——content 是此前对话的摘要，之后的请求只携带摘要+压缩点后的消息
+  role: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'summary'
   content: string
   images: string[] // base64 图片数组
   timestamp: Date
