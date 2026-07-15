@@ -110,8 +110,15 @@ export function Editor({
             ...this.parent?.(),
             language: {
               default: 'plaintext',
-              parseHTML: (element) =>
-                element.getAttribute('data-language') || 'plaintext',
+              // data-language（自家 NodeView）优先；否则回退基类的 language-xxx class 解析——
+              // markdown 解析出的 ```js 走的是 class，之前被覆盖后语言全部洗成 plaintext
+              parseHTML: (element) => {
+                const explicit = element.getAttribute('data-language')
+                if (explicit) return explicit
+                const cls = [...(element.firstElementChild?.classList ?? [])]
+                  .find((c) => c.startsWith('language-'))
+                return cls ? cls.slice('language-'.length) : 'plaintext'
+              },
               renderHTML: (attributes) => ({
                 'data-language': attributes.language,
               }),
@@ -552,12 +559,35 @@ export function Editor({
     }
   }, [editor])
 
+  // 用户是否真正碰过编辑器（聚焦/键入/粘贴/拖放；工具栏命令都带 .focus() 也会命中）。
+  // 打开笔记后扩展会自动跑规范化事务（如 prosemirror-tables 的 fixTables），
+  // 若把规范化后的 markdown 当作编辑上报，会"没编辑却刷 updated_at"
+  const userTouchedRef = useRef(false)
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const touch = () => { userTouchedRef.current = true }
+    dom.addEventListener('focus', touch, true)
+    dom.addEventListener('keydown', touch, true)
+    dom.addEventListener('paste', touch, true)
+    dom.addEventListener('drop', touch, true)
+    return () => {
+      dom.removeEventListener('focus', touch, true)
+      dom.removeEventListener('keydown', touch, true)
+      dom.removeEventListener('paste', touch, true)
+      dom.removeEventListener('drop', touch, true)
+    }
+  }, [editor])
+
   // Handle editor updates
   useEffect(() => {
     if (!editor) return
 
     const handleUpdate = () => {
       if (!diffState.isActive) {
+        // 用户没碰过编辑器 → 这是打开后的自动规范化，不上报（编辑器内保留规范化结果，
+        // 用户真编辑时 getMarkdown 会带上完整内容一起保存）
+        if (!userTouchedRef.current) return
         const newContent = editor.storage.markdown.getMarkdown()
         lastEmittedContentRef.current = newContent
         onContentChange(newContent)
