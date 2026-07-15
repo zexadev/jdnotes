@@ -36,6 +36,8 @@ import { TableBubbleMenu } from './TableBubbleMenu'
 import { AIInlinePrompt } from '../ai/AIInlinePrompt'
 import { AIHighlight } from '../ai/AIHighlightMark'
 import { AIOld } from '../ai/AIOldMark'
+import { LinkPopover, type LinkPopoverState } from './LinkPopover'
+import { getMarkRange } from '@tiptap/core'
 import { Callout } from './CalloutBlock'
 import { WikiRef } from './WikiRef'
 import { SafeHtmlBlock } from './SafeHtmlBlock'
@@ -350,6 +352,115 @@ export function Editor({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [openInlinePrompt])
 
+  // ============= 链接悬停卡 =============
+  const [linkPopover, setLinkPopover] = useState<LinkPopoverState | null>(null)
+  const linkHideTimerRef = useRef<number | null>(null)
+
+  const cancelLinkHide = useCallback(() => {
+    if (linkHideTimerRef.current !== null) {
+      clearTimeout(linkHideTimerRef.current)
+      linkHideTimerRef.current = null
+    }
+  }, [])
+
+  const scheduleLinkHide = useCallback(() => {
+    cancelLinkHide()
+    linkHideTimerRef.current = window.setTimeout(() => {
+      // 编辑态不被鼠标移开打断
+      setLinkPopover((cur) => (cur && cur.mode === 'edit' ? cur : null))
+    }, 300)
+  }, [cancelLinkHide])
+
+  // 悬停外链显示操作卡（note:// 内链单击直跳，不需要卡片）
+  useEffect(() => {
+    if (!editor || !editorContainerRef.current) return
+    const dom = editor.view.dom
+
+    const onOver = (e: MouseEvent) => {
+      const t = e.target
+      if (!(t instanceof HTMLElement)) return
+      const a = t.closest('a')
+      if (!a || !dom.contains(a)) return
+      const href = a.getAttribute('href')
+      if (!href || href.startsWith('note://')) return
+      cancelLinkHide()
+      let range: { from: number; to: number } | null = null
+      try {
+        const pos = editor.view.posAtDOM(a, 0)
+        range = getMarkRange(editor.state.doc.resolve(pos), editor.state.schema.marks.link) ?? null
+      } catch { /* DOM 与文档瞬时不同步，忽略 */ }
+      if (!range) return
+      const rect = a.getBoundingClientRect()
+      const cRect = editorContainerRef.current!.getBoundingClientRect()
+      setLinkPopover((cur) => {
+        if (cur && cur.mode === 'edit') return cur
+        return {
+          top: rect.bottom - cRect.top + 6,
+          left: Math.max(0, Math.min(rect.left - cRect.left, cRect.width - 360)),
+          href,
+          from: range.from,
+          to: range.to,
+          mode: 'view',
+        }
+      })
+    }
+    const onOut = (e: MouseEvent) => {
+      const t = e.target
+      if (t instanceof HTMLElement && t.closest('a')) scheduleLinkHide()
+    }
+
+    dom.addEventListener('mouseover', onOver)
+    dom.addEventListener('mouseout', onOut)
+    return () => {
+      dom.removeEventListener('mouseover', onOver)
+      dom.removeEventListener('mouseout', onOut)
+      cancelLinkHide()
+    }
+  }, [editor, editorContainerRef, cancelLinkHide, scheduleLinkHide])
+
+  // 应用链接编辑（悬停卡编辑态 / 气泡菜单插入链接共用）
+  const applyLinkEdit = useCallback((href: string) => {
+    if (!editor || !linkPopover) return
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: linkPopover.from, to: linkPopover.to })
+      .extendMarkRange('link')
+      .setLink({ href })
+      .run()
+    setLinkPopover(null)
+  }, [editor, linkPopover])
+
+  const removeLink = useCallback(() => {
+    if (!editor || !linkPopover) return
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: linkPopover.from, to: linkPopover.to })
+      .extendMarkRange('link')
+      .unsetLink()
+      .run()
+    setLinkPopover(null)
+  }, [editor, linkPopover])
+
+  // 气泡菜单「插入链接」：打开编辑卡（WebView2 里 window.prompt 不可用）
+  const openLinkEditor = useCallback(() => {
+    if (!editor || !editorContainerRef.current) return
+    const { from, to } = editor.state.selection
+    if (from === to) return
+    const href = (editor.getAttributes('link').href as string) || ''
+    const coords = editor.view.coordsAtPos(from)
+    const cRect = editorContainerRef.current.getBoundingClientRect()
+    setLinkPopover({
+      top: coords.bottom - cRect.top + 6,
+      left: Math.max(0, Math.min(coords.left - cRect.left, cRect.width - 360)),
+      href,
+      from,
+      to,
+      mode: 'edit',
+    })
+  }, [editor, editorContainerRef])
+
   // Ctrl 按住时链接显示手型光标
   useEffect(() => {
     if (!editor) return
@@ -581,7 +692,7 @@ export function Editor({
           ref={editorContainerRef}
           className="mt-6 relative"
         >
-          <AIBubbleMenu editor={editor} onOpenAIPrompt={openInlinePrompt} />
+          <AIBubbleMenu editor={editor} onOpenAIPrompt={openInlinePrompt} onEditLink={openLinkEditor} />
           <TableBubbleMenu editor={editor} />
           <EditorContent editor={editor} />
 
@@ -606,6 +717,25 @@ export function Editor({
               position={noteRefMenuPos}
               onSelect={(note) => insertNoteRef(note.uuid!, note.title)}
               onClose={closeNoteRefMenu}
+            />
+          )}
+
+          {/* 链接悬停卡：打开/复制/编辑/取消链接 */}
+          {linkPopover && (
+            <LinkPopover
+              state={linkPopover}
+              onOpen={(href) => {
+                openUrl(href)
+                setLinkPopover(null)
+              }}
+              onApply={applyLinkEdit}
+              onUnlink={removeLink}
+              onModeChange={(mode) => setLinkPopover((cur) => (cur ? { ...cur, mode } : cur))}
+              onClose={() => setLinkPopover(null)}
+              onMouseEnter={cancelLinkHide}
+              onMouseLeave={() => {
+                if (linkPopover.mode === 'view') scheduleLinkHide()
+              }}
             />
           )}
 

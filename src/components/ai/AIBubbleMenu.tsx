@@ -8,28 +8,18 @@ import {
   Code as CodeIcon,
   Link as LinkIcon,
 } from 'lucide-react'
-import { useCallback } from 'react'
 
 interface AIBubbleMenuProps {
   editor: Editor
   // 打开统一的 AI 输入条（与 Ctrl+J 同一面板：自由指令 + 快捷动作 chips）
   onOpenAIPrompt: () => void
+  // 打开链接编辑卡（window.prompt 在 WebView2 里不可用）
+  onEditLink: () => void
 }
 
 // 选中文本的气泡菜单：格式化 + 单个 AI 入口。
 // AI 操作统一收敛到 Ctrl+J 输入条，不再在气泡里塞一排 AI 按钮和提问框
-export function AIBubbleMenu({ editor, onOpenAIPrompt }: AIBubbleMenuProps) {
-  const setLink = useCallback(() => {
-    const previousUrl = editor.getAttributes('link').href
-    const url = window.prompt('输入链接地址', previousUrl)
-
-    if (url === null) return
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
-    }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-  }, [editor])
+export function AIBubbleMenu({ editor, onOpenAIPrompt, onEditLink }: AIBubbleMenuProps) {
 
   return (
     <BubbleMenu
@@ -72,10 +62,10 @@ export function AIBubbleMenu({ editor, onOpenAIPrompt }: AIBubbleMenuProps) {
             label="内联代码"
           />
           <FormatButton
-            onClick={setLink}
+            onClick={onEditLink}
             active={editor.isActive('link')}
             icon={<LinkIcon className="h-3.5 w-3.5" />}
-            label="插入链接"
+            label="插入/编辑链接"
           />
         </div>
 
