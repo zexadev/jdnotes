@@ -26,6 +26,15 @@ export type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar
 // 侧栏状态循环顺序
 const SIDEBAR_CYCLE: SidebarState[] = ['expanded', 'collapsed', 'hidden']
 
+// 顶层视图切换统一过渡：popLayout 交叠淡切（旧页淡出与新页淡入同时进行，无空白帧），
+// 入场轻微上移；四个视图共用同一组参数，切到哪里手感都一致
+const VIEW_MOTION = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+  transition: { duration: 0.16, ease: 'easeOut' as const },
+}
+
 // 跳过版本的 localStorage key
 const SKIPPED_VERSION_KEY = 'jdnotes-skipped-version'
 
@@ -671,16 +680,13 @@ function App() {
             )}
           </AnimatePresence>
 
-          <div className="flex-1 flex overflow-hidden">
-            <AnimatePresence mode="wait">
+          <div className="relative flex-1 flex overflow-hidden">
+            <AnimatePresence mode="popLayout" initial={false}>
             {/* Dashboard 页面 */}
             {currentView === 'dashboard' ? (
               <motion.div
                 key="dashboard"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                {...VIEW_MOTION}
                 className="flex-1 h-full"
               >
                 <DashboardPage
@@ -692,10 +698,7 @@ function App() {
             ) : currentView === 'settings' ? (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                {...VIEW_MOTION}
                 className="flex-1 h-full overflow-hidden"
               >
                 <SettingsPage
@@ -706,10 +709,7 @@ function App() {
             ) : currentView === 'calendar' ? (
               <motion.div
                 key="calendar"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                {...VIEW_MOTION}
                 className="flex-1 h-full overflow-hidden"
               >
                 <CalendarView
@@ -720,10 +720,7 @@ function App() {
             ) : (
               <motion.div
                 key="notes"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
+                {...VIEW_MOTION}
                 className="flex-1 flex h-full overflow-hidden"
               >
                 <AnimatePresence initial={false}>
