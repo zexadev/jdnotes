@@ -5,6 +5,8 @@ import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { CommandMenu } from './components/modals/CommandMenu'
+import { ContextMenu, type ContextMenuItem } from './components/common/ContextMenu'
+import { Copy, Scissors, ClipboardPaste, TextSelect } from 'lucide-react'
 import { Sidebar, NoteList, MainContent, TitleBar } from './components/layout'
 import type { SidebarState } from './components/layout/Sidebar'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -202,10 +204,67 @@ function App() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [toggleChat])
 
-  // 禁用浏览器默认右键菜单
+  // 右键菜单：网页原生菜单一律禁掉（桌面软件不该出浏览器菜单），换应用自绘菜单——
+  // 可编辑区出 复制/剪切/粘贴/全选，任意区域有选区出 复制，空白处什么都不出。
+  // 没有右键复制是"复制了剪贴板却没有"投诉的元凶（其实根本没复制成）
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+
   useEffect(() => {
+    const pasteInto = async (editableRoot: HTMLElement | null, inputEl: HTMLInputElement | HTMLTextAreaElement | null) => {
+      try {
+        const text = await navigator.clipboard.readText()
+        if (!text) return
+        if (inputEl) {
+          inputEl.focus()
+          document.execCommand('insertText', false, text)
+        } else if (editableRoot) {
+          editableRoot.focus()
+          // 走完整粘贴管线（代码围栏识别、markdown 解析都在里面）
+          const dt = new DataTransfer()
+          dt.setData('text/plain', text)
+          const ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true })
+          Object.defineProperty(ev, 'clipboardData', { value: dt })
+          editableRoot.dispatchEvent(ev)
+        }
+      } catch {
+        toast.error('无法读取剪贴板，请使用 Ctrl+V 粘贴')
+      }
+    }
+
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault()
+      const t = e.target
+      if (!(t instanceof HTMLElement)) return
+      const selText = window.getSelection()?.toString() ?? ''
+      const inputEl = t.closest('input, textarea') as HTMLInputElement | HTMLTextAreaElement | null
+      const editableRoot = inputEl ? null : (t.closest('.ProseMirror, [contenteditable="true"]') as HTMLElement | null)
+
+      const items: ContextMenuItem[] = []
+      if (inputEl || editableRoot) {
+        const hasSel = inputEl
+          ? inputEl.selectionStart !== inputEl.selectionEnd
+          : selText.length > 0
+        items.push(
+          { icon: Copy, label: '复制', hint: 'Ctrl+C', disabled: !hasSel, onSelect: () => document.execCommand('copy') },
+          { icon: Scissors, label: '剪切', hint: 'Ctrl+X', disabled: !hasSel, onSelect: () => document.execCommand('cut') },
+          { icon: ClipboardPaste, label: '粘贴', hint: 'Ctrl+V', onSelect: () => void pasteInto(editableRoot, inputEl) },
+          {
+            icon: TextSelect,
+            label: '全选',
+            hint: 'Ctrl+A',
+            onSelect: () => {
+              if (inputEl) inputEl.select()
+              else {
+                editableRoot?.focus()
+                document.execCommand('selectAll')
+              }
+            },
+          },
+        )
+      } else if (selText) {
+        items.push({ icon: Copy, label: '复制', hint: 'Ctrl+C', onSelect: () => document.execCommand('copy') })
+      }
+      if (items.length > 0) setCtxMenu({ x: e.clientX, y: e.clientY, items })
     }
     document.addEventListener('contextmenu', handleContextMenu)
     return () => document.removeEventListener('contextmenu', handleContextMenu)
@@ -752,6 +811,16 @@ function App() {
 
       {/* 全局 Toast 容器 */}
       <ToastContainer toasts={toasts} removeToast={toast.remove} />
+
+      {/* 应用自绘右键菜单 */}
+      {ctxMenu && (
+        <ContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          items={ctxMenu.items}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
 
       {/* 接收方配对码确认（对端首次连来同步时弹出，与对端屏幕对数字） */}
       <PairingCodeModal
