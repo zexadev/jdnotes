@@ -238,7 +238,7 @@ export function Editor({
         },
       },
       // 粘贴多张图片：一次性按顺序插入，避免逐张 setImage 互相覆盖
-      handlePaste: (_view, event) => {
+      handlePaste: (view, event) => {
         const items = event.clipboardData?.items
         if (!items) return false
         const imageFiles: File[] = []
@@ -249,7 +249,45 @@ export function Editor({
             if (file) imageFiles.push(file)
           }
         }
-        if (imageFiles.length === 0) return false
+        if (imageFiles.length === 0) {
+          // ============= 代码粘贴 =============
+          // 代码块内粘贴走 PM 默认（按纯文本插入）
+          const { $from } = view.state.selection
+          if ($from.parent.type.name === 'codeBlock') return false
+          const text = event.clipboardData?.getData('text/plain') ?? ''
+          if (!text) return false
+
+          // ① IDE 复制的代码：VS Code/Cursor 会带 vscode-editor-data（含语言），直接建代码块
+          const vscodeMeta = event.clipboardData?.getData('vscode-editor-data')
+          if (vscodeMeta) {
+            let language = 'plaintext'
+            try {
+              const mode = JSON.parse(vscodeMeta)?.mode
+              if (typeof mode === 'string' && mode) language = mode
+            } catch { /* 元数据坏了按 plaintext */ }
+            const code = text.replace(/\r\n/g, '\n').replace(/\n$/, '')
+            const { schema } = view.state
+            const node = schema.nodes.codeBlock.create(
+              { language },
+              code ? schema.text(code) : undefined
+            )
+            event.preventDefault()
+            view.dispatch(view.state.tr.replaceSelectionWith(node).scrollIntoView())
+            return true
+          }
+
+          // ② 带 ``` 围栏的纯文本：走块级插入。默认的 clipboardTextParser 用开放 slice，
+          // 粘到段落中间时代码块会被拍成行内裸文本（围栏消失）
+          if (/```/.test(text) && !event.clipboardData?.getData('text/html')) {
+            const ed = editorRef.current
+            if (ed) {
+              event.preventDefault()
+              ed.chain().focus().insertContent(text.replace(/\r\n/g, '\n')).run()
+              return true
+            }
+          }
+          return false
+        }
         event.preventDefault()
         Promise.allSettled(
           imageFiles.map(
