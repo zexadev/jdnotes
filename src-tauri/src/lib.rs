@@ -14,13 +14,15 @@ use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 发布版：封死"外部经调试端口接管本应用"这条路。任何自动化（Playwright 等）要
-    // 驱动我们，都必须让 WebView2 的 msedgewebview2.exe 带上 --remote-debugging-port/pipe
-    // 开出 CDP 端口。双保险：① 启动前拒绝已知注入源（环境变量 / 注册表策略），端口根本
-    // 不开、无竞态；② 启动后持续巡检 webview 子进程命令行，命中即自杀，兜住未知注入源。
-    // 调试版全部跳过——本机 CDP 自动化测试依赖这条路。
+    // 发布版禁掉 WebView2 CDP 注入入口（防君子）：Playwright 等靠
+    // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 塞 --remote-debugging-port 开调试端口接管页面，
+    // 创建 webview 前清掉即可。调试版保留——本机 CDP 自动化测试依赖这条路。
     #[cfg(not(debug_assertions))]
-    anti_remote_debug::guard_before_launch();
+    {
+        std::env::remove_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
+        std::env::remove_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER");
+        std::env::remove_var("WEBVIEW2_USER_DATA_FOLDER");
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -37,10 +39,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            // 启动后巡检：兜住启动前静态检查漏掉的任何注入源（webview 一旦带调试参数就自杀）
-            #[cfg(not(debug_assertions))]
-            anti_remote_debug::spawn_watch();
-
             // 创建系统托盘菜单
             let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
@@ -229,150 +227,4 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-/// 反远程调试注入（仅发布版）。CDP 是 Playwright 等接管 WebView2 的唯一通道，
-/// 而启用 CDP 必须让 webview 进程带上 --remote-debugging-* 参数；无论参数来自
-/// 环境变量还是注册表策略，最终都会落在 msedgewebview2.exe 的命令行上。
-#[cfg(not(debug_assertions))]
-mod anti_remote_debug {
-    const NEEDLES: [&str; 3] = [
-        "--remote-debugging-port",
-        "--remote-debugging-pipe",
-        "--remote-debugging-address",
-    ];
-
-    fn has_needle(s: &str) -> bool {
-        let l = s.to_ascii_lowercase();
-        NEEDLES.iter().any(|n| l.contains(n))
-    }
-
-    /// 启动前：拒绝已知注入源，命中即不启动——端口永远不会开，无竞态窗口。
-    pub fn guard_before_launch() {
-        // ① 环境变量：Playwright/自动化最常用（WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 塞端口）
-        if let Ok(v) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
-            if has_needle(&v) {
-                std::process::exit(1);
-            }
-        }
-        // 无论如何清掉附加参数/目录重定向，避免子 webview 继承
-        std::env::remove_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
-        std::env::remove_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER");
-        std::env::remove_var("WEBVIEW2_USER_DATA_FOLDER");
-
-        // ② 注册表策略覆盖（WebView2 AdditionalBrowserArguments，HKCU/HKLM）
-        #[cfg(windows)]
-        if registry_has_debug_flag() {
-            std::process::exit(1);
-        }
-    }
-
-    /// 启动后：持续巡检 webview 子进程命令行，兜住启动前没覆盖的注入源。
-    pub fn spawn_watch() {
-        std::thread::spawn(|| {
-            let self_pid = std::process::id();
-            loop {
-                if webview_has_debug_flag(self_pid) {
-                    // 检测到远程调试注入：拒绝在被接管状态下继续运行
-                    std::process::exit(1);
-                }
-                std::thread::sleep(std::time::Duration::from_millis(400));
-            }
-        });
-    }
-
-    fn webview_has_debug_flag(self_pid: u32) -> bool {
-        use std::collections::HashMap;
-        use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
-
-        let mut sys = System::new();
-        // 必须显式开启读命令行——默认 refresh 为性能不读 cmd()，否则 p.cmd() 恒空
-        sys.refresh_processes_specifics(
-            ProcessesToUpdate::All,
-            true,
-            ProcessRefreshKind::new().with_cmd(UpdateKind::Always),
-        );
-
-        // pid -> parent pid，用于判定某进程是否本应用的后代
-        let mut parent: HashMap<u32, u32> = HashMap::new();
-        for (pid, p) in sys.processes() {
-            if let Some(par) = p.parent() {
-                parent.insert(pid.as_u32(), par.as_u32());
-            }
-        }
-        let is_descendant = |start: u32| -> bool {
-            let mut cur = start;
-            for _ in 0..64 {
-                match parent.get(&cur) {
-                    Some(&par) if par == self_pid => return true,
-                    Some(&par) => cur = par,
-                    None => return false,
-                }
-            }
-            false
-        };
-
-        for (pid, p) in sys.processes() {
-            let name = p.name().to_string_lossy().to_ascii_lowercase();
-            if !name.contains("msedgewebview2") {
-                continue;
-            }
-            if !is_descendant(pid.as_u32()) {
-                continue;
-            }
-            let joined = p
-                .cmd()
-                .iter()
-                .map(|s| s.to_string_lossy().to_ascii_lowercase())
-                .collect::<Vec<_>>()
-                .join(" ");
-            if NEEDLES.iter().any(|n| joined.contains(n)) {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// 递归扫描 WebView2 策略注册表子树的全部字符串值，命中调试参数即 true。
-    #[cfg(windows)]
-    fn registry_has_debug_flag() -> bool {
-        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
-        use winreg::RegKey;
-        let roots = [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE];
-        let subtrees = [
-            r"Software\Policies\Microsoft\Edge\WebView2",
-            r"Software\Microsoft\Edge\WebView2",
-        ];
-        for root in roots {
-            let hk = RegKey::predef(root);
-            for sub in subtrees {
-                if let Ok(key) = hk.open_subkey(sub) {
-                    if scan_key(&key, 0) {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
-    }
-
-    #[cfg(windows)]
-    fn scan_key(key: &winreg::RegKey, depth: u32) -> bool {
-        if depth > 4 {
-            return false;
-        }
-        for (_, value) in key.enum_values().flatten() {
-            if has_needle(&value.to_string()) {
-                return true;
-            }
-        }
-        for name in key.enum_keys().flatten() {
-            if let Ok(child) = key.open_subkey(&name) {
-                if scan_key(&child, depth + 1) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
 }

@@ -55,9 +55,3 @@ base64 = "0.22"
 netdev = "0.44"
 # 局域网设备自动发现：mDNS / DNS-SD 广播 + 浏览
 mdns-sd = "0.13"
-# 反远程调试注入：巡检 webview 子进程命令行（发布版封死 CDP 接管）
-sysinfo = "0.32"
-
-# 反远程调试注入：读注册表策略覆盖（发布版启动前拒绝）
-[target.'cfg(windows)'.dependencies]
-winreg = "0.52"
