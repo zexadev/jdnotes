@@ -923,6 +923,28 @@ body {
   background: rgba(99, 102, 241, 0.1);
 }
 
+/* 主题切换：瞬间禁掉全部元素级过渡（时长七零八落的 transition-colors 会让变色零碎不齐），
+   统一的变色淡化交给 View Transition 的整页交叉快照；主题开关自身的太阳/月亮动画豁免 */
+.theme-switching,
+.theme-switching *:not(.theme-switch, .theme-switch *),
+.theme-switching *:not(.theme-switch, .theme-switch *)::before,
+.theme-switching *:not(.theme-switch, .theme-switch *)::after {
+  transition: none !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: ease;
+}
+
+/* 圆形揭示（主题开关触发）：关掉默认交叉淡化，旧快照垫底、新快照由 JS clip-path 圆扩散揭示 */
+html[data-theme-vt='circle']::view-transition-old(root),
+html[data-theme-vt='circle']::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 /* 一体化输入卡（模型选择器/附图/发送并入卡内底行） */
 .input-pill {
   background: rgba(255, 255, 255, 0.9);

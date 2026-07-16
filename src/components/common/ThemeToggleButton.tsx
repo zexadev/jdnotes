@@ -7,7 +7,11 @@ export function ThemeToggleButton({ size }: { size?: string } = {}) {
   const checkboxRef = useRef<HTMLInputElement>(null)
 
   const handleChange = () => {
-    toggleTheme()
+    // 传开关中心作为圆形揭示的扩散原点
+    const rect = checkboxRef.current?.closest('label')?.getBoundingClientRect()
+    toggleTheme(
+      rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined
+    )
   }
 
   return (
