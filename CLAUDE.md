@@ -60,12 +60,13 @@
 | `src/lib/contextBudget.ts` | 上下文预算（token 估算 CJK=1/字·其他/3.5、每模型真实窗口表 inferContextWindow、手填 contextWindow 优先、64k 兜底、自动压缩阈值 0.7、图片/工具 schema 开销、压缩器系统提示） |
 | `src/lib/tagColor.ts` | 标签颜色（标签名 djb2 哈希 → 12 色盘，零存储、处处一致；侧栏图标与 TagsInput chip 共用） |
 | `src/components/layout/Sidebar.tsx` | 左侧导航（标签区按使用数降序、默认 Top8+激活钉住、展开全部带筛选——标签上百平铺列表失控） |
+| `src/contexts/ThemeContext.tsx` | 主题（切换用 View Transitions：toggleTheme 可传扩散原点——主题开关传自己中心 → clip-path 圆形揭示 700ms（data-theme-vt=circle 关掉默认交叉淡化，否则打架）；无原点入口如命令面板 → 整页交叉淡化。theme-switching 瞬态禁全部元素级过渡——各处 transition-colors 时长不一逐个变色显得零碎；主题开关自身动画豁免） |
 | `src/hooks/useEditorAI.ts` | 编辑器内联 AI（Cursor 式就地 diff：原文标 aiOld 红删除线保留、新文本 aiHighlight 绿标紧随流式生长、接受/放弃/重试/追加指令按范围操作；插入必须用显式 marks 建文本节点——tr.insertText 会继承插入点 marks 导致红标漏进正文；换行语义：开头 \n 丢弃、\n\n 用 tr.split 真分段（range.to +2）、单 \n 硬换行、尾部换行悬挂跨 chunk） |
 | `src/components/ai/AIReviewToolbar.tsx`·`AIInlinePrompt.tsx`·`AIOldMark.ts` | 浮动审查条（跟随生成位置，Tab/Ctrl+Enter 接受、Esc 放弃、重试、追加指令）·Ctrl+J 输入条（快捷动作 chips，为唯一 AI 面板——气泡菜单/斜杠「自由提问」都只是它的入口）·原文红标 mark |
 | `src/lib/aiTools.ts` | AI 工具层（结果必须带 id、读取带截断分页 offset、append_note/list_notes、Gemini 空 schema 兼容） |
 | `src/lib/chatParts.ts` | assistant 消息 parts JSON 解析（UI 渲染与回传模型共用，回传只取 text 段） |
 | `src/lib/db.ts` | 前端数据库操作、初始化欢迎笔记 |
-| `src/components/editor/Editor.tsx` | Tiptap 编辑器主组件（userTouchedRef：打开后扩展的规范化事务如 fixTables 不当作编辑上报——否则没编辑就刷 updated_at；CodeBlock language 属性 parseHTML 必须回退 language-xxx class，只认 data-language 会把 markdown 代码块语言洗成 plaintext） |
+| `src/components/editor/Editor.tsx` | Tiptap 编辑器主组件（userTouchedRef：打开后扩展的规范化事务如 fixTables 不当作编辑上报——否则没编辑就刷 updated_at；CodeBlock language 属性 parseHTML 必须回退 language-xxx class，只认 data-language 会把 markdown 代码块语言洗成 plaintext；代码粘贴在 handlePaste 拦截——vscode-editor-data 直接建带语言代码块、含 \`\`\` 围栏的纯文本走块级 insertContent，默认 clipboardTextParser 的开放 slice 会把代码块拍成行内裸文本） |
 | `src/components/editor/EditorToolbar.tsx` | 编辑器固定工具栏（格式/列表/待办/图片） |
 | `src/components/editor/ResizableImage.tsx` | 图片节点组件（预览/缩放/删除） |
 | `src/components/editor/SlashCommand.tsx` | 斜杠命令菜单（编辑器命令 + AI 命令；过滤词=编辑器里 / 后的真实文本——中文/IME 天然支持，keywords 拼音/英文别名，键盘 capture 拦截防 Enter 漏进编辑器换行） |
@@ -210,6 +211,7 @@
 - 外部链接：`Ctrl/⌘+Click` 用系统浏览器打开（在 Editor 的 `click` 处理）；**悬停出操作卡**（`LinkPopover.tsx`：URL+打开/复制/编辑/取消链接，编辑态行内输入+无协议自动补 https://）
 - 插入/编辑链接统一走 LinkPopover（气泡菜单链接按钮也是它——window.prompt 在 WebView2 里不可用，别用）
 - 内部引用：单击直接跳转（在 Editor 的 `mousedown` 处理，抢在光标落入前跳，避免误触发编辑态/跳转落空），不出悬停卡
+- 右键菜单：网页原生菜单全局禁用（桌面软件不出浏览器菜单），换 `ContextMenu.tsx` 自绘——可编辑区出 复制/剪切/粘贴/全选，任意区域有选区出 复制，空白无菜单。菜单项 mousedown 必须 preventDefault（否则点击瞬间清选区，复制空）。粘贴用 navigator.clipboard.readText + 合成 paste 事件走完整粘贴管线；readText 需窗口有 OS 焦点（真实右键必有，测试环境需 AppActivate）。另：PowerShell 读剪贴板中文乱码是 GBK 控制台编码，经 UTF-8 文件中转读，别误判剪贴板坏了
 
 ### 笔记引用 / 双向链接
 两种引用形式并存，**渲染成 chip、单击跳转、都计入反向链接**：
