@@ -43,7 +43,7 @@
 | `src-tauri/Cargo.toml` | Rust 依赖、版本号 |
 | `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
 | `src-tauri/src/commands.rs` | Tauri 后端命令 |
-| `src-tauri/src/lib.rs` | 插件注册、命令注册 |
+| `src-tauri/src/lib.rs` | 插件注册、命令注册；发布版反远程调试注入 `anti_remote_debug`（封死 Playwright 等经 CDP 接管——CDP 唯一通道是 webview 带 --remote-debugging-* 参数：启动前拒绝环境变量/注册表注入源[无竞态]+启动后 400ms 巡检 webview 子进程命令行自杀[兜底]；仅 release，debug 保留供本机 CDP 测试；sysinfo 读命令行须 with_cmd 否则 cmd() 恒空） |
 | `src-tauri/src/sync.rs` | 多设备同步内核（局域网 TCP + iroh 跨网 + 同步包文件、三路合并、设备 ID 持久化、probe、mDNS 自动发现、持久 fingerprint） |
 | `src-tauri/src/attachments.rs` | 图片附件内容寻址存储（sha256） |
 | `src-tauri/migrations/004_sync.sql`·`005_sync_merge.sql`·`006_private.sql` | 同步 uuid + 三路合并基准/冲突标记 + 私有笔记标记 |
