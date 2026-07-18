@@ -932,19 +932,6 @@ body {
   transition: none !important;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.28s;
-  animation-timing-function: ease;
-}
-
-/* 圆形揭示（主题开关触发）：关掉默认交叉淡化，旧快照垫底、新快照由 JS clip-path 圆扩散揭示 */
-html[data-theme-vt='circle']::view-transition-old(root),
-html[data-theme-vt='circle']::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
-}
-
 /* 一体化输入卡（模型选择器/附图/发送并入卡内底行） */
 .input-pill {
   background: rgba(255, 255, 255, 0.9);
