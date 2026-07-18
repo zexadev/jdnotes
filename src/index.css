@@ -201,6 +201,13 @@ body {
   height: 6px;
 }
 
+/* 去掉滚动条两端的上下/左右箭头按钮 */
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -222,15 +229,10 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* Firefox 滚动条 */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
-}
-
-.dark * {
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
-}
+/* 注意：不要在此设 scrollbar-width / scrollbar-color 标准属性。
+   Chromium 120+ 下，元素一旦有标准 scrollbar-* 属性，其全部 ::-webkit-scrollbar
+   伪元素规则会被整体忽略——那样上面的 6px 水感样式与去箭头都会失效，退回原生带箭头滚动条。
+   本应用只跑 WebView2（Chromium），无需 Firefox 的标准属性。 */
 
 /* Tiptap 编辑器样式 - Think is Water */
 .tiptap {
