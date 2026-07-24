@@ -1,16 +1,45 @@
-// 从 Markdown 内容提取纯文本预览
+import MarkdownIt from 'markdown-it'
+import taskLists from 'markdown-it-task-lists'
+
+// 与编辑器的 tiptap-markdown 解析行为对齐（html:true、任务列表插件），
+// 否则列表/引用块/表格/任务列表的标记符、高亮回退出的裸 <mark> 标签会原样漏进预览
+const previewMd = new MarkdownIt({ html: true }).use(taskLists)
+
+type MdToken = ReturnType<MarkdownIt['parse']>[number]
+
+function collectPreviewParts(tokens: MdToken[]): { text: string; code: string } {
+  const textParts: string[] = []
+  const codeParts: string[] = []
+  for (const token of tokens) {
+    if (token.type === 'inline') {
+      for (const child of token.children ?? []) {
+        if (child.type === 'text' || child.type === 'code_inline') {
+          textParts.push(child.content)
+        } else if (child.type === 'softbreak' || child.type === 'hardbreak') {
+          textParts.push(' ')
+        }
+        // 其余（emphasis/strong/strike/link/image/html_inline 等标记）不产出文字，天然跳过
+      }
+      textParts.push(' ')
+    } else if (token.type === 'fence' || token.type === 'code_block') {
+      codeParts.push(token.content)
+    }
+  }
+  return { text: textParts.join(''), code: codeParts.join(' ') }
+}
+
+// 从 Markdown 内容提取纯文本预览：真正解析 token 流而非正则替换标记符，
+// 覆盖列表/任务列表/引用块/表格/删除线/字面 [[wiki]] 引用/高亮回退 HTML 等正则难以穷举的语法
 export function extractPreview(markdown: string): string {
-  const text = markdown
-    .replace(/#{1,6}\s/g, '') // 移除标题标记
-    .replace(/\*\*|__/g, '') // 移除粗体
-    .replace(/\*|_/g, '') // 移除斜体
-    .replace(/`{1,3}[^`]*`{1,3}/g, '') // 移除代码
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // 链接只保留文本
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // 移除图片
-    .replace(/\n+/g, ' ') // 换行转空格
+  if (!markdown.trim()) return ''
+  const { text: rawText, code: rawCode } = collectPreviewParts(previewMd.parse(markdown, {}))
+  const text = rawText
+    .replace(/\[\[([^[\]\n]+?)\]\]/g, '$1') // 字面 wiki 引用只保留标题
     .replace(/\s+/g, ' ')
     .trim()
-  return text.slice(0, 80) + (text.length > 80 ? '...' : '')
+  // 纯代码笔记没有其他文字时，用代码内容兜底，避免误显示成"空笔记"
+  const result = text || rawCode.replace(/\s+/g, ' ').trim()
+  return result.slice(0, 80) + (result.length > 80 ? '...' : '')
 }
 
 // 格式化日期（相对时间）
