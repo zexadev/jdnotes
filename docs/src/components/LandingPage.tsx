@@ -79,7 +79,7 @@ export function LandingPage() {
           多设备同步 · 内置 AI 助手 · 数据离线、隐私安全
         </p>
         <div className="landing-hero-buttons">
-          <a href="https://github.com/zexadev/lapis/releases" className="landing-btn-primary">
+          <a href="https://github.com/zexadev/lapisnote/releases" className="landing-btn-primary">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             下载安装
           </a>
@@ -88,9 +88,9 @@ export function LandingPage() {
           </a>
         </div>
         <div className="landing-hero-badges">
-          <img src="https://img.shields.io/github/v/release/zexadev/lapis?style=flat-square&logo=github" alt="Release" />
-          <img src="https://img.shields.io/github/downloads/zexadev/lapis/total?style=flat-square&logo=github" alt="Downloads" />
-          <img src="https://img.shields.io/github/stars/zexadev/lapis?style=flat-square&logo=github" alt="Stars" />
+          <img src="https://img.shields.io/github/v/release/zexadev/lapisnote?style=flat-square&logo=github" alt="Release" />
+          <img src="https://img.shields.io/github/downloads/zexadev/lapisnote/total?style=flat-square&logo=github" alt="Downloads" />
+          <img src="https://img.shields.io/github/stars/zexadev/lapisnote?style=flat-square&logo=github" alt="Stars" />
           <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License" />
         </div>
       </section>
@@ -162,10 +162,10 @@ export function LandingPage() {
         <h2 className="landing-cta-title">开始使用 Lapis</h2>
         <p className="landing-cta-subtitle">免费开源，一键安装，数据完全属于你</p>
         <div className="landing-hero-buttons">
-          <a href="https://github.com/zexadev/lapis/releases" className="landing-btn-primary">
+          <a href="https://github.com/zexadev/lapisnote/releases" className="landing-btn-primary">
             下载最新版本
           </a>
-          <a href="https://github.com/zexadev/lapis" className="landing-btn-secondary">
+          <a href="https://github.com/zexadev/lapisnote" className="landing-btn-secondary">
             GitHub 仓库
           </a>
         </div>

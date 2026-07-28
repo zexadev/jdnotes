@@ -24,7 +24,7 @@ keywords:
 
 为什么越来越多开发者选择 **Tauri** 作为 Electron 替代方案来构建跨平台桌面应用？一个数据可以参考：同样的笔记应用，Electron 打包 90MB+，Tauri 只需要 **8MB**。
 
-本文分享 [Lapis](https://github.com/zexadev/lapis) 的开发经验——一个基于 Tauri 2 + React 的桌面笔记应用，集成了 AI 助手、MCP Server、SQLite 存储等功能。
+本文分享 [Lapis](https://github.com/zexadev/lapisnote) 的开发经验——一个基于 Tauri 2 + React 的桌面笔记应用，集成了 AI 助手、MCP Server、SQLite 存储等功能。
 
 ---
 
@@ -156,7 +156,7 @@ MCP Server 提供三个工具（create_note、append_note、update_note），让
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/zexadev/lapis/releases/latest/download/latest.json"
+        "https://github.com/zexadev/lapisnote/releases/latest/download/latest.json"
       ]
     }
   }
@@ -229,7 +229,7 @@ Tauri 不太适合：
 
 Tauri 2 是 2026 年 Rust 桌面应用开发的主流框架之一。如果你已经有 React/Vue 前端经验，用 Tauri 可以快速构建出体积小、性能好的跨平台桌面应用。配合 Claude Code 等 AI Agent 工具进行开发，可以进一步提升开发效率。
 
-Lapis 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub](https://github.com/zexadev/lapis)，欢迎参考和贡献。
+Lapis 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub](https://github.com/zexadev/lapisnote)，欢迎参考和贡献。
 
 ---
 
@@ -241,4 +241,4 @@ Lapis 是一个用 Tauri 2 构建的真实项目，完整代码开源在 [GitHub
 
 ---
 
-*想体验 Tauri 构建的应用？[下载 Lapis](https://github.com/zexadev/lapis/releases) 感受 8MB 安装包的轻量体验。*
+*想体验 Tauri 构建的应用？[下载 Lapis](https://github.com/zexadev/lapisnote/releases) 感受 8MB 安装包的轻量体验。*

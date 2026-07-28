@@ -6,11 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zexadev/lapis/releases/latest">
-    <img src="https://img.shields.io/github/v/release/zexadev/lapis?style=flat-square&logo=github" alt="Latest Release">
+  <a href="https://github.com/zexadev/lapisnote/releases/latest">
+    <img src="https://img.shields.io/github/v/release/zexadev/lapisnote?style=flat-square&logo=github" alt="Latest Release">
   </a>
-  <a href="https://github.com/zexadev/lapis/releases">
-    <img src="https://img.shields.io/github/downloads/zexadev/lapis/total?style=flat-square&logo=github" alt="Downloads">
+  <a href="https://github.com/zexadev/lapisnote/releases">
+    <img src="https://img.shields.io/github/downloads/zexadev/lapisnote/total?style=flat-square&logo=github" alt="Downloads">
   </a>
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License">
@@ -149,7 +149,7 @@
 
 ### Windows
 
-从 [Releases](https://github.com/zexadev/lapis/releases/latest) 下载最新版本：
+从 [Releases](https://github.com/zexadev/lapisnote/releases/latest) 下载最新版本：
 
 | 文件 | 说明 |
 |------|------|
@@ -164,7 +164,7 @@
 
 ### 安装步骤
 
-1. 从 [Releases](https://github.com/zexadev/lapis/releases/latest) 下载最新安装包
+1. 从 [Releases](https://github.com/zexadev/lapisnote/releases/latest) 下载最新安装包
 2. 运行安装程序，按提示完成安装
 3. 启动 Lapis，开始您的笔记之旅
 
@@ -259,7 +259,7 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 
 如果您在使用中遇到问题或有功能建议：
 
-- 📧 提交 [GitHub Issue](https://github.com/zexadev/lapis/issues/new)
+- 📧 提交 [GitHub Issue](https://github.com/zexadev/lapisnote/issues/new)
 - 📖 查看 [文档站](https://jdnotes.zexa.cc)
 
 ### 常见问题
@@ -290,7 +290,7 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 
 Lapis **2.0 及以后版本**采用 **[GNU AGPL-3.0-or-later](LICENSE)**（强 copyleft：修改 / 分发、乃至通过网络提供服务，都须以 AGPL 开源其改动）。
 
-附加条款（AGPL §7，见 [NOTICE](NOTICE)）：**修改或分发时，需在你的仓库 README / 源码 / NOTICE 中保留对原作者与本项目的署名**（`Based on Lapis — © 2026 zexadev — https://github.com/zexadev/lapis`）并标注你的改动。不要求展示在 app 界面里。
+附加条款（AGPL §7，见 [NOTICE](NOTICE)）：**修改或分发时，需在你的仓库 README / 源码 / NOTICE 中保留对原作者与本项目的署名**（`Based on Lapis — © 2026 zexadev — https://github.com/zexadev/lapisnote`）并标注你的改动。不要求展示在 app 界面里。
 
 历史版本 **1.9.1 及以前**以 [MIT License](LICENSE-MIT) 发布，仍按 MIT 提供。
 
@@ -317,7 +317,7 @@ Copyright © 2026 [Zexa (zexadev)](https://zexa.cc)
 </p>
 
 <p align="center">
-  <a href="https://github.com/zexadev/lapis">
+  <a href="https://github.com/zexadev/lapisnote">
     ⭐ 如果这个项目对您有帮助，请给一个 Star ⭐
   </a>
 </p>

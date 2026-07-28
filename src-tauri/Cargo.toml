@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "Lapis — a calm, local-first notes app"
 authors = ["zexa (zexadev) <https://zexa.cc>"]
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/zexadev/lapis"
+repository = "https://github.com/zexadev/lapisnote"
 edition = "2021"
 rust-version = "1.77.2"
 

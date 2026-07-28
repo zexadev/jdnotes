@@ -41,7 +41,7 @@ const navbar = (
         <b>Lapis</b>
       </span>
     }
-    projectLink="https://github.com/zexadev/lapis"
+    projectLink="https://github.com/zexadev/lapisnote"
   />
 )
 
@@ -71,7 +71,7 @@ const jsonLd = {
         price: '0',
         priceCurrency: 'CNY',
       },
-      downloadUrl: 'https://github.com/zexadev/lapis/releases',
+      downloadUrl: 'https://github.com/zexadev/lapisnote/releases',
       softwareVersion: '2.0.0',
       author: {
         '@type': 'Organization',
@@ -101,7 +101,7 @@ export default async function RootLayout({ children }) {
         <Layout
           navbar={navbar}
           pageMap={await getPageMap()}
-          docsRepositoryBase="https://github.com/zexadev/lapis/tree/main/docs"
+          docsRepositoryBase="https://github.com/zexadev/lapisnote/tree/main/docs"
           footer={footer}
         >
           {children}

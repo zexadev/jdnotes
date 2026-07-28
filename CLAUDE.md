@@ -19,7 +19,7 @@
 - **标识符**：com.jdnotes.app
 - **窗口**：1556x887（默认=最小，逻辑内容尺寸；无边框窗口外框会大 16x9 隐形拉伸边框），无边框 (decorations: false)
 - **前端开发端口**：5173
-- **GitHub**：zexadev/lapis
+- **GitHub**：zexadev/lapisnote
 - **品牌**：Zexa (zexa.cc)
 
 ---
@@ -31,7 +31,7 @@
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
 - **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
 - **Tauri 插件**：log, notification, sql(sqlite), dialog, fs, opener, updater, process
-- **发布状态**：v2.0.0 已于 2026-07-28 正式发布——仓库已改名 `zexadev/lapis`、Release 资产齐全（exe/msi + 双 sig + latest.json）、updater 端点已验证 200。旧地址 `zexadev/jdnotes` 由 GitHub 自动重定向。
+- **发布状态**：v2.0.0 已于 2026-07-28 正式发布。仓库最终名 `zexadev/lapisnote`（jdnotes → lapis → lapisnote，lapis 与既有 GitHub 项目及商业软件撞名故加 note 后缀；应用品牌仍叫 Lapis）。Release 资产齐全（exe/msi + 双 sig + latest.json）、updater 端点已验证 200。旧地址 `zexadev/jdnotes`、`zexadev/lapis` 均由 GitHub 自动重定向，**这两个旧名永不复用**（复用即断老版本 updater 的重定向链）。
 
 ---
 

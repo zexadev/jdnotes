@@ -6,11 +6,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zexadev/lapis/releases/latest">
-    <img src="https://img.shields.io/github/v/release/zexadev/lapis?style=flat-square&logo=github" alt="Latest Release">
+  <a href="https://github.com/zexadev/lapisnote/releases/latest">
+    <img src="https://img.shields.io/github/v/release/zexadev/lapisnote?style=flat-square&logo=github" alt="Latest Release">
   </a>
-  <a href="https://github.com/zexadev/lapis/releases">
-    <img src="https://img.shields.io/github/downloads/zexadev/lapis/total?style=flat-square&logo=github" alt="Downloads">
+  <a href="https://github.com/zexadev/lapisnote/releases">
+    <img src="https://img.shields.io/github/downloads/zexadev/lapisnote/total?style=flat-square&logo=github" alt="Downloads">
   </a>
   <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License">
@@ -145,7 +145,7 @@
 
 ### Windows
 
-Download the latest version from [Releases](https://github.com/zexadev/lapis/releases/latest):
+Download the latest version from [Releases](https://github.com/zexadev/lapisnote/releases/latest):
 
 | File | Description |
 |------|-------------|
@@ -160,7 +160,7 @@ Download the latest version from [Releases](https://github.com/zexadev/lapis/rel
 
 ### Installation
 
-1. Download the latest installer from [Releases](https://github.com/zexadev/lapis/releases/latest)
+1. Download the latest installer from [Releases](https://github.com/zexadev/lapisnote/releases/latest)
 2. Run the installer and follow the prompts
 3. Launch Lapis and start writing
 
@@ -255,7 +255,7 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 
 If you encounter any issues or have suggestions:
 
-- Submit a [GitHub Issue](https://github.com/zexadev/lapis/issues/new)
+- Submit a [GitHub Issue](https://github.com/zexadev/lapisnote/issues/new)
 - Visit the [Documentation](https://jdnotes.zexa.cc)
 
 ### FAQ
@@ -286,7 +286,7 @@ If you encounter any issues or have suggestions:
 
 Lapis **2.0 and later** is licensed under the **[GNU AGPL-3.0-or-later](LICENSE)** (strong copyleft: modifying, distributing, or offering it over a network all require releasing your changes under the AGPL).
 
-Additional term (AGPL §7, see [NOTICE](NOTICE)): when you modify or distribute Lapis, you must **keep an attribution to the original author and project in your repository's README / source / NOTICE** (`Based on Lapis — © 2026 zexadev — https://github.com/zexadev/lapis`) and mark your changes. Displaying it inside the app UI is not required.
+Additional term (AGPL §7, see [NOTICE](NOTICE)): when you modify or distribute Lapis, you must **keep an attribution to the original author and project in your repository's README / source / NOTICE** (`Based on Lapis — © 2026 zexadev — https://github.com/zexadev/lapisnote`) and mark your changes. Displaying it inside the app UI is not required.
 
 Earlier releases — **version 1.9.1 and before** — were published under the [MIT License](LICENSE-MIT) and remain available under those terms.
 
@@ -313,7 +313,7 @@ Thanks to these open-source projects:
 </p>
 
 <p align="center">
-  <a href="https://github.com/zexadev/lapis">
+  <a href="https://github.com/zexadev/lapisnote">
     If this project helps you, please give it a Star :star:
   </a>
 </p>
