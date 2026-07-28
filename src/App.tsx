@@ -117,9 +117,10 @@ function App() {
     } else if (viewBeforeSearchRef.current) {
       const prev = viewBeforeSearchRef.current
       viewBeforeSearchRef.current = null
-      if (currentViewRef.current === 'inbox') setCurrentView(prev)
+      // 走 handleViewChange 而非裸 setCurrentView：恢复目标可能是日历，须同步清掉热力图带来的聚焦日
+      if (currentViewRef.current === 'inbox') handleViewChange(prev)
     }
-  }, [])
+  }, [handleViewChange])
 
   // 沉浸模式：窗口全屏 + 隐藏侧栏/顶栏/笔记列表，只留内容区；F11 切换
   const [isImmersive, setIsImmersive] = useState(false)
