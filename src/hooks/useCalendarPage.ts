@@ -66,8 +66,13 @@ export interface UseCalendarPageReturn {
 export function useCalendarPage(initialDate?: Date): UseCalendarPageReturn {
   const [currentDate, setCurrentDate] = useState(() => initialDate ?? new Date())
   const [selectedDate, setSelectedDate] = useState(() => initialDate ?? new Date())
+  // 带 initialDate 进来（概览热力图点透）时强制创建时间轴：热力图数字按 createdAt 统计，
+  // 若沿用记忆的 updatedAt 轴，落地当天笔记集合会与刚看到的「N 篇」对不上。
+  // 只作初值不写 localStorage，用户手动切换的长期偏好不受影响
   const [dateField, setDateFieldState] = useState<DateField>(() =>
-    localStorage.getItem(DATE_FIELD_STORAGE_KEY) === 'updatedAt' ? 'updatedAt' : 'createdAt'
+    initialDate
+      ? 'createdAt'
+      : localStorage.getItem(DATE_FIELD_STORAGE_KEY) === 'updatedAt' ? 'updatedAt' : 'createdAt'
   )
   const [notes, setNotes] = useState<Note[]>([])
   const [reminderNotes, setReminderNotes] = useState<Note[]>([])
