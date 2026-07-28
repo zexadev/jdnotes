@@ -85,9 +85,16 @@ export function CalendarView({ onSelectNote, onCreateNote }: CalendarViewProps) 
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing) return
       if (e.ctrlKey || e.metaKey || e.altKey) return
+      // 全局浮层（模态/命令面板，均为 fixed inset-0 结构）打开时不接管键盘：
+      // 焦点常在 body，只看 target 祖先链对叠在上面的浮层零感知，Enter 会穿透误建笔记
+      if (document.querySelector('.fixed.inset-0')) return
       // target 可能是 window/document（非 Element 无 closest），防御
       const target = e.target instanceof HTMLElement ? e.target : null
-      if (target?.closest('input, textarea, select, button, [contenteditable="true"], [role="button"]')) return
+      // 输入类上下文全部让路
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      // 焦点在按钮/chip 上（点过「今天」、中止拖拽后焦点滞留 dnd chip 的 role=button）只拦 Enter
+      // 防与按钮激活双触发；方向键/翻页/回今天与按钮无冲突，照常工作
+      const onButton = !!target?.closest('button, [role="button"]')
 
       switch (e.key) {
         case 'ArrowLeft':
@@ -121,6 +128,7 @@ export function CalendarView({ onSelectNote, onCreateNote }: CalendarViewProps) 
           cal.goToToday()
           break
         case 'Enter':
+          if (onButton) return
           e.preventDefault()
           onCreateNote(cal.selectedDate)
           break
