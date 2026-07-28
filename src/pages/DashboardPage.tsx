@@ -141,9 +141,9 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
   const peakHour = useMemo(() => {
     let max = 0
     let hour = 22
-    stats.hourlyActivity.forEach((h, i) => {
-      if (h.count > max) {
-        max = h.count
+    stats.hourlyActivity.forEach((count, i) => {
+      if (count > max) {
+        max = count
         hour = i
       }
     })
@@ -654,18 +654,18 @@ function HoursBar({
   onTip,
   onTipHide,
 }: {
-  hourly: { hour: string; count: number }[]
+  hourly: number[]
   peakHour: number
   onTip: (e: React.MouseEvent, text: string) => void
   onTipHide: () => void
 }) {
   const [hovered, setHovered] = useState<number | null>(null)
-  const max = Math.max(...hourly.map((h) => h.count), 1)
+  const max = Math.max(...hourly, 1)
   return (
     <div className="gap-[2px] h-[88px] grid" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
-      {hourly.map((h, i) => {
-        const height = Math.max(4, (h.count / max) * 100)
-        const isPeak = i === peakHour && h.count > 0
+      {hourly.map((count, i) => {
+        const height = Math.max(4, (count / max) * 100)
+        const isPeak = i === peakHour && count > 0
         return (
           // 命中区是整列全高（同趋势图命中带），不是柱条本体——0 篇的柱只有 ~3.5px 高，悬停根本停不上去
           <div
@@ -673,7 +673,7 @@ function HoursBar({
             className="h-full flex items-end cursor-default"
             onMouseMove={(e) => {
               setHovered(i)
-              onTip(e, `${i}:00 – ${(i + 1) % 24}:00 · ${h.count} 篇`)
+              onTip(e, `${i}:00 – ${(i + 1) % 24}:00 · ${count} 篇`)
             }}
             onMouseLeave={() => {
               setHovered(null)

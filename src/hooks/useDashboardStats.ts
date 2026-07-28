@@ -33,12 +33,11 @@ interface DashboardStats {
     id: number;
     title: string;
     updatedAt: Date;
-    preview: string;
   }[];
 
   // 图表数据
   trendData: { date: string; count: number }[]; // 趋势折线图数据
-  hourlyActivity: { hour: string; count: number }[]; // 写作时段数据
+  hourlyActivity: number[]; // 各小时创建篇数，下标即小时
 }
 
 /**
@@ -149,7 +148,6 @@ export function useDashboardStats(
         id: note.id,
         title: note.title,
         updatedAt: new Date(note.updatedAt),
-        preview: getPreview(note.content),
       }));
 
     // 图表数据计算
@@ -166,7 +164,6 @@ export function useDashboardStats(
     }
 
     // 2. 写作时段数据 (24小时)
-    const hourlyActivity: { hour: string; count: number }[] = [];
     const hourCounts = new Map<number, number>();
     allNotes.forEach(note => {
       if (!note.isDeleted) {
@@ -174,11 +171,9 @@ export function useDashboardStats(
         hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
       }
     });
+    const hourlyActivity: number[] = [];
     for (let i = 0; i < 24; i++) {
-      hourlyActivity.push({
-        hour: `${i}:00`,
-        count: hourCounts.get(i) || 0,
-      });
+      hourlyActivity.push(hourCounts.get(i) || 0);
     }
 
     return {
@@ -230,20 +225,3 @@ function getWordCount(text: string): number {
   return chineseChars.length + englishWords.length;
 }
 
-/**
- * 获取笔记预览文本
- */
-function getPreview(content: string, maxLength: number = 60): string {
-  if (!content) return '空笔记';
-
-  const plainText = content
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]+`/g, '')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
-    .replace(/\[.*?\]\(.*?\)/g, '')
-    .replace(/[#*_~`]/g, '')
-    .trim();
-
-  if (plainText.length <= maxLength) return plainText;
-  return plainText.substring(0, maxLength) + '...';
-}
