@@ -220,10 +220,10 @@ export function CalendarView({ onSelectNote, onCreateNote }: CalendarViewProps) 
               <h2 className="mr-2 text-[17px] font-semibold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">
                 {year}年{month}月
               </h2>
-              <button onClick={() => cal.moveMonth(-1)} className={iconBtn} title="上个月">
+              <button onClick={() => cal.selectMonthDelta(-1)} className={iconBtn} title="上个月">
                 <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
               </button>
-              <button onClick={() => cal.moveMonth(1)} className={iconBtn} title="下个月">
+              <button onClick={() => cal.selectMonthDelta(1)} className={iconBtn} title="下个月">
                 <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
               </button>
               <button

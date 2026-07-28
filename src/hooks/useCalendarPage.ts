@@ -53,7 +53,6 @@ export interface UseCalendarPageReturn {
   selectDate: (date: Date) => void
   moveSelection: (days: number) => void
   selectMonthDelta: (delta: number) => void
-  moveMonth: (delta: number) => void
   goToToday: () => void
   moveNoteToDate: (note: Note, target: Date) => Promise<void>
   moveReminderToDate: (note: Note, target: Date) => Promise<void>
@@ -114,7 +113,8 @@ export function useCalendarPage(): UseCalendarPageReturn {
     [selectedDate, selectDate]
   )
 
-  // 键盘整月移动选中（日号越界钳到目标月末，如 1月31日 → 2月28日）
+  // 整月移动选中（头部箭头与 PgUp/PgDn 共用；日号越界钳到目标月末，如 1月31日 → 2月28日）。
+  // 必须动选中而不能只翻网格：面板数据只查网格 42 天窗口，选中日跌出窗口会假报「没有笔记」
   const selectMonthDelta = useCallback(
     (delta: number) => {
       const y = selectedDate.getFullYear()
@@ -124,11 +124,6 @@ export function useCalendarPage(): UseCalendarPageReturn {
     },
     [selectedDate, selectDate]
   )
-
-  // 头部箭头翻月：只翻网格，不动选中
-  const moveMonth = useCallback((delta: number) => {
-    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
-  }, [])
 
   const goToToday = useCallback(() => {
     const today = new Date()
@@ -189,7 +184,6 @@ export function useCalendarPage(): UseCalendarPageReturn {
     selectDate,
     moveSelection,
     selectMonthDelta,
-    moveMonth,
     goToToday,
     moveNoteToDate,
     moveReminderToDate,
