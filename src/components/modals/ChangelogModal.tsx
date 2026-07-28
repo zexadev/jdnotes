@@ -16,6 +16,12 @@ interface ChangelogModalProps {
 // 内置的更新日志数据
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: '2.0.1',
+    date: '2026-07-28',
+    notes: `## 💅 优化
+- **粘贴多行文字不再挤成一段**：从微信、终端等复制的纯文本，粘贴后每行自动成为独立段落，行距与手打回车一致；列表、引用、表格、代码等结构粘贴不受影响`,
+  },
+  {
     version: '2.0.0',
     date: '2026-05-28',
     notes: `## 🎉 多设备同步首发
