@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { noteOperations, formatDateKey, type Note } from '../lib/db'
+import { toast } from '../lib/toast'
 
 export type DateField = 'createdAt' | 'updatedAt'
 
@@ -131,7 +132,8 @@ export function useCalendarPage(): UseCalendarPageReturn {
     setCurrentDate(today)
   }, [])
 
-  // 拖拽挪日：保留原时分秒只换日期
+  // 拖拽挪日：保留原时分秒只换日期。写库失败必须有反馈——拖拽 UI 上 chip 已弹回原位，
+  // 静默失败会让用户以为拖成功了
   const moveNoteToDate = useCallback(
     async (note: Note, target: Date) => {
       if (isSameDay(note.createdAt, target)) return
@@ -142,7 +144,12 @@ export function useCalendarPage(): UseCalendarPageReturn {
         note.createdAt.getSeconds(),
         note.createdAt.getMilliseconds()
       )
-      await noteOperations.updateCreatedAt(note.id, next)
+      try {
+        await noteOperations.updateCreatedAt(note.id, next)
+      } catch (error) {
+        console.error('Failed to move note:', error)
+        toast.error('移动笔记失败')
+      }
       await refresh()
     },
     [refresh]
@@ -159,7 +166,12 @@ export function useCalendarPage(): UseCalendarPageReturn {
         note.reminderDate.getSeconds(),
         0
       )
-      await noteOperations.setReminder(note.id, next)
+      try {
+        await noteOperations.setReminder(note.id, next)
+      } catch (error) {
+        console.error('Failed to move reminder:', error)
+        toast.error('修改提醒失败')
+      }
       await refresh()
     },
     [refresh]
@@ -167,29 +179,55 @@ export function useCalendarPage(): UseCalendarPageReturn {
 
   const clearReminder = useCallback(
     async (noteId: number) => {
-      await noteOperations.clearReminder(noteId)
+      try {
+        await noteOperations.clearReminder(noteId)
+      } catch (error) {
+        console.error('Failed to clear reminder:', error)
+        toast.error('取消提醒失败')
+      }
       await refresh()
     },
     [refresh]
   )
 
-  return {
-    currentDate,
-    selectedDate,
-    dateField,
-    notes,
-    reminderNotes,
-    range,
-    setDateField,
-    selectDate,
-    moveSelection,
-    selectMonthDelta,
-    goToToday,
-    moveNoteToDate,
-    moveReminderToDate,
-    clearReminder,
-    refresh,
-  }
+  // 返回值整体 memo：调用方（CalendarView 键盘 effect 等）以 cal 为依赖，
+  // 每渲染新对象会导致 window listener 无谓地反复解绑重绑
+  return useMemo(
+    () => ({
+      currentDate,
+      selectedDate,
+      dateField,
+      notes,
+      reminderNotes,
+      range,
+      setDateField,
+      selectDate,
+      moveSelection,
+      selectMonthDelta,
+      goToToday,
+      moveNoteToDate,
+      moveReminderToDate,
+      clearReminder,
+      refresh,
+    }),
+    [
+      currentDate,
+      selectedDate,
+      dateField,
+      notes,
+      reminderNotes,
+      range,
+      setDateField,
+      selectDate,
+      moveSelection,
+      selectMonthDelta,
+      goToToday,
+      moveNoteToDate,
+      moveReminderToDate,
+      clearReminder,
+      refresh,
+    ]
+  )
 }
 
 // 保留提醒但已过期（仍 enabled）的判断：面板里降透明度用
