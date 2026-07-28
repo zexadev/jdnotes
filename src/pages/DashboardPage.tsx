@@ -555,15 +555,20 @@ function formatReminderTime(d: Date, overdue: boolean): string {
   const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   const startToday = new Date()
   startToday.setHours(0, 0, 0, 0)
-  const dayDiff = Math.floor((d.getTime() - startToday.getTime()) / 86400000)
+  const startOfD = new Date(d)
+  startOfD.setHours(0, 0, 0, 0)
+  // 日历日差必须比两个本地零点：直接拿时刻差 floor 会在 DST 转换周差一天（23h/25h 的天）。
+  // 两个本地零点之差恒为 N·24h±1h，round 吸收偏差
+  const dayDiff = Math.round((startOfD.getTime() - startToday.getTime()) / 86400000)
+  const year = d.getFullYear() !== startToday.getFullYear() ? `${d.getFullYear()}年` : ''
   if (dayDiff === 0) return `今天 ${time}`
   if (overdue) {
     if (dayDiff === -1) return `昨天 ${time}`
-    return `${d.getMonth() + 1}月${d.getDate()}日`
+    return `${year}${d.getMonth() + 1}月${d.getDate()}日 ${time}`
   }
   if (dayDiff === 1) return `明天 ${time}`
   if (dayDiff < 7) return `周${'日一二三四五六'[d.getDay()]} ${time}`
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${time}`
+  return `${year}${d.getMonth() + 1}月${d.getDate()}日 ${time}`
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
