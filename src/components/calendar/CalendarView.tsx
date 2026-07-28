@@ -9,7 +9,6 @@ import { CalendarHeader } from './CalendarHeader'
 import { MonthView } from './MonthView'
 import { WeekView } from './WeekView'
 import { DayView } from './DayView'
-import { ReminderNotification } from './ReminderNotification'
 import type { Note } from '../../lib/db'
 
 interface CalendarViewProps {
@@ -160,13 +159,6 @@ export function CalendarView({ onSelectNote }: CalendarViewProps) {
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="h-full flex flex-col bg-[#F9FBFC] dark:bg-[#0B0D11]">
-        {/* 提醒通知 */}
-        <ReminderNotification
-          reminders={calendar.upcomingReminders || []}
-          onSelectNote={onSelectNote}
-          onDismiss={calendar.clearNoteReminder}
-        />
-
         <CalendarHeader
           currentDate={calendar.currentDate}
           view={calendar.view}
