@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateKey, type Note } from '../lib/db'
@@ -67,20 +67,34 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
   }
   const [trendHover, setTrendHover] = useState<number | null>(null)
 
+  // viewBox 宽用容器实测像素：固定 700 + preserveAspectRatio=none 会把圆点/数字横向压扁
+  const chartWrapRef = useRef<HTMLDivElement>(null)
+  const [chartW, setChartW] = useState(CHART_W)
+  useEffect(() => {
+    const el = chartWrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      const w = Math.round(el.clientWidth)
+      if (w > 0) setChartW(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   const trend = useMemo(() => stats.trendData.slice(-trendRange), [stats.trendData, trendRange])
   const trendPeak = useMemo(() => Math.max(...trend.map((d) => d.count), 1), [trend])
 
   const chart = useMemo(() => {
     if (trend.length === 0) return { line: '', area: '', points: [] as { x: number; y: number; v: number }[] }
     const points = trend.map((d, i) => ({
-      x: CHART_P + (i * (CHART_W - 2 * CHART_P)) / (trend.length - 1 || 1),
+      x: CHART_P + (i * (chartW - 2 * CHART_P)) / (trend.length - 1 || 1),
       y: CHART_PT + (CHART_H - CHART_PT - CHART_P) * (1 - d.count / trendPeak),
       v: d.count,
     }))
     const line = smoothLine(points)
     const area = `${line} L${points[points.length - 1].x},${CHART_H} L${points[0].x},${CHART_H} Z`
     return { line, area, points }
-  }, [trend, trendPeak])
+  }, [trend, trendPeak, chartW])
 
   const peakIdx = useMemo(() => chart.points.findIndex((p) => p.v === trendPeak), [chart.points, trendPeak])
 
@@ -159,9 +173,8 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
     return d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
   }
 
-  const trendXLabels = trendRange === 7
-    ? trend.map((d) => d.date)
-    : [0, 7, 14, 21, 29].map((i) => trend[i]?.date ?? '')
+  // 标签跟随数据点真实 x：justify-between 均分与点位最大差 2.6% 图宽，悬停日期会和脚下标签对不上
+  const trendLabelIdx = trendRange === 7 ? trend.map((_, i) => i) : [0, 7, 14, 21, 29]
 
   return (
     <div className="h-full overflow-y-auto bg-transparent">
@@ -283,8 +296,8 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
               }
               tight
             />
-            <div className="relative h-[130px]">
-              <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" className="w-full h-full">
+            <div ref={chartWrapRef} className="relative h-[130px]">
+              <svg viewBox={`0 0 ${chartW} ${CHART_H}`} preserveAspectRatio="none" className="w-full h-full">
                 <defs>
                   <linearGradient id="dashTrendG" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor={PRIMARY} stopOpacity="0.28" />
@@ -292,9 +305,9 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
                   </linearGradient>
                 </defs>
                 <g stroke="currentColor" strokeWidth="1" className="text-[#E4EAF0] dark:text-[#262932]">
-                  <line x1="0" y1="32" x2={CHART_W} y2="32" />
-                  <line x1="0" y1="65" x2={CHART_W} y2="65" />
-                  <line x1="0" y1="98" x2={CHART_W} y2="98" />
+                  <line x1="0" y1="32" x2={chartW} y2="32" />
+                  <line x1="0" y1="65" x2={chartW} y2="65" />
+                  <line x1="0" y1="98" x2={chartW} y2="98" />
                 </g>
                 {chart.area && <path d={chart.area} fill="url(#dashTrendG)" />}
                 {chart.line && <path d={chart.line} fill="none" stroke={PRIMARY} strokeWidth="2" />}
@@ -320,9 +333,9 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
                       )}
                       {/* 悬停命中带：竖向整条，鼠标扫过即出提示 */}
                       <rect
-                        x={p.x - (CHART_W - 2 * CHART_P) / (2 * (trend.length - 1 || 1))}
+                        x={p.x - (chartW - 2 * CHART_P) / (2 * (trend.length - 1 || 1))}
                         y="0"
-                        width={(CHART_W - 2 * CHART_P) / (trend.length - 1 || 1)}
+                        width={(chartW - 2 * CHART_P) / (trend.length - 1 || 1)}
                         height={CHART_H}
                         fill="transparent"
                         onMouseMove={(e) => {
@@ -339,8 +352,19 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
                 })}
               </svg>
             </div>
-            <div className="flex justify-between mt-1.5 font-mono text-[10px] text-gray-400 dark:text-gray-500 tracking-wider">
-              {trendXLabels.map((d, i) => (<span key={i}>{d}</span>))}
+            <div className="relative mt-1.5 h-[13px] font-mono text-[10px] text-gray-400 dark:text-gray-500 tracking-wider">
+              {trendLabelIdx.map((idx, j) => (
+                <span
+                  key={idx}
+                  className="absolute top-0 whitespace-nowrap"
+                  style={{
+                    left: `${((chart.points[idx]?.x ?? 0) / chartW) * 100}%`,
+                    transform: j === 0 ? undefined : j === trendLabelIdx.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
+                  }}
+                >
+                  {trend[idx]?.date}
+                </span>
+              ))}
             </div>
           </Card>
 
