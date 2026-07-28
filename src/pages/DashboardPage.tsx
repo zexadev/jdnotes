@@ -451,6 +451,7 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
                       <button
                         key={cell.key}
                         type="button"
+                        aria-label={`${cell.date.getMonth() + 1}月${cell.date.getDate()}日 · ${cell.count} 篇`}
                         className="aspect-square rounded-[3px] cursor-pointer transition-transform hover:scale-110"
                         style={{ background: cellColor(cell.level) }}
                         onClick={() => onOpenCalendarDate(cell.date)}
