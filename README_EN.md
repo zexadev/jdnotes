@@ -43,15 +43,16 @@
 
 ## About
 
-**Lapis** is a local-first desktop note-taking app built with Tauri 2, featuring a built-in AI assistant and MCP Server. All data is stored locally on your device — no cloud, no tracking, full privacy.
+**Lapis** is a local-first desktop note-taking app built with Tauri 2. Sync across devices over LAN or encrypted P2P — and let AI agents read and write your local notes via MCP. All data is stored locally on your device — no cloud, no tracking, full privacy.
 
 | | Feature | Description |
 |---|---|---|
-| :rocket: | **Lightweight** | Built with Rust + Web tech, fast startup, low memory |
-| :lock: | **Private** | Local SQLite storage, your data stays on your device |
+| :arrows_counterclockwise: | **Multi-Device Sync** | LAN auto-discovery + encrypted cross-network P2P, free, no central server |
+| :electric_plug: | **AI Agent Read/Write** | Built-in MCP Server — Claude Code, Cursor and other AI tools can view, create, append and edit notes in your local library |
+| :link: | **Bi-directional Links** | Type `[[` to reference other notes (or write `[[Title]]` inline), click to jump + automatic backlinks |
 | :robot: | **AI-Powered** | Multi-provider AI assistant: DeepSeek / Claude / Gemini / Ollama |
-| :link: | **MCP Integration** | Built-in MCP Server, works with Claude Code and other AI tools |
-| :art: | **Beautiful** | Modern UI with smooth dark/light theme transitions |
+| :lock: | **Local-First** | Local SQLite storage, works offline, your data stays on your device |
+| :rocket: | **Lightweight** | Built with Rust + Web tech, ~8MB installer, fast startup |
 
 ---
 
@@ -65,15 +66,32 @@
 - **Images** — Insert via toolbar, paste, or drag & drop with resize support
 - **Task Lists** — `- [ ]` / `- [x]` syntax, toolbar and slash commands
 - **Slash Commands** — Type `/` to quickly insert content blocks and AI commands
-- **Links** — Ctrl+Click to open links (VS Code style)
+- **Code Paste as Code Block** — Pasting code from VS Code and similar editors creates a highlighted code block automatically; plain text with ``` fences is recognized too
+- **Links** — Ctrl+Click to open links (VS Code style); hovering a link shows an action card to open, copy, edit or unlink
+- **Note References / Bi-directional Links** — Type `[[` to pick a note, or write `[[Title]]` as plain text (including notes written by AI via MCP); both render as clickable chips, and referenced notes list their backlinks automatically
 - **Auto Save** — Real-time save, never lose your work
+
+### Multi-Device Sync
+
+- **mDNS Auto-Discovery** — Devices running Lapis on the same WiFi find each other automatically, no IP typing
+- **Selective Sync** — Pick exactly which notes to send via search / select-all / per-note checkboxes
+- **Cross-Network P2P** — Encrypted direct connection between different networks (built on iroh: NAT hole-punching with relay fallback)
+- **Per-Note Push** — A push button in the editor header sends the current note to a device
+- **Conflicts Keep Both** — Concurrent edits produce a "conflict copy" note, data is never silently dropped
+- **Pairing Code** — On first sync both devices show a 6-digit code; sync proceeds only if they match (MITM protection)
+- **Private Notes** — Notes marked private never leave this machine
+- **Sync Packages** — Export/import sync package files to move notes offline via USB drive
+- **Online Status** — Cross-network device list shows online/offline in real time
+- **Persistent Device Fingerprint** — The same machine stays the same device across restarts
 
 ### AI Assistant
 
 - **Multi-Provider** — DeepSeek, OpenAI, Anthropic Claude, Google Gemini, Ollama
 - **Multiple Sources** — Configure and switch between AI providers instantly
-- **Sidebar Chat** — Chat with AI anytime (`Ctrl+L`)
-- **Inline Prompt** — Select text and press `Ctrl+J` to ask AI
+- **Inline Rewrite** — Select text, press `Ctrl+J` and give an instruction: AI rewrites in place with the original struck through in red and new text streaming in green; Tab to accept, Esc to discard, retry or refine with follow-up instructions
+- **Sidebar Conversations** — Multiple conversations (`Ctrl+L`) with automatic naming and quick switching; paste or drag images into the chat
+- **AI Reads/Writes Notes** — In chat, AI can query, create and append to your notes directly
+- **Context Compaction** — Long conversations are compacted into a summary automatically; the input card shows live context usage
 - **AI Actions** — Continue writing, rewrite, summarize, translate, Q&A
 - **Auto Title** — AI generates note titles and tags automatically
 
@@ -84,6 +102,15 @@
 - **6 Tools** — Read (`get_note`, `search_notes`, `list_notes`) + Write (`create_note`, `append_note`, `update_note`)
 - **Agent Skill Auto-Install** — Automatically installs Agent Skill to Claude Code, Copilot, Gemini CLI on startup
 - **AI Tool Integration** — Say "view my notes" or "save this to notes" in Claude Code
+
+### Dashboard
+
+- **5 KPIs at a Glance** — Total notes, word count, writing days, active tags, streak
+- **Writing Heatmap** — Daily activity over the past 90 days
+- **7-Day Trend** — Line chart of your weekly rhythm
+- **24h Distribution** — Find your most productive hours
+- **Top 5 Tags** — Most used tags by frequency
+- **Recent Notes** — One click to open
 
 ### Calendar View
 
@@ -96,7 +123,7 @@
 - **Global Search** — Find notes instantly (`Ctrl+K`)
 - **Favorites** — Star important notes
 - **Trash** — Recover deleted notes
-- **Tags** — Flexible categorization
+- **Tags** — Flexible categorization with automatic, consistent tag colors
 - **Reminders** — Set timed reminders for notes
 
 ### Export
@@ -108,6 +135,7 @@
 
 - **Themes** — Dark/light mode with animated toggle
 - **Auto Update** — In-app update checker
+- **Changelog** — Browse release notes inside the app
 
 ---
 
@@ -156,6 +184,8 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 | `Ctrl+K` | Global Search |
 | `Ctrl+L` | Toggle AI Sidebar |
 | `Ctrl+J` | Inline AI Prompt (with selection) |
+| `Ctrl+\` | Cycle Sidebar (expand/collapse/hide) |
+| `F11` | Immersive Mode (distraction-free fullscreen) |
 | `Ctrl+B` | Bold |
 | `Ctrl+I` | Italic |
 | `Ctrl+Shift+C` | Code Block |
