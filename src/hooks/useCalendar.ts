@@ -1,13 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { noteOperations, formatDateKey, type Note } from '../lib/db'
+import type { ReminderWithType } from './useReminders'
 
 export type CalendarView = 'month' | 'week' | 'day'
 export type DateField = 'createdAt' | 'updatedAt'
-
-// 带类型标记的提醒
-export interface ReminderWithType extends Note {
-  reminderType: 'upcoming' | 'due'  // 'upcoming' = 提前提醒, 'due' = 到时提醒
-}
 
 export interface UseCalendarReturn {
   currentDate: Date

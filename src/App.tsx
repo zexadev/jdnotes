@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { initializeDefaultNotes, initDatabase, noteOperations, type Note } from './lib/db'
-import { useAutoSave, useNotes, useCalendar, recoverPendingSaves } from './hooks'
+import { useAutoSave, useNotes, useReminders, recoverPendingSaves } from './hooks'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { CommandMenu } from './components/modals/CommandMenu'
@@ -166,8 +166,8 @@ function App() {
     refreshNotes,
   } = useNotes(searchQuery, currentView)
 
-  // 使用 useCalendar 获取提醒相关功能
-  const calendar = useCalendar()
+  // 全局提醒引擎（唯一实例：轮询 + 精确定时器 + 通知数据源）
+  const { upcomingReminders, refreshReminders } = useReminders()
 
   // 设置笔记提醒
   const handleSetReminder = useCallback(async (noteId: number, reminderDate: Date) => {
@@ -175,8 +175,8 @@ function App() {
     // 刷新笔记列表以更新 activeNote 的提醒状态
     await refreshNotes()
     // 刷新提醒列表
-    await calendar.refreshReminders()
-  }, [refreshNotes, calendar])
+    await refreshReminders()
+  }, [refreshNotes, refreshReminders])
 
   // 清除笔记提醒
   const handleClearReminder = useCallback(async (noteId: number) => {
@@ -184,8 +184,8 @@ function App() {
     // 刷新笔记列表以更新 activeNote 的提醒状态
     await refreshNotes()
     // 刷新提醒列表
-    await calendar.refreshReminders()
-  }, [refreshNotes, calendar])
+    await refreshReminders()
+  }, [refreshNotes, refreshReminders])
 
   // 提醒通知关闭时清除提醒
   const handleDismissReminder = useCallback(async (noteId: number) => {
@@ -193,8 +193,8 @@ function App() {
     // 刷新笔记列表以更新工具栏的提醒按钮状态
     await refreshNotes()
     // 刷新提醒列表
-    await calendar.refreshReminders()
-  }, [refreshNotes, calendar])
+    await refreshReminders()
+  }, [refreshNotes, refreshReminders])
 
   // 切换 AI 聊天侧栏
   const toggleChat = useCallback(() => {
@@ -801,7 +801,7 @@ function App() {
 
       {/* 提醒通知组件 */}
       <ReminderNotification
-        reminders={calendar.upcomingReminders || []}
+        reminders={upcomingReminders}
         onSelectNote={handleSelectNote}
         onDismiss={handleDismissReminder}
       />

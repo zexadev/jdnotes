@@ -17,8 +17,12 @@ export {
   type CalendarView,
   type DateField,
   type UseCalendarReturn,
-  type ReminderWithType,
 } from './useCalendar'
+export {
+  useReminders,
+  type ReminderWithType,
+  type UseRemindersReturn,
+} from './useReminders'
 export {
   useUpdater,
   type UpdateInfo,

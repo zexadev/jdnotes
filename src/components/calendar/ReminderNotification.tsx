@@ -6,7 +6,7 @@ import {
   requestPermission,
   sendNotification
 } from '@tauri-apps/plugin-notification'
-import type { ReminderWithType } from '../../hooks/useCalendar'
+import type { ReminderWithType } from '../../hooks/useReminders'
 
 // 格式化剩余时间
 export function formatTimeRemaining(targetDate: Date): string {
