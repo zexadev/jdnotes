@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { useTheme } from '../contexts/ThemeContext'
+import { formatDateKey } from '../lib/db'
 
 interface DashboardPageProps {
   onNavigate: (view: 'inbox' | 'favorites' | 'calendar') => void
@@ -44,7 +45,7 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
     for (let i = 90; i >= 0; i--) {
       const d = new Date(now)
       d.setDate(d.getDate() - i)
-      const key = d.toISOString().split('T')[0]
+      const key = formatDateKey(d)
       raw.push({ date: key, count: stats.distribution.get(key) || 0 })
     }
     const max = Math.max(...raw.map((c) => c.count), 1)

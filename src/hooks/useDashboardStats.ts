@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useNotes } from './useNotes';
+import { formatDateKey } from '../lib/db';
 
 interface DashboardStats {
   // 基础统计
@@ -79,11 +80,12 @@ export function useDashboardStats(): DashboardStats {
       ? Math.round(totalWords / totalNotes)
       : 0;
 
-    // 计算 distribution（日期分布）
+    // 计算 distribution（日期分布）。日期键必须走本地时区（formatDateKey），
+    // toISOString 是 UTC——夏令时下跨零点创建的笔记会归错日，和日历页口径不一致
     const distribution = new Map<string, number>();
     allNotes.forEach(note => {
       if (!note.isDeleted) {
-        const dateKey = new Date(note.createdAt).toISOString().split('T')[0];
+        const dateKey = formatDateKey(new Date(note.createdAt));
         distribution.set(dateKey, (distribution.get(dateKey) || 0) + 1);
       }
     });
@@ -92,22 +94,21 @@ export function useDashboardStats(): DashboardStats {
     const activeDates = new Set<string>();
     allNotes.forEach(note => {
       if (!note.isDeleted) {
-        const dateKey = new Date(note.createdAt).toISOString().split('T')[0];
+        const dateKey = formatDateKey(new Date(note.createdAt));
         activeDates.add(dateKey);
       }
     });
     const activeDays = activeDates.size;
 
-    // 计算连续天数
+    // 连续天数：今天还没写不算断签（从昨天往回数），否则一早打开永远显示 0
     let streak = 0;
-    let currentDate = new Date();
-    while (streak < 365) {
-      const dateKey = currentDate.toISOString().split('T')[0];
-      if (!activeDates.has(dateKey)) {
-        break;
-      }
+    const cursor = new Date();
+    if (!activeDates.has(formatDateKey(cursor))) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    while (activeDates.has(formatDateKey(cursor))) {
       streak++;
-      currentDate.setDate(currentDate.getDate() - 1);
+      cursor.setDate(cursor.getDate() - 1);
     }
 
     // 标签统计
@@ -150,7 +151,7 @@ export function useDashboardStats(): DashboardStats {
     for (let i = 29; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = formatDateKey(date);
       trendData.push({
         date: `${date.getMonth() + 1}/${date.getDate()}`,
         count: distribution.get(dateKey) || 0,
