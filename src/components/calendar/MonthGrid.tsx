@@ -136,18 +136,20 @@ function DayCell({
       ref={setNodeRef}
       onClick={() => onSelectDate(date)}
       onDoubleClick={() => onCreateNote(date)}
+      // isOver 与基础背景必须互斥：同属性 Tailwind 类特异度相同、胜负取决于产物顺序，
+      // 叠加写法实测亮色主题高亮被基础背景压掉。ring 拖拽反馈优先于选中态
       className={`flex flex-col min-h-0 px-1 pt-1 pb-0.5 select-none transition-colors ${
-        inMonth ? 'bg-white dark:bg-[#101318]' : 'bg-[#F9FBFC] dark:bg-[#0B0D11]'
-      } ${
         isOver
           ? 'bg-[#5E6AD2]/[0.06] dark:bg-[#5E6AD2]/[0.14]'
-          : 'hover:bg-[#F3F6FA] dark:hover:bg-[#161A22]'
+          : inMonth
+            ? 'bg-white dark:bg-[#101318] hover:bg-[#F3F6FA] dark:hover:bg-[#161A22]'
+            : 'bg-[#F9FBFC] dark:bg-[#0B0D11] hover:bg-[#F3F6FA] dark:hover:bg-[#161A22]'
       }`}
       style={
-        isSelected
-          ? { boxShadow: 'inset 0 0 0 1.5px #5E6AD2' }
-          : isOver
-            ? { boxShadow: 'inset 0 0 0 1.5px rgba(94,106,210,.55)' }
+        isOver
+          ? { boxShadow: 'inset 0 0 0 1.5px rgba(94,106,210,.55)' }
+          : isSelected
+            ? { boxShadow: 'inset 0 0 0 1.5px #5E6AD2' }
             : undefined
       }
     >
