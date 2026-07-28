@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.0.1"
+version = "2.0.2"
 description = "Lapis — a calm, local-first notes app"
 authors = ["zexa (zexadev) <https://zexa.cc>"]
 license = "AGPL-3.0-or-later"
