@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { initializeDefaultNotes, initDatabase, noteOperations, type Note } from './lib/db'
+import { initializeDefaultNotes, initDatabase, noteOperations, formatDateKey, type Note } from './lib/db'
 import { useAutoSave, useNotes, useReminders, recoverPendingSaves } from './hooks'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -481,6 +481,32 @@ function App() {
     }
   }
 
+  // 在指定日期新建笔记（日历页入口）：非今天则 createdAt 定到该日正午——
+  // 取正午不取零点，避免时区/夏令时边界把日期挤到前一天
+  const handleCreateNoteAt = async (date: Date) => {
+    try {
+      if (activeNoteId !== null && hasUnsavedChanges()) {
+        await saveNoteById(activeNoteId, localTitle, localContent)
+      }
+
+      const id = await createNote()
+      if (formatDateKey(date) !== formatDateKey(new Date())) {
+        const target = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0)
+        await noteOperations.updateCreatedAt(Number(id), target)
+        await refreshNotes()
+      }
+      setActiveNoteId(Number(id))
+      setLocalTitle('无标题')
+      setLocalContent('')
+      // 同 handleCreateNote：清搜索并切到「全部笔记」，防新空白笔记被过滤掉
+      setSearchQuery('')
+      viewBeforeSearchRef.current = null
+      setCurrentView('inbox')
+    } catch (error) {
+      console.error('Failed to create note:', error)
+    }
+  }
+
   // 软删除笔记（移到废纸篓）
   const handleDeleteNote = async (id: number) => {
     await deleteNote(id)
@@ -714,7 +740,7 @@ function App() {
               >
                 <CalendarView
                   onSelectNote={handleSelectNote}
-                  onBack={() => setCurrentView('inbox')}
+                  onCreateNote={handleCreateNoteAt}
                 />
               </motion.div>
             ) : (

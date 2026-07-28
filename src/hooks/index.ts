@@ -9,15 +9,11 @@ export { useEditorAI } from './useEditorAI'
 export { useSlashCommand } from './useSlashCommand'
 export { useNoteRefMenu } from './useNoteRefMenu'
 export {
-  useCalendar,
-  getWeekNumber,
-  getHeatmapColor,
-  formatCalendarTime,
+  useCalendarPage,
   isSameDay,
-  type CalendarView,
   type DateField,
-  type UseCalendarReturn,
-} from './useCalendar'
+  type UseCalendarPageReturn,
+} from './useCalendarPage'
 export {
   useReminders,
   type ReminderWithType,

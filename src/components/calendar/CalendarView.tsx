@@ -1,356 +1,358 @@
-import { useCallback, useRef, useMemo } from 'react'
-import { DndContext, useSensor, useSensors, PointerSensor } from '@dnd-kit/core'
-import type { DragEndEvent } from '@dnd-kit/core'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
-import { useCalendar } from '../../hooks/useCalendar'
-import { CalendarHeader } from './CalendarHeader'
-import { MonthView } from './MonthView'
-import { WeekView } from './WeekView'
-import { DayView } from './DayView'
-import type { Note } from '../../lib/db'
+import {
+  useCalendarPage,
+  parseDateKey,
+  type DateField,
+} from '../../hooks/useCalendarPage'
+import { formatDateKey, type Note } from '../../lib/db'
+import { MonthGrid } from './MonthGrid'
+import { DayPanel } from './DayPanel'
+import { Chip, type ChipDragData } from './NoteChip'
 
 interface CalendarViewProps {
   onSelectNote: (note: Note) => void
-  onBack?: () => void
+  // 在指定日期新建笔记（App 层负责建笔记、定 createdAt、切到编辑器）
+  onCreateNote: (date: Date) => void
 }
 
-export function CalendarView({ onSelectNote }: CalendarViewProps) {
-  const calendar = useCalendar()
-  const calendarRef = useRef<HTMLDivElement>(null)
+export function CalendarView({ onSelectNote, onCreateNote }: CalendarViewProps) {
+  const cal = useCalendarPage()
+  const [activeDrag, setActiveDrag] = useState<ChipDragData | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
 
-  // 配置拖拽传感器
+  // 拖 6px 才进入拖拽，单击不受影响
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 拖拽 8px 后才激活
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
-  // 处理拖拽结束
+  // 网格范围内的笔记按日分组（按当前时间轴）
+  const notesByDay = useMemo(() => {
+    const map = new Map<string, Note[]>()
+    for (const note of cal.notes) {
+      const key = formatDateKey(note[cal.dateField])
+      const list = map.get(key)
+      if (list) list.push(note)
+      else map.set(key, [note])
+    }
+    return map
+  }, [cal.notes, cal.dateField])
+
+  // 提醒按提醒日期分组（提醒显示在它约定的那天，不是笔记创建那天）
+  const remindersByDay = useMemo(() => {
+    const map = new Map<string, Note[]>()
+    for (const note of cal.reminderNotes) {
+      if (!note.reminderDate) continue
+      const key = formatDateKey(note.reminderDate)
+      const list = map.get(key)
+      if (list) list.push(note)
+      else map.set(key, [note])
+    }
+    return map
+  }, [cal.reminderNotes])
+
+  const selectedKey = formatDateKey(cal.selectedDate)
+  const selectedNotes = notesByDay.get(selectedKey) ?? []
+  const selectedReminders = remindersByDay.get(selectedKey) ?? []
+
+  // 当前月（非 6 周网格）内的笔记，导出用
+  const monthNotes = useMemo(
+    () =>
+      cal.notes.filter((note) => {
+        const d = note[cal.dateField]
+        return (
+          d.getFullYear() === cal.currentDate.getFullYear() &&
+          d.getMonth() === cal.currentDate.getMonth()
+        )
+      }),
+    [cal.notes, cal.dateField, cal.currentDate]
+  )
+
+  // 键盘导航：方向键移日、PgUp/PgDn 移月、T/Home 回今天、Enter 在选中日新建
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, button, [contenteditable="true"], [role="button"]')) return
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault()
+          cal.moveSelection(-1)
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          cal.moveSelection(1)
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          cal.moveSelection(-7)
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          cal.moveSelection(7)
+          break
+        case 'PageUp':
+          e.preventDefault()
+          cal.selectMonthDelta(-1)
+          break
+        case 'PageDown':
+          e.preventDefault()
+          cal.selectMonthDelta(1)
+          break
+        case 'Home':
+        case 't':
+        case 'T':
+          e.preventDefault()
+          cal.goToToday()
+          break
+        case 'Enter':
+          e.preventDefault()
+          onCreateNote(cal.selectedDate)
+          break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [cal, onCreateNote])
+
+  // 导出菜单点击外部关闭
+  useEffect(() => {
+    if (!exportOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (!exportRef.current?.contains(e.target as globalThis.Node)) setExportOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [exportOpen])
+
+  const handleDragStart = useCallback((e: DragStartEvent) => {
+    setActiveDrag((e.active.data.current as ChipDragData) ?? null)
+  }, [])
+
   const handleDragEnd = useCallback(
-    async (event: DragEndEvent) => {
-      const { active, over } = event
-
-      if (!over) return
-
-      // 从 active.id 提取笔记 ID
-      const noteIdStr = String(active.id).replace('note-', '')
-      const noteId = parseInt(noteIdStr, 10)
-
-      if (isNaN(noteId)) return
-
-      // 从 over.data 获取目标日期
-      const targetDate = over.data.current?.date as Date | undefined
-
-      if (targetDate) {
-        await calendar.moveNoteToDate(noteId, targetDate)
+    async (e: DragEndEvent) => {
+      const data = e.active.data.current as ChipDragData | undefined
+      setActiveDrag(null)
+      const dateKey = e.over?.data.current?.dateKey as string | undefined
+      if (!data || !dateKey) return
+      const target = parseDateKey(dateKey)
+      if (data.type === 'reminder') {
+        await cal.moveReminderToDate(data.note, target)
+      } else {
+        await cal.moveNoteToDate(data.note, target)
       }
     },
-    [calendar]
+    [cal]
   )
 
-  // 计算当前视图的时间范围
-  const timeRange = useMemo(() => {
-    const { view, currentDate } = calendar
-    const start = new Date(currentDate)
-    const end = new Date(currentDate)
-
-    if (view === 'month') {
-      // 月视图：当月第一天到最后一天
-      start.setDate(1)
-      start.setHours(0, 0, 0, 0)
-      end.setMonth(end.getMonth() + 1, 0)
-      end.setHours(23, 59, 59, 999)
-    } else if (view === 'week') {
-      // 周视图：本周一到周日
-      const day = start.getDay()
-      const diff = day === 0 ? -6 : 1 - day
-      start.setDate(start.getDate() + diff)
-      start.setHours(0, 0, 0, 0)
-      end.setDate(start.getDate() + 6)
-      end.setHours(23, 59, 59, 999)
-    } else {
-      // 日视图：当天
-      start.setHours(0, 0, 0, 0)
-      end.setHours(23, 59, 59, 999)
-    }
-
-    return { start, end }
-  }, [calendar.view, calendar.currentDate])
-
-  // 获取当前时间范围内的笔记
-  const notesInRange = useMemo(() => {
-    if (!calendar.notes) return []
-    
-    return calendar.notes.filter((note) => {
-      const noteDate = new Date(
-        calendar.dateField === 'createdAt' ? note.createdAt : note.updatedAt
-      )
-      return noteDate >= timeRange.start && noteDate <= timeRange.end
-    })
-  }, [calendar.notes, calendar.dateField, timeRange])
-
-  // 获取时间范围描述
-  const getTimeRangeLabel = useCallback(() => {
-    const { view, currentDate } = calendar
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth() + 1
-
-    if (view === 'month') {
-      return `${year}年${month}月`
-    } else if (view === 'week') {
-      const startStr = `${timeRange.start.getMonth() + 1}月${timeRange.start.getDate()}日`
-      const endStr = `${timeRange.end.getMonth() + 1}月${timeRange.end.getDate()}日`
-      return `${startStr} - ${endStr}`
-    } else {
-      return `${year}年${month}月${currentDate.getDate()}日`
-    }
-  }, [calendar.view, calendar.currentDate, timeRange])
-
-  // 导出当前时间范围的笔记
-  const handleExport = useCallback(async () => {
-    if (notesInRange.length === 0) {
-      alert('当前时间范围内没有笔记可导出')
-      return
-    }
-
-    try {
-      // 显示导出格式选择对话框
-      const format = await showExportDialog(getTimeRangeLabel(), notesInRange.length)
-      if (!format) return
-
-      const dateStr = formatExportDate(calendar.currentDate)
-      const viewName = calendar.view === 'month' ? 'month' : calendar.view === 'week' ? 'week' : 'day'
-
-      if (format === 'markdown') {
-        // 导出为 Markdown
-        const content = generateMarkdownContent(notesInRange, getTimeRangeLabel())
-        const filePath = await save({
-          filters: [{ name: 'Markdown', extensions: ['md'] }],
-          defaultPath: `notes-${viewName}-${dateStr}.md`
-        })
-
-        if (filePath) {
-          const encoder = new TextEncoder()
-          await writeFile(filePath, encoder.encode(content))
+  const handleExport = useCallback(
+    async (format: 'markdown' | 'json') => {
+      setExportOpen(false)
+      const year = cal.currentDate.getFullYear()
+      const month = cal.currentDate.getMonth() + 1
+      const label = `${year}年${month}月`
+      const stem = `notes-${year}-${String(month).padStart(2, '0')}`
+      try {
+        if (format === 'markdown') {
+          const filePath = await save({
+            filters: [{ name: 'Markdown', extensions: ['md'] }],
+            defaultPath: `${stem}.md`,
+          })
+          if (filePath) {
+            await writeFile(
+              filePath,
+              new TextEncoder().encode(generateMarkdown(monthNotes, label))
+            )
+          }
+        } else {
+          const filePath = await save({
+            filters: [{ name: 'JSON', extensions: ['json'] }],
+            defaultPath: `${stem}.json`,
+          })
+          if (filePath) {
+            await writeFile(
+              filePath,
+              new TextEncoder().encode(JSON.stringify(monthNotes, null, 2))
+            )
+          }
         }
-      } else if (format === 'json') {
-        // 导出为 JSON
-        const content = JSON.stringify(notesInRange, null, 2)
-        const filePath = await save({
-          filters: [{ name: 'JSON', extensions: ['json'] }],
-          defaultPath: `notes-${viewName}-${dateStr}.json`
-        })
-
-        if (filePath) {
-          const encoder = new TextEncoder()
-          await writeFile(filePath, encoder.encode(content))
-        }
+      } catch (error) {
+        console.error('Export failed:', error)
       }
-    } catch (error) {
-      console.error('Export failed:', error)
-      alert('导出失败: ' + (error instanceof Error ? error.message : String(error)))
-    }
-  }, [calendar.currentDate, calendar.view, notesInRange, getTimeRangeLabel])
+    },
+    [cal.currentDate, monthNotes]
+  )
+
+  const year = cal.currentDate.getFullYear()
+  const month = cal.currentDate.getMonth() + 1
+
+  const iconBtn =
+    'w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors'
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="h-full flex flex-col bg-[#F9FBFC] dark:bg-[#0B0D11]">
-        <CalendarHeader
-          currentDate={calendar.currentDate}
-          view={calendar.view}
-          dateField={calendar.dateField}
-          showHeatmap={calendar.showHeatmap}
-          onViewChange={calendar.setView}
-          onDateFieldChange={calendar.setDateField}
-          onHeatmapToggle={calendar.setShowHeatmap}
-          onPrevious={calendar.goToPrevious}
-          onNext={calendar.goToNext}
-          onToday={calendar.goToToday}
-          onExport={handleExport}
-        />
-
-        <div ref={calendarRef} className="flex-1 overflow-hidden" id="calendar-content">
-          <AnimatePresence mode="wait">
-            {calendar.view === 'month' && (
-              <motion.div
-                key="month"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="h-full"
+    <DndContext
+      sensors={sensors}
+      collisionDetection={pointerWithin}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveDrag(null)}
+    >
+      <div className="h-full flex bg-[#F9FBFC] dark:bg-[#0B0D11]">
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* 头部：年月 + 导航 | 时间轴 + 导出 */}
+          <header className="h-14 shrink-0 px-5 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              <h2 className="mr-2 text-[17px] font-semibold tracking-tight tabular-nums text-slate-900 dark:text-slate-100">
+                {year}年{month}月
+              </h2>
+              <button onClick={() => cal.moveMonth(-1)} className={iconBtn} title="上个月">
+                <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+              <button onClick={() => cal.moveMonth(1)} className={iconBtn} title="下个月">
+                <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={cal.goToToday}
+                className="ml-1 h-7 px-2.5 rounded-md text-[12px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
               >
-                <MonthView
-                  currentDate={calendar.currentDate}
-                  notes={calendar.notes || []}
-                  distribution={calendar.distribution}
-                  selectedDate={calendar.selectedDate}
-                  showHeatmap={calendar.showHeatmap}
-                  dateField={calendar.dateField}
-                  onSelectDate={calendar.goToDate}
-                  onSelectNote={onSelectNote}
-                />
-              </motion.div>
-            )}
+                今天
+              </button>
+            </div>
 
-            {calendar.view === 'week' && (
-              <motion.div
-                key="week"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="h-full"
-              >
-                <WeekView
-                  currentDate={calendar.currentDate}
-                  notes={calendar.notes || []}
-                  dateField={calendar.dateField}
-                  onSelectNote={onSelectNote}
-                />
-              </motion.div>
-            )}
+            <div className="flex items-center gap-2">
+              {/* 时间轴切换：笔记落在创建日还是最后修改日 */}
+              <div className="flex items-center bg-black/[0.04] dark:bg-white/[0.06] rounded-lg p-0.5">
+                {(
+                  [
+                    { field: 'createdAt', label: '创建', title: '按创建时间排布' },
+                    { field: 'updatedAt', label: '修改', title: '按修改时间排布' },
+                  ] as { field: DateField; label: string; title: string }[]
+                ).map(({ field, label, title }) => (
+                  <button
+                    key={field}
+                    onClick={() => cal.setDateField(field)}
+                    title={title}
+                    className={`h-6 px-2.5 rounded-[7px] text-[12px] font-medium transition-colors ${
+                      cal.dateField === field
+                        ? 'bg-white dark:bg-[#1A1E26] text-slate-900 dark:text-slate-100 shadow-sm'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-            {calendar.view === 'day' && (
-              <motion.div
-                key="day"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-                className="h-full"
-              >
-                <DayView
-                  currentDate={calendar.currentDate}
-                  notes={calendar.notes || []}
-                  dateField={calendar.dateField}
-                  onSelectNote={onSelectNote}
-                  onSetReminder={calendar.setNoteReminder}
-                  onClearReminder={calendar.clearNoteReminder}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+              {/* 导出本月 */}
+              <div className="relative" ref={exportRef}>
+                <button
+                  onClick={() => setExportOpen((o) => !o)}
+                  className={iconBtn}
+                  title="导出本月"
+                >
+                  <Download className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+                {exportOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 z-20 w-48 rounded-lg border border-black/[0.06] dark:border-white/[0.08] bg-white dark:bg-[#171A21] shadow-lg p-1">
+                    <div className="px-2.5 pt-1.5 pb-1 text-[11px] text-slate-400 dark:text-slate-500">
+                      {year}年{month}月 · {monthNotes.length} 篇
+                    </div>
+                    <button
+                      onClick={() => handleExport('markdown')}
+                      disabled={monthNotes.length === 0}
+                      className="w-full h-8 px-2.5 rounded-md text-left text-[13px] text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      导出为 Markdown
+                    </button>
+                    <button
+                      onClick={() => handleExport('json')}
+                      disabled={monthNotes.length === 0}
+                      className="w-full h-8 px-2.5 rounded-md text-left text-[13px] text-slate-700 dark:text-slate-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      导出为 JSON
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          <MonthGrid
+            currentDate={cal.currentDate}
+            gridStart={cal.range.start}
+            selectedDate={cal.selectedDate}
+            dateField={cal.dateField}
+            notesByDay={notesByDay}
+            remindersByDay={remindersByDay}
+            onSelectDate={cal.selectDate}
+            onSelectNote={onSelectNote}
+            onCreateNote={onCreateNote}
+          />
         </div>
+
+        <DayPanel
+          date={cal.selectedDate}
+          notes={selectedNotes}
+          reminders={selectedReminders}
+          dateField={cal.dateField}
+          onSelectNote={onSelectNote}
+          onCreateNote={onCreateNote}
+          onClearReminder={cal.clearReminder}
+        />
       </div>
+
+      {/* 拖拽 ghost：脱离格子裁剪，跟手 */}
+      <DragOverlay dropAnimation={null}>
+        {activeDrag ? (
+          <div className="w-44">
+            <Chip note={activeDrag.note} kind={activeDrag.type} ghost />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   )
 }
 
-// 导出日期格式化
-function formatExportDate(date: Date): string {
-  return date.toISOString().split('T')[0]
-}
-
-// 生成 Markdown 内容
-function generateMarkdownContent(notes: Note[], timeRangeLabel: string): string {
+// 导出为 Markdown：按月份汇总
+function generateMarkdown(notes: Note[], label: string): string {
   const lines: string[] = []
-  
-  lines.push(`# 笔记导出 - ${timeRangeLabel}`)
+  lines.push(`# 笔记导出 · ${label}`)
   lines.push('')
-  lines.push(`> 导出时间: ${new Date().toLocaleString('zh-CN')}`)
-  lines.push(`> 共 ${notes.length} 篇笔记`)
-  lines.push('')
-  lines.push('---')
+  lines.push(`> 共 ${notes.length} 篇 · 导出于 ${new Date().toLocaleString('zh-CN')}`)
   lines.push('')
 
-  notes.forEach((note, index) => {
-    lines.push(`## ${index + 1}. ${note.title || '无标题'}`)
+  notes.forEach((note) => {
+    lines.push('---')
     lines.push('')
-    
-    // 元信息
-    const tags = note.tags || []
-    if (tags.length > 0) {
-      lines.push(`**标签**: ${tags.map((t: string) => `\`${t}\``).join(' ')}`)
+    lines.push(`## ${note.title || '无标题'}`)
+    lines.push('')
+    if (note.tags.length > 0) {
+      lines.push(note.tags.map((t) => `\`${t}\``).join(' '))
       lines.push('')
     }
-    
-    lines.push(`**创建时间**: ${new Date(note.createdAt).toLocaleString('zh-CN')}`)
-    lines.push(`**更新时间**: ${new Date(note.updatedAt).toLocaleString('zh-CN')}`)
+    lines.push(
+      `创建 ${note.createdAt.toLocaleString('zh-CN')} · 更新 ${note.updatedAt.toLocaleString('zh-CN')}`
+    )
     lines.push('')
-    
-    // 内容
     if (note.content) {
-      lines.push('### 内容')
-      lines.push('')
       lines.push(note.content)
       lines.push('')
     }
-    
-    lines.push('---')
-    lines.push('')
   })
 
   return lines.join('\n')
-}
-
-// 显示导出格式选择对话框
-function showExportDialog(timeRangeLabel: string, noteCount: number): Promise<'markdown' | 'json' | null> {
-  return new Promise((resolve) => {
-    const dialog = document.createElement('div')
-    dialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
-    dialog.innerHTML = `
-      <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-xl w-96">
-        <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">导出笔记</h3>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          ${timeRangeLabel} · 共 ${noteCount} 篇笔记
-        </p>
-        <div class="space-y-2">
-          <button id="export-markdown" class="w-full py-3 px-4 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3">
-            <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <div>
-              <div class="font-medium">Markdown 文件</div>
-              <div class="text-xs text-slate-400">适合阅读和分享</div>
-            </div>
-          </button>
-          <button id="export-json" class="w-full py-3 px-4 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3">
-            <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-            </svg>
-            <div>
-              <div class="font-medium">JSON 文件</div>
-              <div class="text-xs text-slate-400">适合备份和导入</div>
-            </div>
-          </button>
-        </div>
-        <button id="export-cancel" class="w-full mt-4 py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
-          取消
-        </button>
-      </div>
-    `
-
-    const cleanup = () => {
-      document.body.removeChild(dialog)
-    }
-
-    dialog.querySelector('#export-markdown')?.addEventListener('click', () => {
-      cleanup()
-      resolve('markdown')
-    })
-
-    dialog.querySelector('#export-json')?.addEventListener('click', () => {
-      cleanup()
-      resolve('json')
-    })
-
-    dialog.querySelector('#export-cancel')?.addEventListener('click', () => {
-      cleanup()
-      resolve(null)
-    })
-
-    dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) {
-        cleanup()
-        resolve(null)
-      }
-    })
-
-    document.body.appendChild(dialog)
-  })
 }
