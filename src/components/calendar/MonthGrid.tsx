@@ -168,7 +168,8 @@ function DayCell({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-[3px]">
+      {/* 跨月格内容降透明度，当月聚焦 */}
+      <div className={`flex-1 min-h-0 overflow-hidden flex flex-col gap-[3px] ${inMonth ? '' : 'opacity-60'}`}>
         {visible.map(({ note, kind }) => (
           <DraggableChip
             key={`${kind}-${note.id}`}
