@@ -385,7 +385,7 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
                       onMouseLeave={hideTip}
                       className="flex items-center gap-2 text-[12px] w-full rounded-md px-1.5 py-1 -mx-1.5 cursor-pointer transition-colors hover:bg-[#F3F6F9] dark:hover:bg-[#1C1F26]"
                     >
-                      <span className="font-medium px-2 py-0.5 rounded text-center flex-shrink-0 w-16 truncate text-[11px]" style={{ background: c.bg, color: c.base }}>
+                      <span className="font-medium px-2 py-0.5 rounded text-center flex-shrink-0 w-16 truncate text-[11px] text-slate-600 dark:text-slate-300" style={{ background: c.bg }}>
                         #{t.name}
                       </span>
                       <span className="flex-1 h-1.5 bg-[#EEF2F6] dark:bg-[#1E2025] rounded-full overflow-hidden">
