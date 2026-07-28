@@ -32,13 +32,18 @@ export function Chip({ note, kind, ghost }: { note: Note; kind: ChipKind; ghost?
     )
   }
 
+  // 标题恒用中性色：哈希色直接作 11px 文字色时 lime/amber 等亮色相在浅底上对比度不足 2:1，
+  // 标签色改由背景 tint + 色点承载
   const tag = note.tags?.[0]
   const c = tag ? tagColor(tag) : null
   return (
     <div
-      className={`${shell} ${c ? '' : 'bg-black/[0.05] text-slate-600 dark:bg-white/[0.08] dark:text-slate-300'}`}
-      style={c ? { background: c.bg, color: c.base } : undefined}
+      className={`${shell} ${c ? '' : 'bg-black/[0.05] dark:bg-white/[0.08]'} text-slate-600 dark:text-slate-300`}
+      style={c ? { background: c.bg } : undefined}
     >
+      {c && (
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.base }} />
+      )}
       <span className="truncate">{note.title || '无标题'}</span>
     </div>
   )
