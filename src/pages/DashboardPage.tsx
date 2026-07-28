@@ -438,7 +438,7 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
                 </div>
               </div>
               <div className="flex-1 min-w-0 flex flex-col">
-                <div className="h-[14px] grid" style={{ gridTemplateColumns: `repeat(${HEAT_WEEKS}, 1fr)` }}>
+                <div className="h-[14px] grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${HEAT_WEEKS}, 1fr)` }}>
                   {heat.monthLabels.map((m, i) => (
                     <span key={i} className="font-mono text-[9px] leading-none text-gray-400 dark:text-gray-500 whitespace-nowrap">{m}</span>
                   ))}
