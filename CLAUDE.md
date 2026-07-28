@@ -76,6 +76,9 @@
 | `src/components/editor/SafeHtmlBlock.ts` | Markdown 解析防吞扩展（html:true 下未闭合 `<style>`/`<script>`/注释会把后文连同图片引用吞到文末：markdown-it html_block 有界化到空行 + raw-text 标签转义防 DOMParser 二次吞） |
 | `src/components/editor/Backlinks.tsx` | 反向链接面板（`noteOperations.findBacklinks` 懒查询 note://uuid + 字面 [[标题]]） |
 | `src/components/layout/MainContent.tsx` | 主内容区布局（标签/工具栏/编辑器） |
+| `src/components/calendar/` | 日历页（CalendarView 容器=头部/键盘/拖拽/导出菜单、MonthGrid 6 周月网格+chip、DayPanel 常驻日面板、NoteChip 笔记/提醒 chip、ReminderNotification 全局提醒卡）；单月视图+日面板形态，周一起始；提醒 chip 落在提醒日；拖 chip 挪 createdAt（仅创建时间轴）/拖提醒改期；双击格子/Enter 在该日新建（非今天 createdAt=该日正午） |
+| `src/hooks/useCalendarPage.ts` | 日历页数据/导航（6 周网格范围查询、选日跨月跟随、dateField 记忆 localStorage calendar.dateField） |
+| `src/hooks/useReminders.ts` | 全局提醒引擎（App 层唯一实例：到期查询+精确定时器+30s 轮询保底）；日历页不再自跑提醒轮询——曾因双实例双弹系统通知 |
 | `src-tauri/src/mcp_server.rs` | MCP HTTP Server（AI 工具集成；时间戳统一用 `chrono::Utc::now()`） |
 | `skills/lapis-mcp.md` | Claude Code Skill 使用指引 |
 | `docs/` | 旧 Nextra 文档站（当前线上，Cloudflare Pages，jdnotes.zexa.cc） |
