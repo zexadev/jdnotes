@@ -40,6 +40,9 @@ const HEAT_WEEKS = 14
 const CHART_W = 700
 const CHART_H = 130
 const CHART_P = 8
+// 顶部另留标签空间：峰值点 y 恒等于顶部内边距（count===peak 时映射括号为 0），
+// 若与横向同用 8px，峰值数字必然画穿峰值圆点
+const CHART_PT = 22
 
 type Tip = { x: number; y: number; text: string }
 
@@ -71,7 +74,7 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
     if (trend.length === 0) return { line: '', area: '', points: [] as { x: number; y: number; v: number }[] }
     const points = trend.map((d, i) => ({
       x: CHART_P + (i * (CHART_W - 2 * CHART_P)) / (trend.length - 1 || 1),
-      y: CHART_P + (CHART_H - 2 * CHART_P) * (1 - d.count / trendPeak),
+      y: CHART_PT + (CHART_H - CHART_PT - CHART_P) * (1 - d.count / trendPeak),
       v: d.count,
     }))
     const line = smoothLine(points)
