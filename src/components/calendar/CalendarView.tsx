@@ -85,7 +85,8 @@ export function CalendarView({ onSelectNote, onCreateNote }: CalendarViewProps) 
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing) return
       if (e.ctrlKey || e.metaKey || e.altKey) return
-      const target = e.target as HTMLElement | null
+      // target 可能是 window/document（非 Element 无 closest），防御
+      const target = e.target instanceof HTMLElement ? e.target : null
       if (target?.closest('input, textarea, select, button, [contenteditable="true"], [role="button"]')) return
 
       switch (e.key) {
