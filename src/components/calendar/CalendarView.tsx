@@ -25,10 +25,12 @@ interface CalendarViewProps {
   onSelectNote: (note: Note) => void
   // 在指定日期新建笔记（App 层负责建笔记、定 createdAt、切到编辑器）
   onCreateNote: (date: Date) => void
+  // 挂载时定位到该日（数据概览热力图点格直达）
+  initialDate?: Date
 }
 
-export function CalendarView({ onSelectNote, onCreateNote }: CalendarViewProps) {
-  const cal = useCalendarPage()
+export function CalendarView({ onSelectNote, onCreateNote, initialDate }: CalendarViewProps) {
+  const cal = useCalendarPage(initialDate)
   const [activeDrag, setActiveDrag] = useState<ChipDragData | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)

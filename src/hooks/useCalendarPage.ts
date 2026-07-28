@@ -62,9 +62,10 @@ export interface UseCalendarPageReturn {
 }
 
 // 日历页数据与导航。提醒的全局通知引擎在 useReminders（App 层），这里只管页面数据。
-export function useCalendarPage(): UseCalendarPageReturn {
-  const [currentDate, setCurrentDate] = useState(() => new Date())
-  const [selectedDate, setSelectedDate] = useState(() => new Date())
+// initialDate：挂载时选中并定位到该日（数据概览热力图点格直达用），缺省今天
+export function useCalendarPage(initialDate?: Date): UseCalendarPageReturn {
+  const [currentDate, setCurrentDate] = useState(() => initialDate ?? new Date())
+  const [selectedDate, setSelectedDate] = useState(() => initialDate ?? new Date())
   const [dateField, setDateFieldState] = useState<DateField>(() =>
     localStorage.getItem(DATE_FIELD_STORAGE_KEY) === 'updatedAt' ? 'updatedAt' : 'createdAt'
   )
