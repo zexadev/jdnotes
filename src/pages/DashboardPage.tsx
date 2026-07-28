@@ -56,6 +56,12 @@ export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOp
   const [tip, setTip] = useState<Tip | null>(null)
   const moveTip = (e: React.MouseEvent, text: string) => setTip({ x: e.clientX, y: e.clientY - 12, text })
   const hideTip = () => setTip(null)
+  // 兜底：hover 中的元素被数据刷新卸载时（如标签掉出 Top5）浏览器不派发 mouseleave，
+  // 不清会留一个永久悬浮的幽灵提示；刷新瞬间清掉，鼠标一动即重现
+  useEffect(() => {
+    setTip(null)
+    setTrendHover(null)
+  }, [stats])
 
   // 趋势区间 7/30 天，跨会话记忆
   const [trendRange, setTrendRangeState] = useState<7 | 30>(() =>
