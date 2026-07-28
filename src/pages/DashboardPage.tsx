@@ -656,19 +656,15 @@ function HoursBar({
   const [hovered, setHovered] = useState<number | null>(null)
   const max = Math.max(...hourly.map((h) => h.count), 1)
   return (
-    <div className="items-end gap-[2px] h-[88px] grid" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
+    <div className="gap-[2px] h-[88px] grid" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
       {hourly.map((h, i) => {
         const height = Math.max(4, (h.count / max) * 100)
         const isPeak = i === peakHour && h.count > 0
         return (
-          <span
+          // 命中区是整列全高（同趋势图命中带），不是柱条本体——0 篇的柱只有 ~3.5px 高，悬停根本停不上去
+          <div
             key={i}
-            className="block rounded-t-sm transition-colors cursor-default"
-            style={{
-              height: `${height}%`,
-              background: isPeak ? PRIMARY : hovered === i ? 'rgba(94,106,210,.45)' : 'rgba(94,106,210,.18)',
-              boxShadow: isPeak ? `0 0 6px rgba(94,106,210,.4)` : undefined,
-            }}
+            className="h-full flex items-end cursor-default"
             onMouseMove={(e) => {
               setHovered(i)
               onTip(e, `${i}:00 – ${(i + 1) % 24}:00 · ${h.count} 篇`)
@@ -677,7 +673,16 @@ function HoursBar({
               setHovered(null)
               onTipHide()
             }}
-          />
+          >
+            <span
+              className="block w-full rounded-t-sm transition-colors"
+              style={{
+                height: `${height}%`,
+                background: isPeak ? PRIMARY : hovered === i ? 'rgba(94,106,210,.45)' : 'rgba(94,106,210,.18)',
+                boxShadow: isPeak ? `0 0 6px rgba(94,106,210,.4)` : undefined,
+              }}
+            />
+          </div>
         )
       })}
     </div>
