@@ -1,12 +1,17 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { useTheme } from '../contexts/ThemeContext'
 import { formatDateKey } from '../lib/db'
+import { startOfWeekMonday } from '../hooks/useCalendarPage'
+import { tagColor } from '../lib/tagColor'
+import type { ViewType } from '../App'
 
 interface DashboardPageProps {
-  onNavigate: (view: 'inbox' | 'favorites' | 'calendar') => void
+  onNavigate: (view: ViewType) => void
   onCreateNote: () => void
   onOpenNote: (id: number) => void
+  // 热力图点格直达日历该日
+  onOpenCalendarDate: (date: Date) => void
 }
 
 type Palette = { bg: string; border: string; ink: string; main: string }
@@ -28,42 +33,84 @@ const HI_DARK: Record<HiKey, Palette> = {
 }
 
 const PRIMARY = '#5E6AD2'
+const HEAT_WEEKS = 14
+const CHART_W = 700
+const CHART_H = 130
+const CHART_P = 8
 
-export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: DashboardPageProps) {
+type Tip = { x: number; y: number; text: string }
+
+export function DashboardPage({ onNavigate, onCreateNote, onOpenNote, onOpenCalendarDate }: DashboardPageProps) {
   const stats = useDashboardStats()
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const HI = isDark ? HI_DARK : HI_LIGHT
 
-  const last7 = useMemo(() => stats.trendData.slice(-7), [stats.trendData])
-  const peak7 = useMemo(() => Math.max(...last7.map((d) => d.count), 1), [last7])
+  // 自绘悬停提示（跟随光标），替代原生 title 的迟滞气泡
+  const [tip, setTip] = useState<Tip | null>(null)
+  const moveTip = (e: React.MouseEvent, text: string) => setTip({ x: e.clientX, y: e.clientY - 12, text })
+  const hideTip = () => setTip(null)
 
-  const heatmap = useMemo(() => {
-    const cells: { date: string; count: number; level: 0 | 1 | 2 | 3 | 4 }[] = []
-    const now = new Date()
-    const raw: { date: string; count: number }[] = []
-    for (let i = 90; i >= 0; i--) {
-      const d = new Date(now)
-      d.setDate(d.getDate() - i)
-      const key = formatDateKey(d)
-      raw.push({ date: key, count: stats.distribution.get(key) || 0 })
+  // 趋势区间 7/30 天，跨会话记忆
+  const [trendRange, setTrendRangeState] = useState<7 | 30>(() =>
+    localStorage.getItem('dashboard.trendRange') === '30' ? 30 : 7
+  )
+  const setTrendRange = (r: 7 | 30) => {
+    setTrendRangeState(r)
+    localStorage.setItem('dashboard.trendRange', String(r))
+  }
+  const [trendHover, setTrendHover] = useState<number | null>(null)
+
+  const trend = useMemo(() => stats.trendData.slice(-trendRange), [stats.trendData, trendRange])
+  const trendPeak = useMemo(() => Math.max(...trend.map((d) => d.count), 1), [trend])
+
+  const chart = useMemo(() => {
+    if (trend.length === 0) return { line: '', area: '', points: [] as { x: number; y: number; v: number }[] }
+    const points = trend.map((d, i) => ({
+      x: CHART_P + (i * (CHART_W - 2 * CHART_P)) / (trend.length - 1 || 1),
+      y: CHART_P + (CHART_H - 2 * CHART_P) * (1 - d.count / trendPeak),
+      v: d.count,
+    }))
+    const line = smoothLine(points)
+    const area = `${line} L${points[points.length - 1].x},${CHART_H} L${points[0].x},${CHART_H} Z`
+    return { line, area, points }
+  }, [trend, trendPeak])
+
+  const peakIdx = useMemo(() => chart.points.findIndex((p) => p.v === trendPeak), [chart.points, trendPeak])
+
+  // 热力图：GitHub 式周对齐——列是周（周一起始），行是星期几，近 14 周
+  const heat = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const start = startOfWeekMonday(today)
+    start.setDate(start.getDate() - (HEAT_WEEKS - 1) * 7)
+    const cells: { date: Date; key: string; count: number; level: 0 | 1 | 2 | 3 | 4; future: boolean }[] = []
+    let max = 1
+    for (let i = 0; i < HEAT_WEEKS * 7; i++) {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      const future = d.getTime() > today.getTime()
+      const count = future ? 0 : stats.distribution.get(formatDateKey(d)) || 0
+      if (count > max) max = count
+      cells.push({ date: d, key: formatDateKey(d), count, level: 0, future })
     }
-    const max = Math.max(...raw.map((c) => c.count), 1)
-    raw.forEach(({ date, count }) => {
-      let level: 0 | 1 | 2 | 3 | 4 = 0
-      if (count > 0) {
-        const ratio = count / max
-        if (ratio > 0.66) level = 4
-        else if (ratio > 0.33) level = 3
-        else if (ratio > 0.15) level = 2
-        else level = 1
+    for (const c of cells) {
+      if (c.count > 0) {
+        const r = c.count / max
+        c.level = r > 0.66 ? 4 : r > 0.33 ? 3 : r > 0.15 ? 2 : 1
       }
-      cells.push({ date, count, level })
-    })
-    return cells
+    }
+    // 每列（该周周一）所在月份，仅变化处标注
+    const monthLabels: (string | null)[] = []
+    let lastMonth = -1
+    for (let w = 0; w < HEAT_WEEKS; w++) {
+      const m = cells[w * 7].date.getMonth()
+      monthLabels.push(m !== lastMonth ? `${m + 1}月` : null)
+      lastMonth = m
+    }
+    const active = cells.filter((c) => c.count > 0).length
+    return { cells, monthLabels, active }
   }, [stats.distribution])
-
-  const activeInHeatmap = heatmap.filter((c) => c.count > 0).length
 
   const peakHour = useMemo(() => {
     let max = 0
@@ -77,28 +124,16 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
     return { hour, max }
   }, [stats.hourlyActivity])
 
-  const kpis: { color: HiKey; label: string; value: string; delta?: string }[] = [
-    { color: 'yellow', label: '笔记总数',  value: stats.totalNotes.toLocaleString(),  delta: stats.weeklyGrowth > 0 ? `本周 +${stats.weeklyGrowth}` : '本周 0' },
-    { color: 'green',  label: '总字数',    value: stats.totalWords.toLocaleString(),  delta: stats.avgWords > 0 ? `${stats.avgWords.toLocaleString()} 均/篇` : '—' },
-    { color: 'blue',   label: '写作天数',  value: stats.activeDays.toString(),        delta: `共 ${stats.activeDays} 天` },
-    { color: 'pink',   label: '活跃标签',  value: stats.topTags.length.toString(),    delta: stats.topTags[0] ? `Top: #${stats.topTags[0].name}` : '—' },
-    { color: 'purple', label: '连续天数',  value: stats.streak.toString(),            delta: stats.streak > 0 ? '🔥 持续中' : '从今天开始' },
+  const kpis: { color: HiKey; label: string; value: string; delta: string; nav?: ViewType }[] = [
+    { color: 'yellow', label: '笔记总数', value: stats.totalNotes.toLocaleString(), delta: stats.weeklyGrowth > 0 ? `本周 +${stats.weeklyGrowth}` : '本周 0', nav: 'inbox' },
+    { color: 'pink',   label: '收藏',     value: stats.favoriteNotes.toLocaleString(), delta: stats.favoriteNotes > 0 ? `占 ${stats.favoriteRatio}%` : '—', nav: 'favorites' },
+    { color: 'green',  label: '总字数',   value: stats.totalWords.toLocaleString(), delta: stats.avgWords > 0 ? `均 ${stats.avgWords.toLocaleString()}/篇` : '—' },
+    { color: 'blue',   label: '写作天数', value: stats.activeDays.toString(), delta: stats.activeDays > 0 ? `日均 ${Math.round(stats.totalWords / stats.activeDays).toLocaleString()} 字` : '—' },
+    { color: 'purple', label: '连续天数', value: stats.streak.toString(), delta: stats.streak === 0 ? '从今天开始' : stats.wroteToday ? '持续中' : '今天还没写' },
   ]
 
-  const tagColors: HiKey[] = ['yellow', 'purple', 'green', 'blue', 'pink']
   const top5Tags = stats.topTags.slice(0, 5)
   const tagMax = top5Tags[0]?.count || 1
-
-  const chartPath = useMemo(() => {
-    if (last7.length === 0) return { line: '', area: '', points: [] as { x: number; y: number; v: number }[] }
-    const W = 700, H = 130, P = 8
-    const xs = last7.map((_, i) => P + (i * (W - 2 * P)) / (last7.length - 1 || 1))
-    const ys = last7.map((d) => P + (H - 2 * P) * (1 - d.count / peak7))
-    const points = last7.map((d, i) => ({ x: xs[i], y: ys[i], v: d.count }))
-    const line = points.map((p, i) => (i === 0 ? `M${p.x},${p.y}` : `L${p.x},${p.y}`)).join(' ')
-    const area = `${line} L${xs[xs.length - 1]},${H} L${xs[0]},${H} Z`
-    return { line, area, points }
-  }, [last7, peak7])
 
   const cellColor = (level: 0 | 1 | 2 | 3 | 4): string => {
     const light = ['#EEF2F6', '#E0E3F7', '#B5BAEC', '#8590DE', PRIMARY]
@@ -117,6 +152,10 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
     if (dd < 7) return `${dd} 天前`
     return d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
   }
+
+  const trendXLabels = trendRange === 7
+    ? trend.map((d) => d.date)
+    : [0, 7, 14, 21, 29].map((i) => trend[i]?.date ?? '')
 
   return (
     <div className="h-full overflow-y-auto bg-transparent">
@@ -141,17 +180,23 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
               <span className="w-1 h-1 rounded-full" style={{ background: PRIMARY, boxShadow: `0 0 10px ${PRIMARY}` }} />
               数据概览
             </div>
-            <h1 className="text-xl sm:text-2xl font-semibold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
-              累计 <em className="not-italic font-serif" style={{ color: PRIMARY }}>{stats.totalWords.toLocaleString()}</em> 字，
-              <span className="px-1 ml-1" style={{ background: 'linear-gradient(180deg, transparent 60%, rgba(252,211,77,.55) 60%)' }}>{stats.totalNotes.toLocaleString()} 篇笔记</span>
-              {stats.streak > 0 && <span className="text-gray-500 dark:text-gray-400 text-sm ml-2 font-normal">· 连续 {stats.streak} 天</span>}
-            </h1>
+            {stats.totalNotes === 0 ? (
+              <h1 className="text-xl sm:text-2xl font-semibold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
+                还没有笔记，<em className="not-italic font-serif" style={{ color: PRIMARY }}>从第一篇开始</em>
+              </h1>
+            ) : (
+              <h1 className="text-xl sm:text-2xl font-semibold leading-tight tracking-tight text-gray-900 dark:text-gray-100">
+                累计 <em className="not-italic font-serif" style={{ color: PRIMARY }}>{stats.totalWords.toLocaleString()}</em> 字，
+                <span className="px-1 ml-1" style={{ background: 'linear-gradient(180deg, transparent 60%, rgba(252,211,77,.55) 60%)' }}>{stats.totalNotes.toLocaleString()} 篇笔记</span>
+                {stats.streak > 0 && <span className="text-gray-500 dark:text-gray-400 text-sm ml-2 font-normal">· 连续 {stats.streak} 天</span>}
+              </h1>
+            )}
           </div>
 
           <div className="relative z-10 hidden md:grid grid-cols-3 gap-5">
-            <MiniStat label="日均" value={stats.activeDays > 0 ? Math.round(stats.totalWords / stats.activeDays).toLocaleString() : '—'} />
-            <MiniStat label="高产时段" value={peakHour.max > 0 ? `${peakHour.hour.toString().padStart(2, '0')}:00` : '—'} />
+            <MiniStat label="今日" value={`${stats.todayCount} 篇`} />
             <MiniStat label="本周新增" value={`${stats.weeklyGrowth} 篇`} />
+            <MiniStat label="高产时段" value={peakHour.max > 0 ? `${peakHour.hour.toString().padStart(2, '0')}:00` : '—'} />
           </div>
 
           <button
@@ -165,16 +210,12 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
           </button>
         </section>
 
-        {/* KPI 5 — 紧凑 */}
+        {/* KPI 5 — 有落点的可点进对应视图 */}
         <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
           {kpis.map((k) => {
             const c = HI[k.color]
-            return (
-              <div
-                key={k.label}
-                className="relative px-3 py-2.5 rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-black/40"
-                style={{ background: c.bg, borderColor: c.border }}
-              >
+            const inner = (
+              <>
                 <div className="flex items-center gap-1.5 text-[11px] font-medium mb-1 tracking-tight" style={{ color: c.ink }}>
                   <span className="w-1.5 h-1.5 rounded-sm" style={{ background: c.main }} />
                   {k.label}
@@ -182,22 +223,62 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
                 <div className="text-2xl font-semibold leading-none tracking-tight tabular-nums text-gray-900 dark:text-gray-100">
                   {k.value}
                 </div>
-                {k.delta && (
-                  <div className="mt-1 text-[10px] font-medium" style={{ color: c.ink }}>
-                    {k.delta}
-                  </div>
-                )}
+                <div className="mt-1 text-[10px] font-medium" style={{ color: c.ink }}>
+                  {k.delta}
+                </div>
+              </>
+            )
+            return k.nav ? (
+              <button
+                key={k.label}
+                type="button"
+                onClick={() => onNavigate(k.nav!)}
+                className="group relative px-3 py-2.5 rounded-xl border text-left cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-black/40"
+                style={{ background: c.bg, borderColor: c.border }}
+              >
+                {inner}
+                <span className="absolute top-2 right-2.5 font-mono text-[11px] opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: c.ink }}>
+                  →
+                </span>
+              </button>
+            ) : (
+              <div key={k.label} className="relative px-3 py-2.5 rounded-xl border" style={{ background: c.bg, borderColor: c.border }}>
+                {inner}
               </div>
             )
           })}
         </section>
 
-        {/* ROW 1: 折线 + Top 标签 + 时段 */}
+        {/* ROW 1: 趋势 + Top 标签 + 时段 */}
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr] gap-3">
           <Card>
-            <CardHead title="最近 7 天" titleEm="新增" sub="按创建时间" tight />
+            <CardHead
+              title="新增"
+              titleEm="趋势"
+              sub="按创建时间"
+              chip={
+                <div className="flex gap-1">
+                  {([7, 30] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setTrendRange(r)}
+                      className={`px-2 h-6 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                        trendRange === r
+                          ? 'text-white'
+                          : 'bg-[#EEF2F6] dark:bg-[#1E2025] text-gray-500 dark:text-gray-400 hover:bg-[#E4EAF0] dark:hover:bg-[#262932]'
+                      }`}
+                      style={trendRange === r ? { background: PRIMARY } : undefined}
+                    >
+                      {r} 天
+                    </button>
+                  ))}
+                </div>
+              }
+              tight
+            />
             <div className="relative h-[130px]">
-              <svg viewBox="0 0 700 130" preserveAspectRatio="none" className="w-full h-full">
+              <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} preserveAspectRatio="none" className="w-full h-full">
                 <defs>
                   <linearGradient id="dashTrendG" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor={PRIMARY} stopOpacity="0.28" />
@@ -205,29 +286,55 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
                   </linearGradient>
                 </defs>
                 <g stroke="currentColor" strokeWidth="1" className="text-[#E4EAF0] dark:text-[#262932]">
-                  <line x1="0" y1="32" x2="700" y2="32" />
-                  <line x1="0" y1="65" x2="700" y2="65" />
-                  <line x1="0" y1="98" x2="700" y2="98" />
+                  <line x1="0" y1="32" x2={CHART_W} y2="32" />
+                  <line x1="0" y1="65" x2={CHART_W} y2="65" />
+                  <line x1="0" y1="98" x2={CHART_W} y2="98" />
                 </g>
-                {chartPath.area && <path d={chartPath.area} fill="url(#dashTrendG)" />}
-                {chartPath.line && <path d={chartPath.line} fill="none" stroke={PRIMARY} strokeWidth="2" />}
-                {chartPath.points.map((p, i) => {
-                  const isPeak = p.v === peak7 && peak7 > 0
+                {chart.area && <path d={chart.area} fill="url(#dashTrendG)" />}
+                {chart.line && <path d={chart.line} fill="none" stroke={PRIMARY} strokeWidth="2" />}
+                {chart.points.map((p, i) => {
+                  const isPeak = i === peakIdx && trendPeak > 0
+                  const showDot = trendRange === 7 || isPeak || trendHover === i
                   return (
                     <g key={i}>
-                      <circle cx={p.x} cy={p.y} r={isPeak ? 4.5 : 3} fill={PRIMARY} stroke={isDark ? '#16181D' : '#FFFFFF'} strokeWidth={isPeak ? 2 : 1.5} />
+                      {showDot && (
+                        <circle
+                          cx={p.x}
+                          cy={p.y}
+                          r={isPeak || trendHover === i ? 4.5 : 3}
+                          fill={PRIMARY}
+                          stroke={isDark ? '#16181D' : '#FFFFFF'}
+                          strokeWidth={isPeak ? 2 : 1.5}
+                        />
+                      )}
                       {isPeak && (
                         <text x={p.x} y={Math.max(p.y - 8, 12)} textAnchor="middle" fill={isDark ? '#F4F6FA' : '#0F1115'} fontFamily="ui-monospace,Menlo,monospace" fontSize="10" fontWeight="600">
                           {p.v}
                         </text>
                       )}
+                      {/* 悬停命中带：竖向整条，鼠标扫过即出提示 */}
+                      <rect
+                        x={p.x - (CHART_W - 2 * CHART_P) / (2 * (trend.length - 1 || 1))}
+                        y="0"
+                        width={(CHART_W - 2 * CHART_P) / (trend.length - 1 || 1)}
+                        height={CHART_H}
+                        fill="transparent"
+                        onMouseMove={(e) => {
+                          setTrendHover(i)
+                          moveTip(e, `${trend[i].date} · ${p.v} 篇`)
+                        }}
+                        onMouseLeave={() => {
+                          setTrendHover(null)
+                          hideTip()
+                        }}
+                      />
                     </g>
                   )
                 })}
               </svg>
             </div>
             <div className="flex justify-between mt-1.5 font-mono text-[10px] text-gray-400 dark:text-gray-500 tracking-wider">
-              {last7.map((d, i) => (<span key={i}>{d.date}</span>))}
+              {trendXLabels.map((d, i) => (<span key={i}>{d}</span>))}
             </div>
           </Card>
 
@@ -236,19 +343,26 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
             {top5Tags.length === 0 ? (
               <EmptyHint text="还没有标签" small />
             ) : (
-              <div className="flex flex-col gap-1.5">
-                {top5Tags.map((t, i) => {
-                  const c = HI[tagColors[i]]
+              <div className="flex flex-col gap-1">
+                {top5Tags.map((t) => {
+                  const c = tagColor(t.name)
                   return (
-                    <div key={t.name} className="flex items-center gap-2 text-[12px]">
-                      <span className="font-medium px-2 py-0.5 rounded text-center flex-shrink-0 w-16 truncate text-[11px]" style={{ background: c.bg, color: c.ink }} title={t.name}>
+                    <button
+                      key={t.name}
+                      type="button"
+                      onClick={() => onNavigate(`tag-${t.name}`)}
+                      onMouseMove={(e) => moveTip(e, `#${t.name} · ${t.count} 篇`)}
+                      onMouseLeave={hideTip}
+                      className="flex items-center gap-2 text-[12px] w-full rounded-md px-1.5 py-1 -mx-1.5 cursor-pointer transition-colors hover:bg-[#F3F6F9] dark:hover:bg-[#1C1F26]"
+                    >
+                      <span className="font-medium px-2 py-0.5 rounded text-center flex-shrink-0 w-16 truncate text-[11px]" style={{ background: c.bg, color: c.base }}>
                         #{t.name}
                       </span>
                       <span className="flex-1 h-1.5 bg-[#EEF2F6] dark:bg-[#1E2025] rounded-full overflow-hidden">
-                        <span className="block h-full rounded-full" style={{ width: `${(t.count / tagMax) * 100}%`, background: c.main }} />
+                        <span className="block h-full rounded-full" style={{ width: `${(t.count / tagMax) * 100}%`, background: c.base }} />
                       </span>
                       <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300 w-6 text-right tabular-nums">{t.count}</span>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -257,7 +371,7 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
 
           <Card>
             <CardHead title="活跃" titleEm="时段" sub="24h" tight />
-            <HoursBar hourly={stats.hourlyActivity} peakHour={peakHour.hour} />
+            <HoursBar hourly={stats.hourlyActivity} peakHour={peakHour.hour} onTip={moveTip} onTipHide={hideTip} />
             <div className="flex justify-between mt-1 font-mono text-[10px] text-gray-400 dark:text-gray-500 tracking-wider">
               <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
             </div>
@@ -269,14 +383,14 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
           </Card>
         </section>
 
-        {/* ROW 2: 热力图 + 最近笔记 */}
-        <section className="grid grid-cols-1 md:grid-cols-[1.3fr_1fr] gap-3">
+        {/* ROW 2: 热力图 + 待办提醒 + 最近笔记 */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr] gap-3">
           <Card>
             <CardHead
               title="热力图"
-              sub={`90 天 · ${activeInHeatmap} 天活跃`}
+              sub={`近 ${HEAT_WEEKS} 周 · ${heat.active} 天活跃 · 点格子看当天`}
               chip={
-                <div className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <div className="inline-flex items-center gap-1">
                   {[0, 1, 2, 3, 4].map((l) => (
                     <i key={l} className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: cellColor(l as 0 | 1 | 2 | 3 | 4) }} />
                   ))}
@@ -284,16 +398,83 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
               }
               tight
             />
-            <div className="grid gap-[3px]" style={{ gridTemplateColumns: 'repeat(13, 1fr)', gridTemplateRows: 'repeat(7, 1fr)' }}>
-              {heatmap.map((cell, i) => (
-                <span
-                  key={i}
-                  title={`${cell.date} · ${cell.count} 篇`}
-                  className="aspect-square rounded-[3px] transition-transform hover:scale-125"
-                  style={{ background: cellColor(cell.level) }}
-                />
-              ))}
+            <div className="flex gap-1.5">
+              <div className="flex flex-col flex-shrink-0">
+                <div className="h-[14px]" />
+                <div className="flex-1 grid gap-[3px]" style={{ gridTemplateRows: 'repeat(7, 1fr)' }}>
+                  {['一', '', '三', '', '五', '', '日'].map((w, i) => (
+                    <span key={i} className="flex items-center font-mono text-[9px] leading-none text-gray-400 dark:text-gray-500">{w}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col">
+                <div className="h-[14px] grid" style={{ gridTemplateColumns: `repeat(${HEAT_WEEKS}, 1fr)` }}>
+                  {heat.monthLabels.map((m, i) => (
+                    <span key={i} className="font-mono text-[9px] leading-none text-gray-400 dark:text-gray-500 whitespace-nowrap">{m}</span>
+                  ))}
+                </div>
+                <div className="grid gap-[3px]" style={{ gridAutoFlow: 'column', gridTemplateRows: 'repeat(7, 1fr)', gridTemplateColumns: `repeat(${HEAT_WEEKS}, 1fr)` }}>
+                  {heat.cells.map((cell) =>
+                    cell.future ? (
+                      <span key={cell.key} />
+                    ) : (
+                      <button
+                        key={cell.key}
+                        type="button"
+                        className="aspect-square rounded-[3px] cursor-pointer transition-transform hover:scale-110"
+                        style={{ background: cellColor(cell.level) }}
+                        onClick={() => onOpenCalendarDate(cell.date)}
+                        onMouseMove={(e) => moveTip(e, `${cell.date.getMonth() + 1}月${cell.date.getDate()}日 · ${cell.count} 篇`)}
+                        onMouseLeave={hideTip}
+                      />
+                    )
+                  )}
+                </div>
+              </div>
             </div>
+          </Card>
+
+          <Card>
+            <CardHead
+              title="待办"
+              titleEm="提醒"
+              sub={stats.reminderItems.length > 0 ? `${stats.reminderItems.filter((r) => !r.overdue).length} 条待办` : undefined}
+              chip={
+                <button
+                  type="button"
+                  onClick={() => onNavigate('calendar')}
+                  className="px-2 h-6 rounded-md text-[11px] font-medium cursor-pointer transition-colors bg-[#EEF2F6] dark:bg-[#1E2025] text-gray-600 dark:text-gray-300 hover:bg-[#E4EAF0] dark:hover:bg-[#262932]"
+                >
+                  日历
+                </button>
+              }
+              tight
+            />
+            {stats.reminderItems.length === 0 ? (
+              <EmptyHint text="暂无提醒 — 在日历里给笔记设一个" small />
+            ) : (
+              <div className="flex flex-col">
+                {stats.reminderItems.slice(0, 5).map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onOpenNote(r.id)}
+                    className="grid grid-cols-[auto_1fr_auto] gap-2 py-1.5 border-b border-[#EEF2F6] dark:border-[#1C1F26] last:border-0 first:pt-0 items-center text-left cursor-pointer group"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: r.overdue ? '#EF4444' : PRIMARY }} />
+                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#5E6AD2] dark:group-hover:text-[#7C83E0] transition-colors truncate">
+                      {r.title || '未命名笔记'}
+                    </span>
+                    <span className={`font-mono text-[10px] whitespace-nowrap ${r.overdue ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                      {formatReminderTime(r.date, r.overdue)}
+                    </span>
+                  </button>
+                ))}
+                {stats.reminderItems.length > 5 && (
+                  <div className="pt-1.5 text-[11px] text-gray-400 dark:text-gray-500">还有 {stats.reminderItems.length - 5} 条</div>
+                )}
+              </div>
+            )}
           </Card>
 
           <Card>
@@ -301,8 +482,12 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
               title="最近笔记"
               sub="按编辑时间"
               chip={
-                <button onClick={() => onNavigate('inbox')} className="text-[11px] text-gray-500 dark:text-gray-400 hover:text-[#5E6AD2] dark:hover:text-[#7C83E0] transition-colors">
-                  全部 →
+                <button
+                  type="button"
+                  onClick={() => onNavigate('inbox')}
+                  className="px-2 h-6 rounded-md text-[11px] font-medium cursor-pointer transition-colors bg-[#EEF2F6] dark:bg-[#1E2025] text-gray-600 dark:text-gray-300 hover:bg-[#E4EAF0] dark:hover:bg-[#262932]"
+                >
+                  全部
                 </button>
               }
               tight
@@ -312,30 +497,74 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote }: Dashboar
             ) : (
               <div className="flex flex-col">
                 {stats.recentNotes.slice(0, 5).map((n) => (
-                  <div
+                  <button
                     key={n.id}
-                    className="grid grid-cols-[1fr_auto] gap-2 py-1.5 border-b border-[#EEF2F6] dark:border-[#1C1F26] last:border-0 first:pt-0 items-center cursor-pointer group"
+                    type="button"
                     onClick={() => onOpenNote(n.id)}
-                    title="点击打开"
+                    className="grid grid-cols-[1fr_auto] gap-2 py-1.5 border-b border-[#EEF2F6] dark:border-[#1C1F26] last:border-0 first:pt-0 items-center text-left cursor-pointer group"
                   >
-                    <div className="text-[13px] font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#5E6AD2] dark:group-hover:text-[#7C83E0] transition-colors line-clamp-1">
+                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#5E6AD2] dark:group-hover:text-[#7C83E0] transition-colors line-clamp-1">
                       {n.title || '未命名笔记'}
-                    </div>
-                    <div className="font-mono text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap uppercase tracking-wider">
+                    </span>
+                    <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap uppercase tracking-wider">
                       {relativeTime(n.updatedAt)}
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                 ))}
               </div>
             )}
           </Card>
         </section>
       </div>
+
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1 rounded-md text-[11px] font-medium whitespace-nowrap -translate-x-1/2 -translate-y-full shadow-lg"
+          style={{ left: tip.x, top: tip.y, background: isDark ? '#272B35' : '#1C1F26', color: '#F4F6FA' }}
+        >
+          {tip.text}
+        </div>
+      )}
     </div>
   )
 }
 
 /* ============ 子组件 ============ */
+
+// Catmull-Rom 转三次贝塞尔的平滑折线；控制点纵向钳在图表内，防尖峰数据过冲出界
+function smoothLine(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return ''
+  if (pts.length === 1) return `M${pts[0].x},${pts[0].y}`
+  const clampY = (y: number) => Math.min(Math.max(y, 2), CHART_H - 2)
+  let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] ?? p2
+    const c1x = p1.x + (p2.x - p0.x) / 6
+    const c1y = clampY(p1.y + (p2.y - p0.y) / 6)
+    const c2x = p2.x - (p3.x - p1.x) / 6
+    const c2y = clampY(p2.y - (p3.y - p1.y) / 6)
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+  }
+  return d
+}
+
+function formatReminderTime(d: Date, overdue: boolean): string {
+  const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  const startToday = new Date()
+  startToday.setHours(0, 0, 0, 0)
+  const dayDiff = Math.floor((d.getTime() - startToday.getTime()) / 86400000)
+  if (dayDiff === 0) return `今天 ${time}`
+  if (overdue) {
+    if (dayDiff === -1) return `昨天 ${time}`
+    return `${d.getMonth() + 1}月${d.getDate()}日`
+  }
+  if (dayDiff === 1) return `明天 ${time}`
+  if (dayDiff < 7) return `周${'日一二三四五六'[d.getDay()]} ${time}`
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${time}`
+}
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
@@ -373,7 +602,18 @@ function EmptyHint({ text, small }: { text: string; small?: boolean }) {
   return <div className={`text-center text-gray-400 dark:text-gray-500 ${small ? 'py-3 text-[12px]' : 'py-8 text-sm'}`}>{text}</div>
 }
 
-function HoursBar({ hourly, peakHour }: { hourly: { hour: string; count: number }[]; peakHour: number }) {
+function HoursBar({
+  hourly,
+  peakHour,
+  onTip,
+  onTipHide,
+}: {
+  hourly: { hour: string; count: number }[]
+  peakHour: number
+  onTip: (e: React.MouseEvent, text: string) => void
+  onTipHide: () => void
+}) {
+  const [hovered, setHovered] = useState<number | null>(null)
   const max = Math.max(...hourly.map((h) => h.count), 1)
   return (
     <div className="items-end gap-[2px] h-[88px] grid" style={{ gridTemplateColumns: 'repeat(24, 1fr)' }}>
@@ -383,12 +623,19 @@ function HoursBar({ hourly, peakHour }: { hourly: { hour: string; count: number 
         return (
           <span
             key={i}
-            title={`${i}:00 · ${h.count} 篇`}
-            className="block rounded-t-sm transition-colors cursor-pointer"
+            className="block rounded-t-sm transition-colors cursor-default"
             style={{
               height: `${height}%`,
-              background: isPeak ? PRIMARY : 'rgba(94,106,210,.18)',
+              background: isPeak ? PRIMARY : hovered === i ? 'rgba(94,106,210,.45)' : 'rgba(94,106,210,.18)',
               boxShadow: isPeak ? `0 0 6px rgba(94,106,210,.4)` : undefined,
+            }}
+            onMouseMove={(e) => {
+              setHovered(i)
+              onTip(e, `${i}:00 – ${(i + 1) % 24}:00 · ${h.count} 篇`)
+            }}
+            onMouseLeave={() => {
+              setHovered(null)
+              onTipHide()
             }}
           />
         )

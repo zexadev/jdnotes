@@ -19,6 +19,8 @@ interface DashboardStats {
   // 活跃度
   activeDays: number;
   streak: number;
+  todayCount: number;
+  wroteToday: boolean;
   distribution: Map<string, number>;
 
   // 标签统计
@@ -26,6 +28,8 @@ interface DashboardStats {
 
   // 提醒统计
   upcomingReminders: number;
+  // 待办提醒明细：已过期在前（新过期优先），其后按到期时间升序
+  reminderItems: { id: number; title: string; date: Date; overdue: boolean }[];
 
   // 最近活跃
   recentNotes: {
@@ -111,6 +115,9 @@ export function useDashboardStats(): DashboardStats {
       cursor.setDate(cursor.getDate() - 1);
     }
 
+    const todayCount = distribution.get(formatDateKey(now)) || 0;
+    const wroteToday = todayCount > 0;
+
     // 标签统计
     const tagCount = new Map<string, number>();
     allNotes.forEach(note => {
@@ -132,6 +139,20 @@ export function useDashboardStats(): DashboardStats {
       n.reminderDate &&
       new Date(n.reminderDate) > now
     ).length;
+
+    // 待办提醒明细：过期的排最前（最近过期的优先），未到期的按时间升序
+    const reminderItems = allNotes
+      .filter(n => !n.isDeleted && n.reminderEnabled && n.reminderDate)
+      .map(n => {
+        const date = new Date(n.reminderDate!);
+        return { id: n.id, title: n.title, date, overdue: date.getTime() <= now.getTime() };
+      })
+      .sort((a, b) => {
+        if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+        return a.overdue
+          ? b.date.getTime() - a.date.getTime()
+          : a.date.getTime() - b.date.getTime();
+      });
 
     // 最近活跃笔记（最近编辑的 5 篇）
     const recentNotes = allNotes
@@ -215,9 +236,12 @@ export function useDashboardStats(): DashboardStats {
       avgWords,
       activeDays,
       streak,
+      todayCount,
+      wroteToday,
       distribution,
       topTags,
       upcomingReminders,
+      reminderItems,
       recentNotes,
       trendData,
       categoryData,

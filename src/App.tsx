@@ -45,6 +45,8 @@ function App() {
   const [localTitle, setLocalTitle] = useState('')
   const [localContent, setLocalContent] = useState('')
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
+  // 日历聚焦日：概览热力图点格带过来；常规入口（侧栏/概览导航）进日历前清掉，避免停在旧日期
+  const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -58,6 +60,18 @@ function App() {
     }
     return 'expanded'
   })
+
+  // 常规视图切换（侧栏/概览导航共用）：清掉热力图带来的日历聚焦日
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCalendarFocusDate(null)
+    setCurrentView(view)
+  }, [])
+
+  // 概览热力图点格直达日历该日
+  const handleOpenCalendarDate = useCallback((date: Date) => {
+    setCalendarFocusDate(date)
+    setCurrentView('calendar')
+  }, [])
 
   // 循环切换侧栏状态（展开 → 收起 → 隐藏 → …）并持久化；Ctrl+\ 与顶栏按钮共用。
   // 按钮图标按状态标注"下一步动作"（收起态是虚线面板=再点隐藏），见 TitleBar
@@ -672,7 +686,7 @@ function App() {
             >
               <Sidebar
                 currentView={currentView}
-                onViewChange={setCurrentView}
+                onViewChange={handleViewChange}
                 counts={counts}
                 allTags={allTags}
                 allNotes={allNotes || []}
@@ -716,9 +730,10 @@ function App() {
                 className="flex-1 h-full"
               >
                 <DashboardPage
-                  onNavigate={(view) => setCurrentView(view)}
+                  onNavigate={handleViewChange}
                   onCreateNote={handleCreateNote}
                   onOpenNote={handleCommandSelectNote}
+                  onOpenCalendarDate={handleOpenCalendarDate}
                 />
               </motion.div>
             ) : currentView === 'settings' ? (
@@ -741,6 +756,7 @@ function App() {
                 <CalendarView
                   onSelectNote={handleSelectNote}
                   onCreateNote={handleCreateNoteAt}
+                  initialDate={calendarFocusDate ?? undefined}
                 />
               </motion.div>
             ) : (
