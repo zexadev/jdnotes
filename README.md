@@ -45,6 +45,8 @@
 
 **Lapis** 是一款本地优先的桌面笔记应用（Tauri 2 构建）。支持局域网 + 跨网 P2P 加密多设备同步，AI 可经 MCP 直接读写你的笔记库。数据本地存储，隐私安全。
 
+> **前身是 jdnotes（JD Notes）**：自 2.0 起更名为 Lapis。同一应用、同一套数据，老版本直接安装新版即可升级，笔记原样保留。
+
 | | 特性 | 说明 |
 |---|---|---|
 | 🔄 | **多设备同步** | 局域网自动发现 + 跨网 P2P 加密直连，免费、无中心服务器 |
@@ -261,6 +263,11 @@ claude mcp add --transport http lapis http://127.0.0.1:19230/mcp
 - 📖 查看 [文档站](https://jdnotes.zexa.cc)
 
 ### 常见问题
+
+<details>
+<summary><strong>Q: 我是 jdnotes 老用户，升级会怎样？</strong></summary>
+<p>Lapis 就是 jdnotes，2.0 起更名。数据目录不变（<code>%APPDATA%/com.jdnotes.app/</code>），直接安装新版即覆盖升级，笔记、标签、设置全部原样保留。</p>
+</details>
 
 <details>
 <summary><strong>Q: 数据存储在哪里？</strong></summary>

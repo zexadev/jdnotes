@@ -45,6 +45,8 @@
 
 **Lapis** is a local-first desktop note-taking app built with Tauri 2. Sync across devices over LAN or encrypted P2P — and let AI agents read and write your local notes via MCP. All data is stored locally on your device — no cloud, no tracking, full privacy.
 
+> **Formerly jdnotes (JD Notes)**: renamed to Lapis as of 2.0. Same app, same data — existing installs upgrade in place, all notes preserved.
+
 | | Feature | Description |
 |---|---|---|
 | :arrows_counterclockwise: | **Multi-Device Sync** | LAN auto-discovery + encrypted cross-network P2P, free, no central server |
@@ -257,6 +259,11 @@ If you encounter any issues or have suggestions:
 - Visit the [Documentation](https://jdnotes.zexa.cc)
 
 ### FAQ
+
+<details>
+<summary><strong>Q: I'm a jdnotes user — what happens when I upgrade?</strong></summary>
+<p>Lapis is jdnotes, renamed as of 2.0. The data directory is unchanged (<code>%APPDATA%/com.jdnotes.app/</code>) — just install the new version over the old one; notes, tags and settings are all preserved.</p>
+</details>
 
 <details>
 <summary><strong>Q: Where is my data stored?</strong></summary>
