@@ -135,11 +135,20 @@ function ReminderRow({
 }) {
   const overdue = !!note.reminderDate && isOverdue(note.reminderDate)
 
+  // 提醒行也可拖回网格改期：月格 chip 超 3 条被折叠时这里是唯一的拖拽入口（与笔记卡对等）
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `panel-reminder-${note.id}`,
+    data: { type: 'reminder', note },
+  })
+
   return (
     <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
       className={`group flex items-center gap-2 h-9 px-2.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 ${
         overdue ? 'opacity-60' : ''
-      }`}
+      } ${isDragging ? 'opacity-30' : ''}`}
     >
       <Bell className="h-3.5 w-3.5 text-amber-500 shrink-0" strokeWidth={1.8} />
       {note.reminderDate && (
