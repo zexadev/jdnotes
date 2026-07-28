@@ -61,6 +61,30 @@ interface EditorProps {
   onOpenNoteByTitle?: (title: string) => void // 点击字面 [[标题]] 引用时按标题跳转
 }
 
+// 纯文本粘贴的单换行在 Markdown 语义下是段内换行，粘贴微信/终端多行文字会挤成
+// 一段硬换行（只有行高没有段距，与手打回车的独立段落观感不一致）。把普通文本行
+// 之间的单换行升级为段落分隔；块结构行（列表/引用/标题/表格/缩进代码/水平线）
+// 与围栏内部保持原样，否则粘贴列表会被拆散、围栏代码会被塞进空行。
+const MD_BLOCK_LINE = /^(\s*([-*+]\s|\d+[.)]\s|>|#{1,6}\s|\||```|~~~)|\s{4}|\t)|^\s*[-=_*]{3,}\s*$/
+function upgradePlainTextNewlines(text: string): string {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
+  let out = lines[0] ?? ''
+  let inFence = false
+  for (let i = 1; i < lines.length; i++) {
+    const prev = lines[i - 1]
+    const cur = lines[i]
+    if (/^\s*(```|~~~)/.test(prev)) inFence = !inFence
+    const plainPair =
+      !inFence &&
+      prev.trim() !== '' &&
+      cur.trim() !== '' &&
+      !MD_BLOCK_LINE.test(prev) &&
+      !MD_BLOCK_LINE.test(cur)
+    out += (plainPair ? '\n\n' : '\n') + cur
+  }
+  return out
+}
+
 export function Editor({
   title,
   content,
@@ -197,6 +221,13 @@ export function Editor({
       attributes: {
         class:
           'prose prose-slate dark:prose-invert prose-lg max-w-none focus:outline-none min-h-[300px] prose-a:cursor-text prose-a:text-indigo-600 dark:prose-a:text-indigo-400 prose-a:underline-offset-4 hover:prose-a:text-indigo-500 prose-a:transition-colors',
+      },
+      // 只在纯文本粘贴路径触发（剪贴板带 HTML 时走 transformPastedHTML，不经这里）；
+      // 代码相关粘贴到不了这里：vscode-editor-data / ``` 围栏在 handlePaste 已拦截，
+      // 代码块内粘贴按 $from 判断跳过
+      transformPastedText: (text, _plain, view) => {
+        if (view.state.selection.$from.parent.type.spec.code) return text
+        return upgradePlainTextNewlines(text)
       },
       handleDOMEvents: {
         // 内部引用用 mousedown 抢在光标落入之前跳转：否则 ProseMirror 先把光标落进引用
