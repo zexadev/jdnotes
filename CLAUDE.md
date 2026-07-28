@@ -31,7 +31,7 @@
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
 - **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
 - **Tauri 插件**：log, notification, sql(sqlite), dialog, fs, opener, updater, process
-- **发布状态（待「发」）**：GitHub 仓库当前仍是 `zexadev/jdnotes`，**尚未改名为 lapis、2.0 未正式发布 release**。因此 updater 端点 `.../zexadev/lapis/releases/latest/download/latest.json` 返回 404、README/文档站的 GitHub 徽章显示 repo not found，**均属预期**，发布后自动恢复。发布 = 改名仓库 + 建 release 传资产（含 latest.json）。
+- **发布状态**：v2.0.0 已于 2026-07-28 正式发布——仓库已改名 `zexadev/lapis`、Release 资产齐全（exe/msi + 双 sig + latest.json）、updater 端点已验证 200。旧地址 `zexadev/jdnotes` 由 GitHub 自动重定向。
 
 ---
 
