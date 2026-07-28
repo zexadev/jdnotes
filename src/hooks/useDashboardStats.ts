@@ -25,8 +25,9 @@ interface DashboardStats {
   // 标签统计
   topTags: { name: string; count: number }[];
 
-  // 待办提醒明细：已过期在前（新过期优先），其后按到期时间升序
-  reminderItems: { id: number; title: string; date: Date; overdue: boolean }[];
+  // 待办提醒明细：已过期在前（新过期优先），其后按到期时间升序。
+  // 不携带 overdue 标记——memo 里冻结的钟跨零点会把已过期标成未来，过期判定留给渲染期实时算
+  reminderItems: { id: number; title: string; date: Date }[];
 
   // 最近活跃
   recentNotes: {
@@ -121,16 +122,17 @@ export function useDashboardStats(): DashboardStats {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
-    // 待办提醒明细：过期的排最前（最近过期的优先），未到期的按时间升序
+    // 待办提醒明细：过期的排最前（最近过期的优先），未到期的按时间升序。
+    // 排序用计算时刻的钟即可（顺序陈旧无害）；显示层的过期判定由渲染期实时算
+    const nowMs = now.getTime();
     const reminderItems = allNotes
       .filter(n => !n.isDeleted && n.reminderEnabled && n.reminderDate)
-      .map(n => {
-        const date = new Date(n.reminderDate!);
-        return { id: n.id, title: n.title, date, overdue: date.getTime() <= now.getTime() };
-      })
+      .map(n => ({ id: n.id, title: n.title, date: new Date(n.reminderDate!) }))
       .sort((a, b) => {
-        if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
-        return a.overdue
+        const aOver = a.date.getTime() <= nowMs;
+        const bOver = b.date.getTime() <= nowMs;
+        if (aOver !== bOver) return aOver ? -1 : 1;
+        return aOver
           ? b.date.getTime() - a.date.getTime()
           : a.date.getTime() - b.date.getTime();
       });

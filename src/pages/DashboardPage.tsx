@@ -438,7 +438,7 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote, onOpenCale
             <CardHead
               title="待办"
               titleEm="提醒"
-              sub={stats.reminderItems.length > 0 ? `${stats.reminderItems.filter((r) => !r.overdue).length} 条待办` : undefined}
+              sub={stats.reminderItems.length > 0 ? `${stats.reminderItems.filter((r) => r.date.getTime() > Date.now()).length} 条待办` : undefined}
               chip={
                 <button
                   type="button"
@@ -454,22 +454,26 @@ export function DashboardPage({ onNavigate, onCreateNote, onOpenNote, onOpenCale
               <EmptyHint text="暂无提醒 — 在日历里给笔记设一个" small />
             ) : (
               <div className="flex flex-col">
-                {stats.reminderItems.slice(0, 5).map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => onOpenNote(r.id)}
-                    className="grid grid-cols-[auto_1fr_auto] gap-2 py-1.5 border-b border-[#EEF2F6] dark:border-[#1C1F26] last:border-0 first:pt-0 items-center text-left cursor-pointer group"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: r.overdue ? '#EF4444' : PRIMARY }} />
-                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#5E6AD2] dark:group-hover:text-[#7C83E0] transition-colors truncate">
-                      {r.title || '未命名笔记'}
-                    </span>
-                    <span className={`font-mono text-[10px] whitespace-nowrap ${r.overdue ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
-                      {formatReminderTime(r.date, r.overdue)}
-                    </span>
-                  </button>
-                ))}
+                {stats.reminderItems.slice(0, 5).map((r) => {
+                  // 过期与否按渲染时刻算：hook memo 里冻结的钟跨零点会把刚过期的标成未来
+                  const overdue = r.date.getTime() <= Date.now()
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => onOpenNote(r.id)}
+                      className="grid grid-cols-[auto_1fr_auto] gap-2 py-1.5 border-b border-[#EEF2F6] dark:border-[#1C1F26] last:border-0 first:pt-0 items-center text-left cursor-pointer group"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: overdue ? '#EF4444' : PRIMARY }} />
+                      <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#5E6AD2] dark:group-hover:text-[#7C83E0] transition-colors truncate">
+                        {r.title || '未命名笔记'}
+                      </span>
+                      <span className={`font-mono text-[10px] whitespace-nowrap ${overdue ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                        {formatReminderTime(r.date, overdue)}
+                      </span>
+                    </button>
+                  )
+                })}
                 {stats.reminderItems.length > 5 && (
                   <div className="pt-1.5 text-[11px] text-gray-400 dark:text-gray-500">还有 {stats.reminderItems.length - 5} 条</div>
                 )}
