@@ -10,7 +10,6 @@ interface DashboardStats {
 
   // 增长趋势
   weeklyGrowth: number;
-  monthlyGrowth: number;
 
   // 字数统计
   totalWords: number;
@@ -26,8 +25,6 @@ interface DashboardStats {
   // 标签统计
   topTags: { name: string; count: number }[];
 
-  // 提醒统计
-  upcomingReminders: number;
   // 待办提醒明细：已过期在前（新过期优先），其后按到期时间升序
   reminderItems: { id: number; title: string; date: Date; overdue: boolean }[];
 
@@ -41,9 +38,7 @@ interface DashboardStats {
 
   // 图表数据
   trendData: { date: string; count: number }[]; // 趋势折线图数据
-  categoryData: { name: string; value: number; color: string }[]; // 分类饼图数据
   hourlyActivity: { hour: string; count: number }[]; // 写作时段数据
-  wordDistribution: { range: string; count: number }[]; // 字数分布数据
 }
 
 /**
@@ -56,7 +51,6 @@ export function useDashboardStats(): DashboardStats {
   const stats = useMemo(() => {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // 基础统计
     const totalNotes = counts.inbox;
@@ -66,14 +60,9 @@ export function useDashboardStats(): DashboardStats {
       : 0;
 
     // 增长趋势
-    const weeklyNotes = allNotes.filter(n =>
+    const weeklyGrowth = allNotes.filter(n =>
       !n.isDeleted && new Date(n.createdAt) >= oneWeekAgo
-    );
-    const monthlyNotes = allNotes.filter(n =>
-      !n.isDeleted && new Date(n.createdAt) >= oneMonthAgo
-    );
-    const weeklyGrowth = weeklyNotes.length;
-    const monthlyGrowth = monthlyNotes.length;
+    ).length;
 
     // 字数统计
     const allWords = allNotes
@@ -132,14 +121,6 @@ export function useDashboardStats(): DashboardStats {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
-    // 提醒统计
-    const upcomingReminders = allNotes.filter(n =>
-      !n.isDeleted &&
-      n.reminderEnabled &&
-      n.reminderDate &&
-      new Date(n.reminderDate) > now
-    ).length;
-
     // 待办提醒明细：过期的排最前（最近过期的优先），未到期的按时间升序
     const reminderItems = allNotes
       .filter(n => !n.isDeleted && n.reminderEnabled && n.reminderDate)
@@ -179,24 +160,7 @@ export function useDashboardStats(): DashboardStats {
       });
     }
 
-    // 2. 分类饼图数据
-    const categoryColors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4'];
-    const categoryData = topTags.slice(0, 6).map((tag, index) => ({
-      name: tag.name,
-      value: tag.count,
-      color: categoryColors[index % categoryColors.length],
-    }));
-    // 添加"其他"分类
-    const otherCount = totalNotes - categoryData.reduce((sum, cat) => sum + cat.value, 0);
-    if (otherCount > 0) {
-      categoryData.push({
-        name: '其他',
-        value: otherCount,
-        color: '#94a3b8',
-      });
-    }
-
-    // 3. 写作时段数据 (24小时)
+    // 2. 写作时段数据 (24小时)
     const hourlyActivity: { hour: string; count: number }[] = [];
     const hourCounts = new Map<number, number>();
     allNotes.forEach(note => {
@@ -212,26 +176,11 @@ export function useDashboardStats(): DashboardStats {
       });
     }
 
-    // 4. 字数分布数据
-    const wordRanges = [
-      { range: '0-100', min: 0, max: 100 },
-      { range: '100-300', min: 100, max: 300 },
-      { range: '300-500', min: 300, max: 500 },
-      { range: '500-1000', min: 500, max: 1000 },
-      { range: '1000-3000', min: 1000, max: 3000 },
-      { range: '3000+', min: 3000, max: Infinity },
-    ];
-    const wordDistribution = wordRanges.map(({ range, min, max }) => {
-      const count = allWords.filter(w => w >= min && w < max).length;
-      return { range, count };
-    });
-
     return {
       totalNotes,
       favoriteNotes,
       favoriteRatio,
       weeklyGrowth,
-      monthlyGrowth,
       totalWords,
       avgWords,
       activeDays,
@@ -240,13 +189,10 @@ export function useDashboardStats(): DashboardStats {
       wroteToday,
       distribution,
       topTags,
-      upcomingReminders,
       reminderItems,
       recentNotes,
       trendData,
-      categoryData,
       hourlyActivity,
-      wordDistribution,
     };
   }, [allNotes, counts]);
 
