@@ -109,12 +109,12 @@ export function ReminderNotification({
         const title = note.title || '无标题笔记'
         let message: string
         if (note.reminderType === 'due') {
-          message = `⏰ 时间到了：${title}`
+          message = `时间到了：${title}`
         } else {
           const remaining = note.reminderDate ? formatTimeRemaining(note.reminderDate) : ''
-          message = `⏳ 还有 ${remaining}：${title}`
+          message = `还有 ${remaining}：${title}`
         }
-        sendSystemNotification('JDNotes提醒您', message)
+        sendSystemNotification('Lapis', message)
       })
     }
   }, [reminders, notifiedIds])
@@ -184,8 +184,8 @@ export function ReminderNotification({
                         : 'text-amber-600 dark:text-amber-400'
                     }`}>
                       {note.reminderType === 'due'
-                        ? '⏰ 时间到了'
-                        : `⏳ 还有 ${note.reminderDate ? formatTimeRemaining(note.reminderDate) : ''}`}
+                        ? '时间到了'
+                        : `还有 ${note.reminderDate ? formatTimeRemaining(note.reminderDate) : ''}`}
                     </span>
                     <button
                       onClick={() => handleDismiss(note.id)}

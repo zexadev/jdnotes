@@ -580,7 +580,7 @@ function ReminderPickerPopup({
     onSetReminder(date)
     // 显示 toast 提示
     const remaining = formatTimeRemaining(date)
-    toast.success(`⏰ 将在 ${remaining} 后提醒`)
+    toast.success(`将在 ${remaining} 后提醒`)
   }
 
   const handleCustomTime = () => {
@@ -595,7 +595,7 @@ function ReminderPickerPopup({
     setSelectedTime('')
     // 显示 toast 提示
     const remaining = formatTimeRemaining(date)
-    toast.success(`⏰ 将在 ${remaining} 后提醒`)
+    toast.success(`将在 ${remaining} 后提醒`)
   }
 
   return (
