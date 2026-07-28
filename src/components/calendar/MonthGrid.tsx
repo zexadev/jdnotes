@@ -182,8 +182,11 @@ function DayCell({
           />
         ))}
         {overflow > 0 && (
-          // 点击冒泡到格子 = 选中该日，右侧面板看全部
-          <div className="px-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+          // 点击冒泡到格子 = 选中该日，右侧面板看全部；双击拦下——冒泡到格子会误建笔记
+          <div
+            onDoubleClick={(e) => e.stopPropagation()}
+            className="px-1.5 text-[10px] text-slate-400 dark:text-slate-500"
+          >
             还有 {overflow} 条
           </div>
         )}
