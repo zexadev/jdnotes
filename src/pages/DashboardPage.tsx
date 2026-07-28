@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { useTheme } from '../contexts/ThemeContext'
-import { formatDateKey } from '../lib/db'
+import { formatDateKey, type Note } from '../lib/db'
 import { startOfWeekMonday } from '../hooks/useCalendarPage'
 import { tagColor } from '../lib/tagColor'
 import type { ViewType } from '../App'
 
 interface DashboardPageProps {
+  // App 层唯一 useNotes 实例的数据，统计与全应用同源同刷新
+  allNotes: Note[]
+  counts: { inbox: number; favorites: number; trash: number }
   onNavigate: (view: ViewType) => void
   onCreateNote: () => void
   onOpenNote: (id: number) => void
@@ -40,8 +43,8 @@ const CHART_P = 8
 
 type Tip = { x: number; y: number; text: string }
 
-export function DashboardPage({ onNavigate, onCreateNote, onOpenNote, onOpenCalendarDate }: DashboardPageProps) {
-  const stats = useDashboardStats()
+export function DashboardPage({ allNotes, counts, onNavigate, onCreateNote, onOpenNote, onOpenCalendarDate }: DashboardPageProps) {
+  const stats = useDashboardStats(allNotes, counts)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
   const HI = isDark ? HI_DARK : HI_LIGHT

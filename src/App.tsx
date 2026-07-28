@@ -731,6 +731,8 @@ function App() {
                 className="flex-1 h-full"
               >
                 <DashboardPage
+                  allNotes={allNotes || []}
+                  counts={counts}
                   onNavigate={handleViewChange}
                   onCreateNote={handleCreateNote}
                   onOpenNote={handleCommandSelectNote}

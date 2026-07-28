@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useNotes } from './useNotes';
-import { formatDateKey } from '../lib/db';
+import { formatDateKey, type Note } from '../lib/db';
 
 interface DashboardStats {
   // 基础统计
@@ -44,10 +43,14 @@ interface DashboardStats {
 
 /**
  * Dashboard 数据统计 Hook
- * 计算各种统计指标用于数据概览页面
+ * 计算各种统计指标用于数据概览页面。
+ * 数据由 App 层唯一 useNotes 实例传入——此前自建第二实例只监听 db:changed（仅 Rust 侧发），
+ * App 层操作（如在概览页上关闭提醒通知）刷不到它，卡片会一直挂着已清除的提醒
  */
-export function useDashboardStats(): DashboardStats {
-  const { allNotes, counts } = useNotes('', 'inbox');
+export function useDashboardStats(
+  allNotes: Note[],
+  counts: { inbox: number; favorites: number; trash: number }
+): DashboardStats {
 
   const stats = useMemo(() => {
     const now = new Date();
