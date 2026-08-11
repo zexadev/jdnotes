@@ -12,8 +12,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "release": "powershell -ExecutionPolicy Bypass -File ./scripts/build-release.ps1",
-    "release:bat": "scripts\\build-release.bat",
-    "signer:generate": "tauri signer generate -w ./~/.tauri/jdnotes.key"
+    "release:bat": "scripts\\build-release.bat"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",

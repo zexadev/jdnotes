@@ -32,14 +32,16 @@ echo 准备构建版本: v%NEW_VERSION%
 echo.
 
 :: 检查签名密钥
-set "KEY_FILE=%~dp0..\~\.tauri\jdnotes.key"
+:: 密钥放仓库外。曾经默认落在 %~dp0..\~\.tauri\ 即项目内，跟着提交进了公开仓库
+set "KEY_FILE=%USERPROFILE%\.tauri\lapis.key"
 if exist "%KEY_FILE%" (
     echo [成功] 找到签名密钥
     for /f "delims=" %%i in (%KEY_FILE%) do set "TAURI_SIGNING_PRIVATE_KEY=!TAURI_SIGNING_PRIVATE_KEY!%%i"
 ) else (
-    echo [警告] 未找到签名密钥: %KEY_FILE%
-    echo 如需签名，请先运行: pnpm tauri signer generate -w "%KEY_FILE%"
-    echo.
+    echo [错误] 未找到签名密钥: %KEY_FILE%
+    echo 正式发布走 CI（推 v* tag）。换新密钥必须同步改 tauri.conf.json 的 pubkey 和仓库 secret，
+    echo 只生成密钥会让产物验签失败、更新静默全断。
+    exit /b 1
 )
 
 :: 更新版本号（如果变化）

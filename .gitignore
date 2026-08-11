@@ -26,8 +26,12 @@ dist-ssr
 .claude/skills/ui-ux-pro-max/
 release/
 
-# Signing keys
+# Signing keys —— 私钥一律不进仓库。密钥现放在仓库外的 ~/.tauri/lapis.key（用户主目录），
+# CI 用仓库 secret 签名。这里的规则只是兜底：早先 updater 私钥就是因为落在项目内的 `~/.tauri/`
+# 而未被 src-tauri/keys/ 覆盖，跟着提交进了公开仓库
 src-tauri/keys/
+**/.tauri/
+*.key
 
 # 本地文档（不入库的临时笔记/设计探索/调试草稿）
 docs/local/

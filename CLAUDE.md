@@ -137,7 +137,20 @@
 
    跟进：`gh run watch` 或 `gh run list --workflow=release.yml --limit 1`
 
-   **签名密钥必须与线上 pubkey 同一把**（`src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey`）。换了 key 而不改 pubkey，所有老用户验签失败、更新全断——2026-03 就踩过：CI 上了一把新 key（`RWTV/ePB…`），随后撤 CI 并把 pubkey revert 回 `RWRH2d76…`。改 secret 前先比对 `~/.tauri/jdnotes.key.pub` 与配置里的 pubkey 是否相等。
+   **签名密钥必须与线上 pubkey 同一把**（`src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey`）。签名 key 与包内 pubkey 不匹配时，产物照样能签能发，但所有客户端验签失败、更新静默全断，且要等发版后才暴露——2026-03 踩过：CI 配了一把新 key（`RWTV/ePB…`）却没改 pubkey，随后撤 CI 并把 pubkey revert 回 `RWRH2d76…`。
+
+   **改 key 是三处联动，缺一不可**：`tauri.conf.json` 的 pubkey + 仓库 secret `TAURI_SIGNING_PRIVATE_KEY` + 同名 `..._PASSWORD`。所以不提供 `signer:generate` 之类的一键生成脚本（原先那个还默认写进项目内的 `~/.tauri/`，导致私钥进了公开仓库）。要换 key：
+
+   ```powershell
+   pnpm tauri signer generate --ci -p '<新密码>' -w "$env:USERPROFILE\.tauri\lapis.key"
+   # 把 lapis.key.pub 的内容原样填进 tauri.conf.json 的 pubkey（该文件本身就是 base64，别再编码一次）
+   gh secret set TAURI_SIGNING_PRIVATE_KEY < "$env:USERPROFILE\.tauri\lapis.key"
+   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body '<新密码>'
+   ```
+
+   **私钥一律放仓库外**（`%USERPROFILE%\.tauri\lapis.key`）。`.gitignore` 有 `**/.tauri/` 与 `*.key` 兜底。
+
+   **换 key 会断更新链**：老版本用旧 pubkey 验签，收不到新版本，必须手动下载一次。换 key 那一版的 changelog 和 Release notes 必须写明这点。
 
 8. **等待文档站部署**
    文档站通过 Cloudflare Pages 自动部署。

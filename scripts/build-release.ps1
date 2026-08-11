@@ -4,7 +4,8 @@
 param(
     [string]$Version,
     [switch]$SkipBuild,
-    [string]$KeyFile = "$PSScriptRoot\..\~\.tauri\jdnotes.key"
+    # 密钥放仓库外。曾经默认落在 $PSScriptRoot\..\~\.tauri\ 即项目内，跟着提交进了公开仓库
+    [string]$KeyFile = "$env:USERPROFILE\.tauri\lapis.key"
 )
 
 $ErrorActionPreference = "Stop"
@@ -126,30 +127,13 @@ if (Test-Path $KeyFile) {
     $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $KeyFile -Raw
 }
 else {
-    Write-Warn "Key file not found: $KeyFile"
-    Write-Host "Generate new key? (y/n): " -NoNewline -ForegroundColor Yellow
-    $genKey = Read-Host
-    
-    if ($genKey -eq 'y') {
-        $keyDir = Split-Path $KeyFile -Parent
-        if (-not (Test-Path $keyDir)) {
-            New-Item -ItemType Directory -Path $keyDir -Force | Out-Null
-        }
-        pnpm tauri signer generate -w $KeyFile
-        
-        if (Test-Path $KeyFile) {
-            $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $KeyFile -Raw
-            Write-OK "Key generated!"
-            Write-Warn "Please add the public key to tauri.conf.json plugins.updater.pubkey"
-        }
-        else {
-            Write-Err "Key generation failed!"
-            exit 1
-        }
-    }
-    else {
-        Write-Warn "Skipping signing, update feature will not work"
-    }
+    # 不在这里现生成密钥：新生成的 key 与包内已固化的 pubkey 必然不匹配，
+    # 产物能签出来、能发布，但所有客户端验签失败、更新静默全断，而事故要等发版后才暴露。
+    # 换 key 是独立动作，必须同时改 tauri.conf.json 的 pubkey 与 CI secret，见 CLAUDE.md 发布流程
+    Write-Err "Signing key not found: $KeyFile"
+    Write-Host "正式发布走 CI（推 v* tag）。本地要签名，请先把私钥放到该路径；" -ForegroundColor Yellow
+    Write-Host "换新密钥必须同步更新 tauri.conf.json 的 pubkey 和仓库 secret，别只生成密钥。" -ForegroundColor Yellow
+    exit 1
 }
 
 # Step 3: Install dependencies
