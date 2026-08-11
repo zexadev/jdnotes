@@ -17,6 +17,7 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table'
 import { TableCell } from '@tiptap/extension-table'
 import { TableHeader } from '@tiptap/extension-table'
+import { Link } from '@tiptap/extension-link'
 import { Markdown } from 'tiptap-markdown'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { CodeBlockComponent } from './CodeBlockComponent'
@@ -125,8 +126,23 @@ export function Editor({
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        link: false,
+      }),
+      // 裸文本一律不自动成链。linkifyjs 认邮箱时 local part 向前贪吃到空白为止，中文标点、
+      // `|` `/` `-` 全算合法字符：「备注：a@b.com」整条吞成 mailto:备注：a@b.com，
+      // 「pw----user@b.com」把前一个字段吃进地址；URL 侧则把中文句号吃进 href。
+      // 且这不是渲染装饰——序列化后 [文本](mailto:…) 写进 notes.content，跟着导出/同步/MCP 扩散。
+      // 边界无法靠猜修好（`-` 在 local part 里本就合法），只能不猜；笔记里的邮箱多是账号数据而非收件人。
+      Link.extend({
+        // autolink 开关只管打字路径。粘贴走 addPasteRules，它无条件把整段文本里每个裸链接
+        // 都 linkify，不受 autolink / linkOnPaste 约束，只能整条摘掉
+        addPasteRules: () => [],
+      }).configure({
         // 放行 note: 协议，让笔记引用 note://<uuid> 不被链接消毒过滤；点击交给下方 click 处理
-        link: { openOnClick: false, protocols: ['note'] },
+        openOnClick: false,
+        protocols: ['note'],
+        autolink: false,
+        // linkOnPaste 保留默认开：它要求有选区、且剪贴板整体恰好是一个链接，属明确手动动作
       }),
       CodeBlock.extend({
         addAttributes() {

@@ -213,6 +213,7 @@
 - 组件：`ResizableImage.tsx`（NodeView）
 
 ### 链接
+- **裸文本不自动成链**（`Editor.tsx` 里 StarterKit `link: false`，改用独立 `Link.extend({addPasteRules: () => []}).configure({autolink: false})`）。**别再打开 autolink，也别指望换 linkify 引擎能修好**：linkifyjs 的邮箱 local part 向前贪吃到空白为止，中文标点/`|`/`/`/`-` 全算合法字符，`备注：a@b.com` 整条吞成 `mailto:备注：a@b.com`，`pw----user@b.com` 把前一字段吃进地址，URL 侧把中文句号吃进 href；`-` 在 local part 里本就合法，边界无解。且它落盘——序列化成 `[文本](mailto:…)` 写进 `notes.content`，随导出/同步/MCP 扩散。参照 VSCode `linkComputer.ts`：只认 `http/https/file` + `://`，无 email 分支，从不回头扫起点；其 Markdown 预览还额外 `linkify.set({fuzzyLink: false})`。autolink 只管打字路径，粘贴走 `addPasteRules`（无条件批量 linkify，不受 autolink/linkOnPaste 约束），两条都要堵；`linkOnPaste` 保留（需选区且剪贴板整体恰为一个链接，属手动动作）
 - 外部链接：`Ctrl/⌘+Click` 用系统浏览器打开（在 Editor 的 `click` 处理）；**悬停出操作卡**（`LinkPopover.tsx`：URL+打开/复制/编辑/取消链接，编辑态行内输入+无协议自动补 https://）
 - 插入/编辑链接统一走 LinkPopover（气泡菜单链接按钮也是它——window.prompt 在 WebView2 里不可用，别用）
 - 内部引用：单击直接跳转（在 Editor 的 `mousedown` 处理，抢在光标落入前跳，避免误触发编辑态/跳转落空），不出悬停卡
