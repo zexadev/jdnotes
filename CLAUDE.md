@@ -26,7 +26,7 @@
 
 ## 基建
 
-- **CI/CD**：已移除 GitHub Actions 自动构建，手动打包发布
+- **CI/CD**：GitHub Actions 构建发布（`.github/workflows/release.yml`，推 `v*` tag 触发，windows-latest）。Release body 从 `docs/src/content/changelog.mdx` 里手写的 `## vX.Y.Z` 小节抽取——**更新日志始终人写，不用 commit 自动生成**，抽不到直接让 workflow 失败。`latest.json` 由 tauri-action 生成上传，不再手工拼
 - **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
 - **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
@@ -129,32 +129,17 @@
    git push origin vx.y.z
    ```
 
-7. **本地打包（需签名）**
-   构建时必须设置签名密钥环境变量：
-   ```powershell
-   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content '.\~\.tauri\jdnotes.key' -Raw
-   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<密码>'
-   pnpm tauri build
-   ```
-   产物位于：
-   - `src-tauri/target/release/bundle/nsis/Lapis_x.y.z_x64-setup.exe` + `.sig`
-   - `src-tauri/target/release/bundle/msi/Lapis_x.y.z_x64_en-US.msi` + `.sig`
+7. **CI 自动打包发布**
+   推 tag 即触发 `.github/workflows/release.yml`，无需本地构建。它会：
+   - 用 `TAURI_SIGNING_PRIVATE_KEY` / `..._PASSWORD` 两个仓库 secret 签名
+   - 从 `docs/src/content/changelog.mdx` 抽 `## vx.y.z` 小节当 Release body（**抽不到直接失败**，不静默回退）
+   - 上传 exe/msi + 双 sig + `latest.json`（`updaterJsonPreferNsis: true`，更新通道走 setup.exe）
 
-8. **创建 GitHub Release 并上传全部资产**
-   ```bash
-   # 创建 Release
-   gh release create vx.y.z --title "vx.y.z" --notes "..."
-   # 上传全部文件（exe + sig + msi + sig + latest.json）
-   gh release upload vx.y.z \
-     ./src-tauri/target/release/bundle/nsis/Lapis_x.y.z_x64-setup.exe \
-     ./src-tauri/target/release/bundle/nsis/Lapis_x.y.z_x64-setup.exe.sig \
-     ./src-tauri/target/release/bundle/msi/Lapis_x.y.z_x64_en-US.msi \
-     ./src-tauri/target/release/bundle/msi/Lapis_x.y.z_x64_en-US.msi.sig \
-     ./latest.json
-   ```
-   其中 `latest.json` 需手动创建，格式参考之前版本，包含 version、notes、pub_date、platforms（signature + url）。
+   跟进：`gh run watch` 或 `gh run list --workflow=release.yml --limit 1`
 
-9. **等待文档站部署**
+   **签名密钥必须与线上 pubkey 同一把**（`src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey`）。换了 key 而不改 pubkey，所有老用户验签失败、更新全断——2026-03 就踩过：CI 上了一把新 key（`RWTV/ePB…`），随后撤 CI 并把 pubkey revert 回 `RWRH2d76…`。改 secret 前先比对 `~/.tauri/jdnotes.key.pub` 与配置里的 pubkey 是否相等。
+
+8. **等待文档站部署**
    文档站通过 Cloudflare Pages 自动部署。
 
 ---

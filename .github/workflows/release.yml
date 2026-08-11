@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Release body 取自手写的 changelog，不用 commit 自动生成——发布说明的措辞要和
+      # 文档站、应用内 ChangelogModal 三处一致。取不到就直接失败：静默回退成「发布 vX.Y.Z」
+      # 会让 Release 页和更新提示变成空壳，且失败发生在打包之后才发现，代价更大
+      - name: Extract changelog
+        shell: bash
+        run: |
+          # 按字段精确比对标题里的版本 token，不用正则匹配：版本号含点，正则下 . 会通配，
+          # 且前缀匹配会让 v2.2.1 命中排在更前面的 ## v2.2.10 那一节。
+          # 标题允许带后缀（如「## v2.0.0 — 多设备同步首发」），只比对 $2
+          BODY=$(awk -v ver="$GITHUB_REF_NAME" '
+            /^## / { if (found) exit; if ($2 == ver) found = 1; next }
+            found { print }
+          ' docs/src/content/changelog.mdx)
+          if [ -z "$(printf '%s' "$BODY" | tr -d '[:space:]')" ]; then
+            echo "::error::docs/src/content/changelog.mdx 里没有 '## ${GITHUB_REF_NAME}' 小节，或该节为空"
+            exit 1
+          fi
+          printf '%s\n' "$BODY" > release_notes.md
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseBody: ''
+          releaseDraft: false
+          prerelease: false
+          # 既有更新通道走 NSIS 的 setup.exe；默认值 false 会让 latest.json 改指 MSI，
+          # 等于把所有老用户的更新包类型换掉
+          updaterJsonPreferNsis: true
+
+      - name: Update release body
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: gh release edit "$TAG" --notes-file release_notes.md
