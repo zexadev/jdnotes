@@ -100,9 +100,10 @@
    git log --oneline -3
    ```
 
-2. **更新版本号**
-   - `src-tauri/tauri.conf.json` 中的 `version`
+2. **更新版本号**（三处，缺一处就会漂——`package.json` 曾漏改，一路停在 2.0.0 直到 2.2.0）
+   - `src-tauri/tauri.conf.json` 中的 `version`（构建实际读这份）
    - `src-tauri/Cargo.toml` 中的 `version`
+   - `package.json` 中的 `version`
    - patch 修复：x.y.z → x.y.(z+1)
    - 新功能：x.y.z → x.(y+1).0
 
