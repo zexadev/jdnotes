@@ -64,9 +64,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
           releaseBody: ''
-          # 首次用新签名密钥跑 CI，先出 draft：draft 不会被 releases/latest 选中，
-          # 验完 latest.json 的签名再手动转正式，避免把验不过签的包直接推上更新通道
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           # 既有更新通道走 NSIS 的 setup.exe；默认值 false 会让 latest.json 改指 MSI，
           # 等于把所有老用户的更新包类型换掉
