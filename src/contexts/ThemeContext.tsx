@@ -54,6 +54,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove('dark')
     }
+    // Android：状态栏/手势条区域是原生窗口背景，网页管不到；应用内深色是自己的开关（不一定跟系统），
+    // 所以把当前主题报给 MainActivity 挂的 JS 桥，让它同步涂底色和图标反色
+    window.LapisNative?.setDark(resolvedTheme === 'dark')
     requestAnimationFrame(() => {
       requestAnimationFrame(() => root.classList.remove('theme-switching'))
     })

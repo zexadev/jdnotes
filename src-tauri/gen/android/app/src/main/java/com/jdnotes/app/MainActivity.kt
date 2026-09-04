@@ -4,12 +4,17 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
+  // 页面报上来的主题（应用内深色是自己的开关，不一定跟系统）；未报之前按系统 uiMode
+  private var pageDark: Boolean? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -26,6 +31,21 @@ class MainActivity : TauriActivity() {
     applyTheme()
   }
 
+  // 给页面挂 window.LapisNative：ThemeContext 切主题时调 setDark，原生跟着涂状态栏底色
+  override fun onWebViewCreate(webView: WebView) {
+    webView.addJavascriptInterface(ThemeBridge(), "LapisNative")
+  }
+
+  inner class ThemeBridge {
+    @JavascriptInterface
+    fun setDark(dark: Boolean) {
+      runOnUiThread {
+        pageDark = dark
+        applyTheme()
+      }
+    }
+  }
+
   // manifest 的 configChanges 含 uiMode：切深浅色不重建 Activity，这里跟着刷
   override fun onConfigurationChanged(newConfig: Configuration) {
     super.onConfigurationChanged(newConfig)
@@ -35,7 +55,8 @@ class MainActivity : TauriActivity() {
   // padding 让出来的状态栏/手势条区域露的是窗口背景，涂成和页面同色（index.css 的 water-bg / dark-bg），
   // 状态栏图标按深浅色反色
   private fun applyTheme() {
-    val dark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val dark = pageDark ?: systemDark
     window.decorView.setBackgroundColor(Color.parseColor(if (dark) "#0B0D11" else "#F9FBFC"))
     val controller = WindowCompat.getInsetsController(window, window.decorView)
     controller.isAppearanceLightStatusBars = !dark
