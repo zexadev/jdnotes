@@ -2,6 +2,7 @@ import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Trash2, ImageOff } from 'lucide-react'
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
+import { isMobilePlatform } from '../../lib/platform'
 
 // 从图片 src 解析底层引用、附件 hash、尺寸：attachment://<hash>?w=<宽度>
 function parseImageSrc(src: unknown): { ref: string; hash: string | null; width: number | null } {
@@ -149,11 +150,17 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
     let cancelled = false
     const p = parseImageSrc(src)
     if (p.hash) {
-      invoke<string | null>('get_attachment_path', { hash: p.hash })
-        .then((path) => {
+      // 手机端不走 asset://（Android WebView 上有未修的 500，tauri#12364），让 Rust 读文件回 data URL
+      const resolve = isMobilePlatform
+        ? invoke<string | null>('read_attachment_data_url', { hash: p.hash })
+        : invoke<string | null>('get_attachment_path', { hash: p.hash }).then((path) =>
+            path ? convertFileSrc(path) : null,
+          )
+      resolve
+        .then((url) => {
           if (cancelled) return
-          if (path) {
-            setResolvedSrc(convertFileSrc(path))
+          if (url) {
+            setResolvedSrc(url)
             setLoadFailed(false)
           } else {
             setLoadFailed(true)

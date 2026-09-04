@@ -6,6 +6,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { check, Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
+import { isMobilePlatform } from '../lib/platform'
 
 export interface UpdateInfo {
   version: string
@@ -56,6 +57,8 @@ export function useUpdater(): UseUpdaterReturn {
 
   // 检查更新
   const checkForUpdates = useCallback(async () => {
+    // 手机端没有 updater 插件（侧载分发），直接跳过，否则 check() 抛 "updater.check not allowed"
+    if (isMobilePlatform) return
     try {
       setStatus('checking')
       setError(null)
