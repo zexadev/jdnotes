@@ -571,11 +571,13 @@ pub fn set_device_mine(app: &tauri::AppHandle, fingerprint: &str, mine: bool) ->
 
 // ============= 旧版本数据迁移 =============
 
-/// 旧版本的 identifier 列表（用于数据迁移）
+/// 旧版本的 identifier 列表（用于数据迁移）；手机从没装过旧 identifier，整段只在桌面编译
+#[cfg(desktop)]
 const OLD_IDENTIFIERS: &[&str] = &["com.jdnotes.dev"];
 
 /// 从旧 identifier 目录迁移数据到当前目录
 /// 应在应用启动时、数据库初始化之前调用
+#[cfg(desktop)]
 pub fn migrate_from_old_identifier(app: &tauri::AppHandle) -> Result<(), String> {
     let current_dir = app
         .path()

@@ -1388,6 +1388,8 @@ pub async fn mdns_reregister_device_name(app: &AppHandle) -> Result<(), String> 
 }
 
 /// 应用启动入口：拉起 TCP 监听 + mDNS 注册（让用户即使没打开同步页也能被对方发现）
+/// 手机是间歇在线的发起端，不常驻监听，只在桌面编译
+#[cfg(desktop)]
 pub async fn init_lan_sync(app: AppHandle, db_path: String) {
     start_listener(app.clone(), db_path);
     if let Err(e) = ensure_mdns_started(&app).await {
@@ -1397,6 +1399,7 @@ pub async fn init_lan_sync(app: AppHandle, db_path: String) {
 
 /// 应用退出前调用：发送 mDNS goodbye 包，对端列表立即清除本机
 /// 不调的话对方要等几分钟 TTL 才看到我们离线，体验略差
+#[cfg(desktop)]
 pub fn shutdown_mdns() {
     if let Some(daemon) = MDNS_DAEMON.get() {
         // shutdown 非阻塞，返回的 Receiver 我们不等——goodbye 包发出即可
