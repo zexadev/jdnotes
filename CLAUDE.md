@@ -27,7 +27,7 @@
 ## 基建
 
 - **CI/CD**：GitHub Actions 构建发布（`.github/workflows/release.yml`，推 `v*` tag 触发，windows-latest）。Release body 从 `docs/src/content/changelog.mdx` 里手写的 `## vX.Y.Z` 小节抽取——**更新日志始终人写，不用 commit 自动生成**，抽不到直接让 workflow 失败。`latest.json` 由 tauri-action 生成上传，不再手工拼
-- **Android 构建**（手机端在做，单仓库同一 `src-tauri` 加 target）：`CI=true pnpm tauri android build --debug --apk --target aarch64` → `src-tauri/gen/android/app/build/outputs/apk/universal/debug/`。本机 NDK 27 + JDK 21，Windows 主机交叉编译+链接已跑通，小米 14T Pro / Android 16 真机启动通过（2026-09-04）。Android 上 `app_data_dir()` = `/data/user/0/com.jdnotes.app`，DB 默认 WAL；Rust 日志看 logcat tag `app_lib`。小米 `adb install` 被 USER_RESTRICTED 拒 = 开发者选项「USB 安装」没开；Git Bash 下 adb 路径前要 `MSYS_NO_PATHCONV=1`。桌面专属依赖在 Cargo.toml 走 `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`（cargo 的 target 表不认 tauri-build 注入的 `cfg(desktop)`，源码里才用 `#[cfg(desktop)]`）；reqwest 必须关默认 feature（native-tls 在 Android 要 openssl-sys）。方案与实测细节见 docs/local/mobile-app.md
+- **Android 构建**（手机端在做，单仓库同一 `src-tauri` 加 target，前端就是桌面 `dist` 同一份、靠窄屏自适应）：`CI=true pnpm tauri android build --debug --apk --target aarch64` → `src-tauri/gen/android/app/build/outputs/apk/universal/debug/`。本机 NDK 27 + JDK 21，Windows 主机交叉编译+链接已跑通，小米 14T Pro / Android 16 真机启动通过（2026-09-04）。Android 上 `app_data_dir()` = `/data/user/0/com.jdnotes.app`，DB 默认 WAL；Rust 日志看 logcat tag `app_lib`。小米 `adb install` 被 USER_RESTRICTED 拒 = 开发者选项「USB 安装」没开；Git Bash 下 adb 路径前要 `MSYS_NO_PATHCONV=1`。桌面专属依赖在 Cargo.toml 走 `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`（cargo 的 target 表不认 tauri-build 注入的 `cfg(desktop)`，源码里才用 `#[cfg(desktop)]`）；reqwest 必须关默认 feature（native-tls 在 Android 要 openssl-sys）。方案与实测细节见 docs/local/mobile-app.md
 - **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
 - **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
@@ -43,7 +43,8 @@
 | `src-tauri/tauri.conf.json` | Tauri 配置、版本号 |
 | `src-tauri/Cargo.toml` | Rust 依赖、版本号；桌面专属依赖（托盘 feature/单实例/updater/process/MCP/dirs）在末尾 target 表 |
 | `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI；`MainActivity.kt` 把系统栏/键盘 inset 转成内容区 padding（WebView 拿不到 env(safe-area-inset)） |
-| `src/mobile/` | 手机端独立前端入口（列表 → react-markdown 阅读 → textarea 源码编辑 / 速记；history.pushState 屏幕栈接 Android 返回手势；不种 welcome 笔记）。`vite.mobile.config.ts` 以它为 root 出 `dist-mobile`，`src-tauri/tauri.android.conf.json` 覆盖 frontendDist/beforeBuildCommand，桌面包不动。**新加平台配置文件后要 `touch tauri.conf.json` 强制 app crate 重编一次**，否则 APK 嵌的还是旧 dist |
+| `src/lib/platform.ts` | `isMobilePlatform`（UA）+ `useIsNarrow()`（<768px，与 Tailwind md 同线）。**手机端用桌面同一套页面窄屏自适应，不另写入口（用户拍板「要桌面全部功能」，独立 src/mobile 已 revert）**：侧栏→抽屉、列表与编辑器堆叠、AI 侧栏→全屏层、设置导航→横向 tab、日历日面板下沉；updater/窗口 API/沉浸模式在手机跳过，图片走 read_attachment_data_url 不走 asset:// |
+| `src/lib/backStack.ts` | 窄屏返回栈：打开笔记/抽屉/AI 层各 pushState 一层，Android 返回手势→wry goBack→popstate 逐层退；界面关闭按钮也必须走 closeLayer()（history.back）保证层数一致。新增/删除 `tauri.<platform>.conf.json` 后要 `touch tauri.conf.json` 强制 app crate 重编，否则 APK 嵌旧 dist |
 | `src-tauri/capabilities/desktop.json` | updater/process 权限，`platforms` 限定桌面——这两个插件 Android 不编译，放 default.json 会 permission not found |
 | `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
 | `src-tauri/src/commands.rs` | Tauri 后端命令 |
