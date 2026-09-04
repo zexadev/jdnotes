@@ -478,6 +478,19 @@ pub async fn local_fingerprint(app: &AppHandle, db_path: &str) -> Result<String,
     Ok(ep.id().to_string().chars().take(16).collect())
 }
 
+/// 发起方解析对端回包。对端未把本机列入配对白名单时按协议回纯文本 PAIRING_REQUIRED 后关连接
+/// （局域网路径在握手阶段就拦下了，iroh 路径此前没拦，纯文本直接进 serde_json，
+/// 用户看到的是「expected value at line 1 column 1」这种没法行动的报错）；空回包多半是对端中途断开
+fn parse_remote_package(resp: &[u8]) -> Result<SyncPackage, String> {
+    if resp == b"PAIRING_REQUIRED" {
+        return Err("对方尚未确认配对：请在对方设备上接受配对请求后重试".to_string());
+    }
+    if resp.is_empty() {
+        return Err("对方未返回数据（连接可能中途断开），请重试".to_string());
+    }
+    serde_json::from_slice(resp).map_err(|e| format!("解析对端数据失败: {}", e))
+}
+
 /// 接收端握手：发 challenge → 收发起方签名 → 验签。
 /// 成功返回 (发起方完整公钥串, fingerprint, 发起方对本机下的 challenge)。
 /// 最后一项供本机签名回证身份给发起方（双向认证）。
@@ -555,8 +568,7 @@ pub async fn sync_connect(app: AppHandle, db_path: &str, addr: &str) -> Result<S
     let mut stream = lan_connect_authed(&app, addr, None).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
-    let remote: SyncPackage =
-        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    let remote = parse_remote_package(&resp)?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
@@ -1028,8 +1040,7 @@ pub async fn iroh_push_note(
         .read_to_end(MAX_MSG as usize)
         .await
         .map_err(|e| e.to_string())?;
-    let remote: SyncPackage =
-        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    let remote = parse_remote_package(&resp)?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) =
@@ -1116,8 +1127,7 @@ pub async fn iroh_push_notes(
         .read_to_end(MAX_MSG as usize)
         .await
         .map_err(|e| e.to_string())?;
-    let remote: SyncPackage =
-        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    let remote = parse_remote_package(&resp)?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) =
@@ -1191,8 +1201,7 @@ pub async fn lan_push_notes(
     let mut stream = lan_connect_authed(&app, addr, expected_fp).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
-    let remote: SyncPackage =
-        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    let remote = parse_remote_package(&resp)?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) =
@@ -1448,8 +1457,7 @@ pub async fn lan_push_note(
     let mut stream = lan_connect_authed(&app, addr, expected_fp).await?;
     write_msg(&mut stream, &bytes).await?;
     let resp = read_msg(&mut stream).await?;
-    let remote: SyncPackage =
-        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    let remote = parse_remote_package(&resp)?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) =
@@ -1505,8 +1513,7 @@ pub async fn iroh_sync_connect(
         .read_to_end(MAX_MSG as usize)
         .await
         .map_err(|e| e.to_string())?;
-    let remote: SyncPackage =
-        serde_json::from_slice(&resp).map_err(|e| format!("解析对端数据失败: {}", e))?;
+    let remote = parse_remote_package(&resp)?;
     save_attachments(&app, &remote.attachments);
     let received = remote.notes.len();
     let (inserted, updated, conflicts) = merge_notes(&pool, &remote.notes, &remote.device_name).await?;
