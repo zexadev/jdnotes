@@ -1,10 +1,12 @@
 mod attachments;
 mod commands;
 mod db;
+#[cfg(desktop)]
 mod mcp_server;
 mod models;
 mod sync;
 
+#[cfg(desktop)]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -24,61 +26,68 @@ pub fn run() {
         std::env::remove_var("WEBVIEW2_USER_DATA_FOLDER");
     }
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // 已有实例运行时，显示并聚焦窗口
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-        }))
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        // 已有实例运行时，显示并聚焦窗口
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }));
+    let builder = builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+    #[cfg(desktop)]
+    let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_process::init());
+    builder
         .setup(|app| {
-            // 创建系统托盘菜单
-            let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            // 创建系统托盘菜单 + 托盘图标（手机没有托盘）
+            #[cfg(desktop)]
+            {
+                let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
-            // 创建系统托盘图标
-            let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .tooltip("Lapis")
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                let _tray = TrayIconBuilder::new()
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .tooltip("Lapis")
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                         }
-                    }
-                    "quit" => {
-                        // 发 mDNS goodbye 让对方立即从设备列表清除本机
-                        sync::shutdown_mdns();
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                        "quit" => {
+                            // 发 mDNS goodbye 让对方立即从设备列表清除本机
+                            sync::shutdown_mdns();
+                            app.exit(0);
                         }
-                    }
-                })
-                .build(app)?;
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            let app = tray.app_handle();
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    })
+                    .build(app)?;
+            }
 
             // 设置日志插件（仅在开发模式）
             if cfg!(debug_assertions) {
@@ -89,7 +98,8 @@ pub fn run() {
                 )?;
             }
 
-            // 从旧版本 identifier (com.jdnotes.dev) 迁移数据
+            // 从旧版本 identifier (com.jdnotes.dev) 迁移数据；手机从没装过旧 identifier，无可迁移
+            #[cfg(desktop)]
             if let Err(e) = db::migrate_from_old_identifier(app.handle()) {
                 log::error!("旧版本数据迁移失败: {}", e);
                 // 迁移失败不阻止启动，继续使用新目录
@@ -155,25 +165,32 @@ pub fn run() {
                     .build(),
             )?;
 
-            // 启动 MCP Server
-            mcp_server::register_in_ai_tools();
-            let db_path_for_mcp = db_path.clone();
-            let app_handle_for_mcp = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                mcp_server::start_mcp_server(db_path_for_mcp, app_handle_for_mcp).await;
-            });
+            // 启动 MCP Server（手机上没有 AI 工具宿主可接）
+            #[cfg(desktop)]
+            {
+                mcp_server::register_in_ai_tools();
+                let db_path_for_mcp = db_path.clone();
+                let app_handle_for_mcp = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    mcp_server::start_mcp_server(db_path_for_mcp, app_handle_for_mcp).await;
+                });
+            }
 
             // 启动局域网同步基础设施（TCP 监听 + mDNS 服务注册）
-            // 提前到 setup，让用户即使没打开「设备同步」页也能被对端发现
-            let db_path_for_lan = db_path.clone();
-            let app_handle_for_lan = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                sync::init_lan_sync(
-                    app_handle_for_lan,
-                    db_path_for_lan.to_string_lossy().to_string(),
-                )
-                .await;
-            });
+            // 提前到 setup，让用户即使没打开「设备同步」页也能被对端发现。
+            // 手机是间歇在线的发起端，不常驻监听、不在启动时注册 mDNS（Android 组播要 MulticastLock，按需再起）
+            #[cfg(desktop)]
+            {
+                let db_path_for_lan = db_path.clone();
+                let app_handle_for_lan = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    sync::init_lan_sync(
+                        app_handle_for_lan,
+                        db_path_for_lan.to_string_lossy().to_string(),
+                    )
+                    .await;
+                });
+            }
 
             Ok(())
         })
