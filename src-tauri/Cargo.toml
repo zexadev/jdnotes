@@ -21,25 +21,17 @@ tauri-build = { version = "2.5.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.9.5", features = ["tray-icon", "protocol-asset"] }
+tauri = { version = "2.9.5", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-updater = "2"
-tauri-plugin-process = "2"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
-dirs = "6"
-# MCP Server
-rmcp = { version = "1", features = ["server", "macros", "transport-streamable-http-server"] }
-axum = "0.8"
 tokio = { version = "1", features = ["net", "io-util", "sync"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
-schemars = "1.0"
-tauri-plugin-single-instance = "2.4.0"
 urlencoding = "2.1.3"
 reqwest = { version = "0.12", features = ["rustls-tls"] }
 scraper = "0.26.0"
@@ -55,3 +47,17 @@ base64 = "0.22"
 netdev = "0.44"
 # 局域网设备自动发现：mDNS / DNS-SD 广播 + 浏览
 mdns-sd = "0.13"
+
+# 桌面专属：托盘、单实例、自更新、进程控制、MCP HTTP server（rmcp/axum/schemars）、
+# 往桌面 AI 工具配置文件里登记（dirs）。手机没有托盘/自更新（侧载）/MCP 宿主。
+# cargo 的 target 表只认 rustc 内建 cfg，tauri-build 注入的 cfg(desktop) 在这里不生效，
+# 所以这里必须写 target_os；源码里照用 #[cfg(desktop)]。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2.9.5", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2.4.0"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+rmcp = { version = "1", features = ["server", "macros", "transport-streamable-http-server"] }
+axum = "0.8"
+schemars = "1.0"
+dirs = "6"
