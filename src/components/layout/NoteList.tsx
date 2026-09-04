@@ -134,7 +134,7 @@ export function NoteList({
               {!isTrash && (
                 <button
                   onClick={onCreateNote}
-                  className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/[0.03] transition-colors duration-200 btn-press"
+                  className="hidden md:inline-flex p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/[0.03] transition-colors duration-200 btn-press"
                   title="新建笔记"
                 >
                   <Plus className="h-4 w-4 text-slate-600 dark:text-slate-400" strokeWidth={1.5} />
@@ -179,7 +179,7 @@ export function NoteList({
 
       {/* 笔记列表。overflow-x-hidden：卡片 hover 放大(scale 1.01)的 transform 包围盒会超出容器宽度，
           不裁掉会在列表底部挤出横向滚动条 */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-0">
         {isLoading ? (
           <>
             <NoteCardSkeleton />
@@ -212,6 +212,17 @@ export function NoteList({
           </AnimatePresence>
         )}
       </div>
+
+      {/* 窄屏：新建改为右下角悬浮按钮（列表头部的 + 太小且离拇指远）；废纸篓视图不新建 */}
+      {!isTrash && (
+        <button
+          onClick={onCreateNote}
+          className="md:hidden fixed bottom-6 right-5 z-30 h-12 flex items-center gap-1.5 pl-4 pr-5 rounded-full bg-[#5E6AD2] text-white text-[15px] font-medium shadow-lg shadow-[#5E6AD2]/30 btn-press"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2} />
+          新建笔记
+        </button>
+      )}
 
       {/* 批量彻底删除确认弹窗（不可逆，必须确认） */}
       {showPermDeleteConfirm && (
