@@ -96,7 +96,7 @@ export function NoteCard({
 
       {/* 操作按钮（多选模式下隐藏） */}
       {!selectionMode && (
-      <div className="absolute top-3 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+      <div className="absolute top-2 right-1 md:top-3 md:right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200">
         {isTrashView ? (
           <>
             {/* 恢复按钮 */}
@@ -105,7 +105,7 @@ export function NoteCard({
                 e.stopPropagation()
                 onRestore?.()
               }}
-              className="p-1 rounded hover:bg-black/[0.03] dark:hover:bg-white/[0.06] btn-press"
+              className="p-2 md:p-1 rounded hover:bg-black/[0.03] dark:hover:bg-white/[0.06] btn-press"
               title="恢复笔记"
             >
               <RotateCcw className="h-3.5 w-3.5 text-slate-400 hover:text-green-500" strokeWidth={1.5} />
@@ -116,7 +116,7 @@ export function NoteCard({
                 e.stopPropagation()
                 onPermanentDelete?.()
               }}
-              className="p-1 rounded hover:bg-black/[0.03] dark:hover:bg-white/[0.06] btn-press"
+              className="p-2 md:p-1 rounded hover:bg-black/[0.03] dark:hover:bg-white/[0.06] btn-press"
               title="彻底删除"
             >
               <Trash2 className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" strokeWidth={1.5} />
@@ -129,7 +129,7 @@ export function NoteCard({
               e.stopPropagation()
               onDelete()
             }}
-            className="p-1 rounded hover:bg-black/[0.03] dark:hover:bg-white/[0.06] btn-press"
+            className="p-2 md:p-1 rounded hover:bg-black/[0.03] dark:hover:bg-white/[0.06] btn-press"
             title="删除笔记"
           >
             <X className="h-3.5 w-3.5 text-slate-400 hover:text-red-500" strokeWidth={1.5} />

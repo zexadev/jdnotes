@@ -890,6 +890,7 @@ function App() {
                 <div className="flex-1 flex h-full overflow-hidden min-w-0">
                   <MainContent
                     onBack={isNarrow ? closeLayer : undefined}
+                    onDeleteNote={isNarrow ? handleDeleteNote : undefined}
                     activeNoteId={activeNoteId}
                     activeNote={activeNote}
                     localTitle={localTitle}

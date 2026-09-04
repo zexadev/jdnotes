@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2, Lock, Wifi } from 'lucide-react'
+import { Star, Sparkles, Bell, X, Send, MonitorSmartphone, Loader2, Lock, Wifi, Trash2 } from 'lucide-react'
 import { Editor } from '../editor'
 import { TagsInput, EmptyState } from '../common'
 import { EditorToolbar } from '../editor/EditorToolbar'
@@ -37,6 +37,7 @@ interface MainContentProps {
   onOpenNoteByTitle?: (title: string) => void // 点击字面 [[标题]] 引用跳转
   onOpenNote?: (id: number) => void // 反向链接面板点击跳转（按 id）
   onBack?: () => void // 窄屏堆叠布局：编辑器全屏时头部出「返回」回列表
+  onDeleteNote?: (id: number) => void // 窄屏头部的删除（移到废纸篓）
 }
 
 export function MainContent({
@@ -61,6 +62,7 @@ export function MainContent({
   onOpenNoteByTitle,
   onOpenNote,
   onBack,
+  onDeleteNote,
 }: MainContentProps) {
   const [showReminderPicker, setShowReminderPicker] = useState(false)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
@@ -297,6 +299,17 @@ export function MainContent({
                     strokeWidth={1.5}
                   />
                 </motion.button>
+                {/* 删除（移到废纸篓）：桌面靠列表卡片 hover 出的 ×，窄屏编辑器全屏时列表不可见，头部补一个 */}
+                {onDeleteNote && (
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => activeNoteId && onDeleteNote(activeNoteId)}
+                    className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors duration-200"
+                    title="删除笔记"
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                  </motion.button>
+                )}
                 {/* 私有按钮（开启后此笔记不参与同步） */}
                 {onTogglePrivate && (
                   <motion.button
