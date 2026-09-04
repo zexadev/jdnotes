@@ -42,7 +42,8 @@
 |------|------|
 | `src-tauri/tauri.conf.json` | Tauri 配置、版本号 |
 | `src-tauri/Cargo.toml` | Rust 依赖、版本号；桌面专属依赖（托盘 feature/单实例/updater/process/MCP/dirs）在末尾 target 表 |
-| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI |
+| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI；`MainActivity.kt` 把系统栏/键盘 inset 转成内容区 padding（WebView 拿不到 env(safe-area-inset)） |
+| `src/mobile/` | 手机端独立前端入口（列表 → react-markdown 阅读 → textarea 源码编辑 / 速记；history.pushState 屏幕栈接 Android 返回手势；不种 welcome 笔记）。`vite.mobile.config.ts` 以它为 root 出 `dist-mobile`，`src-tauri/tauri.android.conf.json` 覆盖 frontendDist/beforeBuildCommand，桌面包不动。**新加平台配置文件后要 `touch tauri.conf.json` 强制 app crate 重编一次**，否则 APK 嵌的还是旧 dist |
 | `src-tauri/capabilities/desktop.json` | updater/process 权限，`platforms` 限定桌面——这两个插件 Android 不编译，放 default.json 会 permission not found |
 | `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
 | `src-tauri/src/commands.rs` | Tauri 后端命令 |
