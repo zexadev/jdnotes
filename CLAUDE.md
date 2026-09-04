@@ -42,7 +42,7 @@
 |------|------|
 | `src-tauri/tauri.conf.json` | Tauri 配置、版本号 |
 | `src-tauri/Cargo.toml` | Rust 依赖、版本号；桌面专属依赖（托盘 feature/单实例/updater/process/MCP/dirs）在末尾 target 表 |
-| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI；`MainActivity.kt` 把系统栏/键盘 inset 转成内容区 padding（WebView 拿不到 env(safe-area-inset)） |
+| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI；`MainActivity.kt`：左右刘海与键盘做原生 padding，状态栏/手势条高度经 `window.LapisNative`（`getInsets` + inset 变化时写 CSS 变量 `--safe-area-top/bottom`）交给页面自己留白自己画背景（WebView 拿不到 env(safe-area-inset)；原生涂色会和页面切主题不同步）；`setDark` 桥只管状态栏图标反色。脱离文档流的层（抽屉/AI 层/悬浮按钮/Toast/提醒卡）要按这两个变量补偏移 |
 | `src/lib/platform.ts` | `isMobilePlatform`（UA）+ `useIsNarrow()`（<768px，与 Tailwind md 同线）。**手机端用桌面同一套页面窄屏自适应，不另写入口（用户拍板「要桌面全部功能」，独立 src/mobile 已 revert）**：侧栏→抽屉、列表与编辑器堆叠、AI 侧栏→全屏层、设置导航→横向 tab、日历日面板下沉；updater/窗口 API/沉浸模式在手机跳过，图片走 read_attachment_data_url 不走 asset:// |
 | `src/lib/backStack.ts` | 窄屏返回栈：打开笔记/抽屉/AI 层各 pushState 一层，Android 返回手势→wry goBack→popstate 逐层退；界面关闭按钮也必须走 closeLayer()（history.back）保证层数一致。新增/删除 `tauri.<platform>.conf.json` 后要 `touch tauri.conf.json` 强制 app crate 重编，否则 APK 嵌旧 dist |
 | `src-tauri/capabilities/desktop.json` | updater/process 权限，`platforms` 限定桌面——这两个插件 Android 不编译，放 default.json 会 permission not found |
