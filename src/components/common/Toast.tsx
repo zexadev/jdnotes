@@ -38,7 +38,7 @@ export function Toast({ message, type, onClose }: ToastProps) {
 
 export function ToastContainer({ toasts, removeToast }: { toasts: Omit<ToastProps, 'onClose'>[], removeToast: (id: number) => void }) {
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="fixed right-4 z-50 flex flex-col gap-2 pointer-events-none" style={{ top: 'calc(1rem + var(--safe-area-top, 0px))' }}>
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />

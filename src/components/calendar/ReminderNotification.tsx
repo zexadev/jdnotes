@@ -134,7 +134,7 @@ export function ReminderNotification({
   if (visibleReminders.length === 0) return null
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm pointer-events-none">
+    <div className="fixed right-4 z-50 space-y-2 max-w-sm pointer-events-none" style={{ top: 'calc(1rem + var(--safe-area-top, 0px))' }}>
       <div className="pointer-events-auto">
         {/* 批量关闭按钮 */}
         {visibleReminders.length > 1 && (

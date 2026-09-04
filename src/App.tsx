@@ -40,6 +40,13 @@ const VIEW_MOTION = {
 // 跳过版本的 localStorage key
 const SKIPPED_VERSION_KEY = 'jdnotes-skipped-version'
 
+// Android 状态栏/手势条由页面自己留白（变量由 MainActivity 写入，桌面为 0）：
+// 留白区画的是页面自己的背景，切主题时才能和内容同一帧变色
+const SAFE_AREA_PADDING = {
+  paddingTop: 'var(--safe-area-top, 0px)',
+  paddingBottom: 'var(--safe-area-bottom, 0px)',
+} as const
+
 function App() {
   const [isReady, setIsReady] = useState(false)
   const [activeNoteId, setActiveNoteId] = useState<number | null>(null)
@@ -670,7 +677,7 @@ function App() {
   // 启动加载状态
   if (!isReady) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
+      <div className="h-screen w-screen flex items-center justify-center bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300" style={SAFE_AREA_PADDING}>
         <div className="book-loader">
           <div>
             <ul>
@@ -713,7 +720,7 @@ function App() {
         onSkip={handleSkipUpdate}
       />
 
-      <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
+      <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300" style={SAFE_AREA_PADDING}>
         {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区；沉浸模式整列收拢 */}
         <AnimatePresence initial={false}>
           {!isImmersive && !isNarrow && (
@@ -753,6 +760,7 @@ function App() {
               <motion.div
                 // sidebar-gradient 是半透明渐变（设计上垫在 app 底色上），抽屉浮在内容之上必须自带不透明底
                 className="relative h-full flex shadow-2xl bg-[#F9FBFC] dark:bg-[#0B0D11]"
+                style={SAFE_AREA_PADDING}
                 initial={{ x: -260 }}
                 animate={{ x: 0 }}
                 exit={{ x: -260 }}

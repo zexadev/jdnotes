@@ -114,6 +114,8 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
       exit={fullScreen ? { x: '100%' } : { width: 0, opacity: 0 }}
       transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
       className={fullScreen ? 'fixed inset-0 z-40 bg-[#F9FBFC] dark:bg-[#0B0D11]' : 'h-full flex-shrink-0 overflow-hidden'}
+      // 全屏层盖住 App 根容器的安全区留白，自己再留一遍
+      style={fullScreen ? { paddingTop: 'var(--safe-area-top, 0px)', paddingBottom: 'var(--safe-area-bottom, 0px)' } : undefined}
     >
     <div
       className={`${fullScreen ? 'w-full' : 'w-[350px] border-l'} ai-sidebar-glass border-black/[0.03] dark:border-white/[0.06] flex flex-col h-full ai-chat-sidebar`}

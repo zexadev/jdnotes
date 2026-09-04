@@ -874,8 +874,8 @@ export function Editor({
           {/* AI 审查条：浮动在生成内容旁（拿不到锚点时兜底居中固定） */}
           {diffState.isActive && (
             <div
-              className={reviewAnchor ? 'absolute z-40' : 'fixed bottom-6 left-1/2 -translate-x-1/2 z-50'}
-              style={reviewAnchor ?? undefined}
+              className={reviewAnchor ? 'absolute z-40' : 'fixed left-1/2 -translate-x-1/2 z-50'}
+              style={reviewAnchor ?? { bottom: 'calc(1.5rem + var(--safe-area-bottom, 0px))' }}
             >
               <AIReviewToolbar
                 isStreaming={diffState.isStreaming}
@@ -890,7 +890,7 @@ export function Editor({
 
         {/* 错误提示 */}
         {showError && (
-          <div className="fixed bottom-4 right-4 px-4 py-2 bg-red-50/90 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-xl shadow-lg border border-red-200/50 dark:border-red-800/50 backdrop-blur-sm">
+          <div style={{ bottom: 'calc(1rem + var(--safe-area-bottom, 0px))' }} className="fixed right-4 px-4 py-2 bg-red-50/90 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-xl shadow-lg border border-red-200/50 dark:border-red-800/50 backdrop-blur-sm">
             {showError}
           </div>
         )}

@@ -217,7 +217,8 @@ export function NoteList({
       {!isTrash && (
         <button
           onClick={onCreateNote}
-          className="md:hidden fixed bottom-6 right-5 z-30 h-12 flex items-center gap-1.5 pl-4 pr-5 rounded-full bg-[#5E6AD2] text-white text-[15px] font-medium shadow-lg shadow-[#5E6AD2]/30 btn-press"
+          className="md:hidden fixed right-5 z-30 h-12 flex items-center gap-1.5 pl-4 pr-5 rounded-full bg-[#5E6AD2] text-white text-[15px] font-medium shadow-lg shadow-[#5E6AD2]/30 btn-press"
+          style={{ bottom: 'calc(1.5rem + var(--safe-area-bottom, 0px))' }}
         >
           <Plus className="h-4 w-4" strokeWidth={2} />
           新建笔记

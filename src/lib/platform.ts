@@ -18,3 +18,18 @@ export function useIsNarrow(): boolean {
   }, [])
   return narrow
 }
+
+// Android 上状态栏/手势条区域由页面自己留白、自己画背景（切主题时才能和页面同帧变色），
+// 高度由 MainActivity 经 window.LapisNative 给出；启动时读一次，之后原生在 inset 变化时直接写 CSS 变量
+export function initNativeInsets() {
+  const raw = window.LapisNative?.getInsets?.()
+  if (!raw) return
+  try {
+    const { top, bottom } = JSON.parse(raw) as { top: number; bottom: number }
+    const style = document.documentElement.style
+    style.setProperty('--safe-area-top', `${top}px`)
+    style.setProperty('--safe-area-bottom', `${bottom}px`)
+  } catch {
+    // 桥返回了非 JSON：当没有留白处理
+  }
+}
