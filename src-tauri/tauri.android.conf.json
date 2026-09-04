@@ -1,0 +1,8 @@
+{
+  "build": {
+    "frontendDist": "../dist-mobile",
+    "devUrl": "http://localhost:5174",
+    "beforeDevCommand": "pnpm dev:mobile",
+    "beforeBuildCommand": "pnpm build:mobile"
+  }
+}

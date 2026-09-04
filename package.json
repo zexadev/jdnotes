@@ -9,6 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "dev:mobile": "vite --config vite.mobile.config.ts",
+    "build:mobile": "tsc -b && vite build --config vite.mobile.config.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
