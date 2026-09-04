@@ -58,10 +58,10 @@ export function AISettings() {
       </div>
 
       {/* 双列：左 sources / 右 details */}
-      <div className="grid grid-cols-[220px_1fr] gap-5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-start">
 
         {/* 左列：来源列表 */}
-        <div className="space-y-2 sticky top-0">
+        <div className="space-y-2 md:sticky md:top-0">
           {config.sources.map((source) => {
             const isActive = source.id === config.activeSourceId
             const isSelected = source.id === (selectedId ?? config.activeSourceId)
@@ -108,7 +108,7 @@ export function AISettings() {
                       if (selectedId === source.id) setSelectedId(null)
                       removeSource(source.id)
                     }}
-                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                     title="删除来源"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -303,7 +303,7 @@ export function AISettings() {
             </div>
           ) : (
             <div className="text-center py-12 text-sm text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-              从左侧选择一个来源开始配置
+              选择一个来源开始配置
             </div>
           )}
         </div>
