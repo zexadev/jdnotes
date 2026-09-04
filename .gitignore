@@ -43,5 +43,3 @@ branding/
 .agents/
 skills-lock.json
 .claude/skills/ss-*
-# 手机端前端产物（vite.mobile.config.ts 输出，tauri.android.conf.json 的 frontendDist）
-dist-mobile
