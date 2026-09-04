@@ -27,6 +27,7 @@
 ## 基建
 
 - **CI/CD**：GitHub Actions 构建发布（`.github/workflows/release.yml`，推 `v*` tag 触发，windows-latest）。Release body 从 `docs/src/content/changelog.mdx` 里手写的 `## vX.Y.Z` 小节抽取——**更新日志始终人写，不用 commit 自动生成**，抽不到直接让 workflow 失败。`latest.json` 由 tauri-action 生成上传，不再手工拼
+- **Android 构建**（手机端在做，单仓库同一 `src-tauri` 加 target）：`CI=true pnpm tauri android build --debug --apk --target aarch64` → `src-tauri/gen/android/app/build/outputs/apk/universal/debug/`。本机 NDK 27 + JDK 21，Windows 主机交叉编译+链接已跑通；真机验收待做。桌面专属依赖在 Cargo.toml 走 `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`（cargo 的 target 表不认 tauri-build 注入的 `cfg(desktop)`，源码里才用 `#[cfg(desktop)]`）；reqwest 必须关默认 feature（native-tls 在 Android 要 openssl-sys）。方案与实测细节见 docs/local/mobile-app.md
 - **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
 - **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
@@ -40,10 +41,12 @@
 | 文件 | 说明 |
 |------|------|
 | `src-tauri/tauri.conf.json` | Tauri 配置、版本号 |
-| `src-tauri/Cargo.toml` | Rust 依赖、版本号 |
+| `src-tauri/Cargo.toml` | Rust 依赖、版本号；桌面专属依赖（托盘 feature/单实例/updater/process/MCP/dirs）在末尾 target 表 |
+| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI |
+| `src-tauri/capabilities/desktop.json` | updater/process 权限，`platforms` 限定桌面——这两个插件 Android 不编译，放 default.json 会 permission not found |
 | `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
 | `src-tauri/src/commands.rs` | Tauri 后端命令 |
-| `src-tauri/src/lib.rs` | 插件注册、命令注册；发布版禁 WebView2 CDP 注入（防君子）：run() 开头 remove_var 清 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 等三个变量——Playwright 靠它塞 --remote-debugging-port 开调试端口接管页面，创建 webview 前清掉即失效；仅 release，debug 保留供本机 CDP 测试。（不做注册表扫描/进程巡检那套军备竞赛，防不了同权限攻击者，数据真正保护靠 DB 落盘加密[roadmap]） |
+| `src-tauri/src/lib.rs` | 插件注册、命令注册；托盘/单实例/updater/process/MCP/旧 identifier 迁移/启动时 LAN 监听全部 `#[cfg(desktop)]`（手机是间歇在线发起端，不常驻监听）；发布版禁 WebView2 CDP 注入（防君子）：run() 开头 remove_var 清 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 等三个变量——Playwright 靠它塞 --remote-debugging-port 开调试端口接管页面，创建 webview 前清掉即失效；仅 release，debug 保留供本机 CDP 测试。（不做注册表扫描/进程巡检那套军备竞赛，防不了同权限攻击者，数据真正保护靠 DB 落盘加密[roadmap]） |
 | `src-tauri/src/sync.rs` | 多设备同步内核（局域网 TCP + iroh 跨网 + 同步包文件、三路合并、设备 ID 持久化、probe、mDNS 自动发现、持久 fingerprint） |
 | `src-tauri/src/attachments.rs` | 图片附件内容寻址存储（sha256） |
 | `src-tauri/migrations/004_sync.sql`·`005_sync_merge.sql`·`006_private.sql` | 同步 uuid + 三路合并基准/冲突标记 + 私有笔记标记 |
