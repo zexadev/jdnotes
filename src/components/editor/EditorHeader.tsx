@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
@@ -24,13 +24,27 @@ export function EditorHeader({
   const titleRef = useRef<HTMLTextAreaElement>(null)
 
   // 自动调整标题输入框高度
-  useEffect(() => {
+  const fitTitleHeight = useCallback(() => {
     const textarea = titleRef.current
     if (textarea) {
       textarea.style.height = 'auto'
       textarea.style.height = `${textarea.scrollHeight}px`
     }
-  }, [title])
+  }, [])
+
+  useEffect(() => {
+    fitTitleHeight()
+  }, [title, fitTitleHeight])
+
+  // 宽度变了要重量：只按 title 量一次的话，首次量高若落在 popLayout 过渡的瞬时窄宽度上
+  // （文字折成很多行），得到的几百像素高度会一直钉在内联样式里，正文被顶出首屏
+  useEffect(() => {
+    const textarea = titleRef.current
+    if (!textarea) return
+    const observer = new ResizeObserver(() => fitTitleHeight())
+    observer.observe(textarea.parentElement ?? textarea)
+    return () => observer.disconnect()
+  }, [fitTitleHeight])
 
   return (
     <>
