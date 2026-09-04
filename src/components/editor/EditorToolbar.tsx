@@ -202,9 +202,9 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   ]
 
   return (
-    <div className="flex items-center gap-0.5 py-1.5 relative">
+    <div className="no-scrollbar flex items-center gap-0.5 py-1.5 relative overflow-x-auto md:overflow-visible">
       {buttons.map((group, groupIndex) => (
-        <div key={groupIndex} className="flex items-center gap-0.5">
+        <div key={groupIndex} className="flex items-center gap-0.5 flex-shrink-0">
           {groupIndex > 0 && (
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
           )}

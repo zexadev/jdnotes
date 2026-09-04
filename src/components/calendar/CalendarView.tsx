@@ -222,7 +222,7 @@ export function CalendarView({ onSelectNote, onCreateNote, initialDate }: Calend
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveDrag(null)}
     >
-      <div className="h-full flex bg-[#F9FBFC] dark:bg-[#0B0D11]">
+      <div className="h-full flex flex-col md:flex-row bg-[#F9FBFC] dark:bg-[#0B0D11]">
         <div className="flex-1 min-w-0 flex flex-col">
           {/* 头部：年月 + 导航 | 时间轴 + 导出 */}
           <header className="h-14 shrink-0 px-5 flex items-center justify-between">

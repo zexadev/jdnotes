@@ -1374,3 +1374,8 @@ body {
   0% { background-color: rgb(94 106 210 / 0.14); }
   100% { background-color: transparent; }
 }
+
+/* 窄屏横向滚动的工具栏 / 设置 tab：可滚但不露滚动条（桌面上这些容器本就不溢出） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

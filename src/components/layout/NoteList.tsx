@@ -88,7 +88,7 @@ export function NoteList({
   }
 
   return (
-    <div className="w-[320px] bg-[#F9FBFC] dark:bg-[#0B0D11] border-r border-black/[0.03] dark:border-white/[0.06] flex flex-col transition-colors duration-300">
+    <div className="w-full md:w-[320px] bg-[#F9FBFC] dark:bg-[#0B0D11] md:border-r border-black/[0.03] dark:border-white/[0.06] flex flex-col transition-colors duration-300">
       {/* 列表头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.03] dark:border-white/[0.06]">
         {selectionMode ? (

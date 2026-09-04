@@ -24,9 +24,11 @@ interface AIChatSidebarProps {
   noteTitle: string
   noteContent: string
   onInsertToNote?: (content: string) => void
+  /** 窄屏：不再是右侧 350px 栏，而是从右滑入的全屏层 */
+  fullScreen?: boolean
 }
 
-export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent, onInsertToNote }: AIChatSidebarProps) {
+export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent, onInsertToNote, fullScreen }: AIChatSidebarProps) {
   const {
     input,
     setInput,
@@ -106,15 +108,15 @@ export function AIChatSidebar({ isOpen, onClose, noteId, noteTitle, noteContent,
       {isOpen && (
     <motion.div
       key="ai-chat-sidebar"
-      // 宽度滑入滑出；内容固定 350px 宽，动画期间只裁切不挤压
-      initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 350, opacity: 1 }}
-      exit={{ width: 0, opacity: 0 }}
+      // 桌面：宽度滑入滑出，内容固定 350px 宽，动画期间只裁切不挤压；窄屏：全屏层从右滑入
+      initial={fullScreen ? { x: '100%' } : { width: 0, opacity: 0 }}
+      animate={fullScreen ? { x: 0 } : { width: 350, opacity: 1 }}
+      exit={fullScreen ? { x: '100%' } : { width: 0, opacity: 0 }}
       transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
-      className="h-full flex-shrink-0 overflow-hidden"
+      className={fullScreen ? 'fixed inset-0 z-40 bg-[#F9FBFC] dark:bg-[#0B0D11]' : 'h-full flex-shrink-0 overflow-hidden'}
     >
     <div
-      className="w-[350px] ai-sidebar-glass border-l border-black/[0.03] dark:border-white/[0.06] flex flex-col h-full ai-chat-sidebar"
+      className={`${fullScreen ? 'w-full' : 'w-[350px] border-l'} ai-sidebar-glass border-black/[0.03] dark:border-white/[0.06] flex flex-col h-full ai-chat-sidebar`}
       // 侧栏内任意位置按 Esc 停止生成（不聚焦输入框也能停；不动全局，避免与图片预览等 Esc 冲突）
       onKeyDownCapture={(e) => {
         if (e.key === 'Escape' && (isStreaming || isStreamingActive || isCompacting)) {

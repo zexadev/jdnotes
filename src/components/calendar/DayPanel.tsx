@@ -45,7 +45,7 @@ export function DayPanel({
   const empty = notes.length === 0 && reminders.length === 0
 
   return (
-    <aside className="w-[300px] shrink-0 h-full flex flex-col border-l border-[#E4EAF0] dark:border-[#262932]">
+    <aside className="w-full md:w-[300px] shrink-0 h-[42%] md:h-full flex flex-col border-t md:border-t-0 md:border-l border-[#E4EAF0] dark:border-[#262932]">
       {/* 抬头 */}
       <div className="px-5 pt-5 pb-4 shrink-0">
         <div className="flex items-baseline gap-2 min-w-0">

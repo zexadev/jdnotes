@@ -767,7 +767,7 @@ export function Editor({
   if (!editor) {
     return (
       <div className="flex-1 h-full overflow-y-auto">
-        <div className="px-12 py-8">
+        <div className="px-4 py-5 md:px-12 md:py-8">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             {title || '无标题'}
           </h1>
@@ -791,7 +791,7 @@ export function Editor({
 
   return (
     <div className="flex-1 h-full overflow-y-auto">
-      <div className="px-12 py-8">
+      <div className="px-4 py-5 md:px-12 md:py-8">
         <EditorHeader
           title={title}
           isEditing={isEditing}

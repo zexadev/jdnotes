@@ -19,6 +19,8 @@ import { toast } from './lib/toast'
 import { SettingsPage } from './pages/SettingsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { useUpdater } from './hooks/useUpdater'
+import { isMobilePlatform, useIsNarrow } from './lib/platform'
+import { pushLayer, closeLayer } from './lib/backStack'
 
 // 视图类型
 export type ViewType = 'dashboard' | 'inbox' | 'favorites' | 'trash' | 'calendar' | 'settings' | `tag-${string}`
@@ -51,6 +53,14 @@ function App() {
   const [contentToInsert, setContentToInsert] = useState<string | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [toasts, setToasts] = useState(toast.getToasts())
+
+  // 窄屏（手机）：侧栏变抽屉、列表与编辑器堆叠、AI 侧栏变全屏层；每一层都挂到返回栈上接 Android 返回手势
+  const isNarrow = useIsNarrow()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const openDrawer = useCallback(() => {
+    setDrawerOpen(true)
+    pushLayer(() => setDrawerOpen(false))
+  }, [])
 
   // 侧栏状态（从 localStorage 恢复）
   const [sidebarState, setSidebarState] = useState<SidebarState>(() => {
@@ -125,6 +135,8 @@ function App() {
   // 沉浸模式：窗口全屏 + 隐藏侧栏/顶栏/笔记列表，只留内容区；F11 切换
   const [isImmersive, setIsImmersive] = useState(false)
   const toggleImmersive = useCallback(() => {
+    // 手机没有窗口全屏 API，也没有可收的侧栏/顶栏
+    if (isMobilePlatform) return
     setIsImmersive((prev) => {
       const next = !prev
       // UI 先切换，窗口全屏异步跟上；失败（如权限缺失）时回滚，避免"全屏没进去但界面全没了"
@@ -211,10 +223,22 @@ function App() {
     await refreshReminders()
   }, [refreshNotes, refreshReminders])
 
-  // 切换 AI 聊天侧栏
+  // 切换 AI 聊天侧栏；窄屏下它是全屏层，开关都经返回栈，返回手势才关得掉它
   const toggleChat = useCallback(() => {
+    if (isNarrow) {
+      if (isChatOpen) closeLayer()
+      else {
+        pushLayer(() => setIsChatOpen(false))
+        setIsChatOpen(true)
+      }
+      return
+    }
     setIsChatOpen((prev) => !prev)
-  }, [])
+  }, [isNarrow, isChatOpen])
+  const closeChat = useCallback(() => {
+    if (isNarrow) closeLayer()
+    else setIsChatOpen(false)
+  }, [isNarrow])
 
   // Cmd/Ctrl + L 快捷键切换侧栏
   useEffect(() => {
@@ -303,7 +327,7 @@ function App() {
 
   // 启动后延迟检查更新（避开初始化高峰）
   useEffect(() => {
-    if (!isReady || hasCheckedUpdateRef.current) return
+    if (!isReady || hasCheckedUpdateRef.current || isMobilePlatform) return
     hasCheckedUpdateRef.current = true
     const timer = setTimeout(() => {
       updaterRef.current.checkForUpdates().catch((err) => {
@@ -438,6 +462,22 @@ function App() {
     // 更新已知 ID 集合
     knownNoteIdsRef.current = currentIds
   }, [notes, activeNoteId])
+
+  // 窄屏：打开笔记=堆一层（编辑器全屏），返回手势与「返回」按钮都经 closeLayer 弹回列表
+  const noteLayerRef = useRef(false)
+  useEffect(() => {
+    if (!isNarrow) return
+    if (activeNoteId !== null && !noteLayerRef.current) {
+      noteLayerRef.current = true
+      pushLayer(() => {
+        noteLayerRef.current = false
+        setActiveNoteId(null)
+      })
+    } else if (activeNoteId === null && noteLayerRef.current) {
+      // 经删除等别的路径关掉的：把历史里那一层也弹掉，回调里的置空只是重复一次
+      closeLayer()
+    }
+  }, [activeNoteId, isNarrow])
 
   // 自动保存
   const { saveNoteById, hasUnsavedChanges } = useAutoSave({
@@ -676,7 +716,7 @@ function App() {
       <div className="h-screen w-screen flex overflow-hidden bg-[#F9FBFC] dark:bg-[#0B0D11] transition-colors duration-300">
         {/* 左列：侧栏贯穿到顶，左上角是独立的 logo+名称展示区；沉浸模式整列收拢 */}
         <AnimatePresence initial={false}>
-          {!isImmersive && (
+          {!isImmersive && !isNarrow && (
             <motion.div
               key="app-sidebar"
               initial={{ width: 0, opacity: 0 }}
@@ -698,8 +738,48 @@ function App() {
           )}
         </AnimatePresence>
 
+        {/* 窄屏：侧栏改为从左滑入的抽屉，选中任一项即收回；背景点击/返回手势都经返回栈关闭 */}
+        <AnimatePresence>
+          {isNarrow && drawerOpen && (
+            <motion.div
+              key="app-drawer"
+              className="fixed inset-0 z-40 flex"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="absolute inset-0 bg-black/40" onClick={closeLayer} />
+              <motion.div
+                // sidebar-gradient 是半透明渐变（设计上垫在 app 底色上），抽屉浮在内容之上必须自带不透明底
+                className="relative h-full flex shadow-2xl bg-[#F9FBFC] dark:bg-[#0B0D11]"
+                initial={{ x: -260 }}
+                animate={{ x: 0 }}
+                exit={{ x: -260 }}
+                transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+              >
+                <Sidebar
+                  currentView={currentView}
+                  onViewChange={(view) => {
+                    handleViewChange(view)
+                    closeLayer()
+                  }}
+                  counts={counts}
+                  allTags={allTags}
+                  allNotes={allNotes || []}
+                  onOpenSettings={() => {
+                    setCurrentView('settings')
+                    closeLayer()
+                  }}
+                  sidebarState="expanded"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* 右列：顶栏（只压内容区）+ 内容 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <AnimatePresence initial={false}>
             {!isImmersive && (
               <motion.div
@@ -714,8 +794,9 @@ function App() {
                   searchQuery={searchQuery}
                   onSearchChange={handleSearchChange}
                   sidebarState={sidebarState}
-                  onToggleSidebar={cycleSidebar}
+                  onToggleSidebar={isNarrow ? openDrawer : cycleSidebar}
                   showBrandFallback={sidebarState === 'hidden'}
+                  compact={isNarrow}
                 />
               </motion.div>
             )}
@@ -769,14 +850,16 @@ function App() {
                 className="flex-1 flex h-full overflow-hidden"
               >
                 <AnimatePresence initial={false}>
-                  {!isImmersive && (
+                  {/* 窄屏：列表与编辑器堆叠，打开笔记时列表让位 */}
+                  {!isImmersive && !(isNarrow && activeNoteId !== null) && (
                     <motion.div
                       key="app-notelist"
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: 'auto', opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
                       transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                      className="h-full flex-shrink-0 overflow-hidden flex"
+                      // 窄屏列表独占一行：flex-shrink-0 + width:auto 会按内容宽（长预览）撑开把卡片推出屏幕，须改 flex-1 min-w-0
+                      className={isNarrow ? 'h-full flex-1 min-w-0 overflow-hidden flex' : 'h-full flex-shrink-0 overflow-hidden flex'}
                     >
                       <NoteList
                         searchQuery={searchQuery}
@@ -802,9 +885,11 @@ function App() {
                   )}
                 </AnimatePresence>
 
-                {/* 右侧编辑器 + AI 侧栏 */}
-                <div className="flex-1 flex h-full overflow-hidden">
+                {/* 右侧编辑器 + AI 侧栏；窄屏下没打开笔记时不渲染，列表独占 */}
+                {(!isNarrow || activeNoteId !== null) && (
+                <div className="flex-1 flex h-full overflow-hidden min-w-0">
                   <MainContent
+                    onBack={isNarrow ? closeLayer : undefined}
                     activeNoteId={activeNoteId}
                     activeNote={activeNote}
                     localTitle={localTitle}
@@ -827,16 +912,18 @@ function App() {
                     onOpenNote={handleCommandSelectNote}
                   />
 
-                  {/* AI 聊天侧栏 */}
+                  {/* AI 聊天侧栏（窄屏为全屏层） */}
                   <AIChatSidebar
                     isOpen={isChatOpen}
-                    onClose={() => setIsChatOpen(false)}
+                    onClose={closeChat}
                     noteId={activeNoteId}
                     noteTitle={localTitle}
                     noteContent={localContent}
                     onInsertToNote={handleInsertToNote}
+                    fullScreen={isNarrow}
                   />
                 </div>
+                )}
               </motion.div>
             )}
             </AnimatePresence>

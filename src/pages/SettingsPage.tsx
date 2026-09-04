@@ -45,10 +45,10 @@ export function SettingsPage({ onClose, onDataChange }: SettingsPageProps) {
       </div>
 
       {/* 主内容区域 */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* 左侧导航 */}
-        <div className="w-56 border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-dark-sidebar">
-          <nav className="p-3 space-y-1">
+        <div className="w-full md:w-56 flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-dark-sidebar">
+          <nav className="no-scrollbar p-2 md:p-3 flex md:flex-col gap-1 md:gap-0 md:space-y-1 overflow-x-auto">
             {SECTIONS.map((section) => {
               const Icon = section.icon
               const isActive = activeSection === section.id
@@ -58,7 +58,7 @@ export function SettingsPage({ onClose, onDataChange }: SettingsPageProps) {
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
                   className={`
-                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+                    md:w-full flex-shrink-0 whitespace-nowrap flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-lg text-sm font-medium transition-colors
                     ${isActive
                       ? 'bg-[#5E6AD2] text-white'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -81,7 +81,7 @@ export function SettingsPage({ onClose, onDataChange }: SettingsPageProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="p-8"
+            className="p-4 md:p-8"
           >
             {activeSection === 'ai' && <AISettings />}
             {activeSection === 'data' && <DataSettings onDataChange={onDataChange} />}

@@ -36,6 +36,7 @@ interface MainContentProps {
   onOpenNoteRef?: (uuid: string) => void // 点击 note:// 引用跳转
   onOpenNoteByTitle?: (title: string) => void // 点击字面 [[标题]] 引用跳转
   onOpenNote?: (id: number) => void // 反向链接面板点击跳转（按 id）
+  onBack?: () => void // 窄屏堆叠布局：编辑器全屏时头部出「返回」回列表
 }
 
 export function MainContent({
@@ -59,6 +60,7 @@ export function MainContent({
   onOpenNoteRef,
   onOpenNoteByTitle,
   onOpenNote,
+  onBack,
 }: MainContentProps) {
   const [showReminderPicker, setShowReminderPicker] = useState(false)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
@@ -253,18 +255,29 @@ export function MainContent({
             className="flex-1 flex flex-col h-full overflow-hidden"
           >
             {/* 编辑器头部 - 毛玻璃效果 */}
-            <div className="flex items-center justify-between px-12 py-4 border-b border-black/[0.03] dark:border-white/[0.06] editor-header-glass sticky top-0 z-10">
-              <nav className="text-[13px] text-slate-400">
-                <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors">
-                  全部笔记
-                </span>
-                <span className="mx-2">/</span>
-                <span className="text-slate-900 dark:text-slate-100">
+            <div className="flex items-center justify-between gap-2 px-4 md:px-12 py-3 md:py-4 border-b border-black/[0.03] dark:border-white/[0.06] editor-header-glass sticky top-0 z-10">
+              <nav className="flex items-center min-w-0 text-[13px] text-slate-400">
+                {onBack ? (
+                  <button
+                    onClick={onBack}
+                    className="mr-3 flex-shrink-0 h-8 px-3 rounded-lg bg-black/[0.05] dark:bg-white/[0.08] text-[13px] font-medium text-slate-700 dark:text-slate-200 btn-press"
+                  >
+                    返回
+                  </button>
+                ) : (
+                  <>
+                    <span className="hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer transition-colors">
+                      全部笔记
+                    </span>
+                    <span className="mx-2">/</span>
+                  </>
+                )}
+                <span className="truncate text-slate-900 dark:text-slate-100">
                   {localTitle || '无标题'}
                 </span>
               </nav>
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] text-slate-400">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="hidden md:inline text-[12px] text-slate-400">
                   最后编辑于 {formatDate(activeNote?.updatedAt ?? new Date())}
                 </span>
                 {/* 收藏按钮 */}
@@ -472,7 +485,7 @@ export function MainContent({
             </div>
 
             {/* 标签输入区域 */}
-            <div className="px-12 py-2 border-b border-black/[0.03] dark:border-white/[0.06]">
+            <div className="px-4 md:px-12 py-2 border-b border-black/[0.03] dark:border-white/[0.06]">
               <TagsInput
                 tags={activeNote?.tags ?? []}
                 onChange={onTagsChange}
@@ -481,7 +494,7 @@ export function MainContent({
 
             {/* 编辑器工具栏 - 固定不滚动 */}
             {editorInstance && (
-              <div className="px-12 border-b border-black/[0.03] dark:border-white/[0.06]">
+              <div className="px-4 md:px-12 border-b border-black/[0.03] dark:border-white/[0.06]">
                 <EditorToolbar editor={editorInstance} />
               </div>
             )}
