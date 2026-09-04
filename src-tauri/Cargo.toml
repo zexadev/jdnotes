@@ -33,9 +33,10 @@ uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["net", "io-util", "sync"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 urlencoding = "2.1.3"
-# json feature 必须自己开：桌面上它是 tauri-plugin-updater 顺带打开的，手机目标没有 updater，
-# commands.rs 的 .json() 会直接消失
-reqwest = { version = "0.12", features = ["rustls-tls", "json"] }
+# 关默认 feature：default-tls 是 native-tls，在 Android 目标要 openssl-sys，没有系统 OpenSSL 直接编不过；
+# 且两套后端同时开时 reqwest 默认选 native-tls，这里声明的 rustls 从未生效过。
+# json 也必须自己开：桌面上它是 tauri-plugin-updater 顺带打开的，手机目标没有 updater。
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "charset", "http2", "system-proxy"] }
 scraper = "0.26.0"
 ego-tree = "0.11.0"
 # P2P 跨网同步
