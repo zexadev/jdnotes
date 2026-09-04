@@ -6,6 +6,7 @@ import {
   sendNotification
 } from '@tauri-apps/plugin-notification'
 import { invoke } from '@tauri-apps/api/core'
+import { isMobilePlatform } from '../../lib/platform'
 
 export function NotificationSettings() {
   const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'default'>('default')
@@ -28,13 +29,21 @@ export function NotificationSettings() {
     checkPermission()
   }, [])
 
+  // 已授权就绝不再调 requestPermission：Android 13+ 上插件的 requestPermissions 在已授权时不 resolve
+  // （NotificationPlugin.kt 只在未授权时走 requestPermissionForAlias，没有 else），Promise 永远挂着，
+  // 后面的 sendNotification 根本不会执行——「发送测试通知」在手机上没反应就是这个
+  const ensurePermission = async (): Promise<boolean> => {
+    if (await isPermissionGranted()) return true
+    return (await requestPermission()) === 'granted'
+  }
+
   // 请求通知权限
   const handleRequestPermission = async () => {
     try {
-      const result = await requestPermission()
-      setNotificationPermission(result === 'granted' ? 'granted' : 'denied')
+      const granted = await ensurePermission()
+      setNotificationPermission(granted ? 'granted' : 'denied')
 
-      if (result === 'granted') {
+      if (granted) {
         await sendNotification({
           title: 'Lapis',
           body: '通知已启用！',
@@ -49,8 +58,10 @@ export function NotificationSettings() {
   // 发送测试通知
   const handleTestNotification = async () => {
     try {
-      // 重新请求一次权限确保生效
-      await requestPermission()
+      if (!(await ensurePermission())) {
+        setNotificationPermission('denied')
+        return
+      }
       await sendNotification({
         title: 'Lapis',
         body: '每一个被记录的瞬间，都值得被温柔对待',
@@ -144,7 +155,8 @@ export function NotificationSettings() {
             </button>
           )}
 
-          {notificationPermission === 'granted' && (
+          {/* ms-settings: 是 Windows 专属；Android 从网页开不了应用通知设置页 */}
+          {notificationPermission === 'granted' && !isMobilePlatform && (
             <button
               onClick={handleOpenSystemSettings}
               className="w-full px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700 flex items-center justify-center gap-2"
