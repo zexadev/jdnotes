@@ -33,7 +33,9 @@ uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["net", "io-util", "sync"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 urlencoding = "2.1.3"
-reqwest = { version = "0.12", features = ["rustls-tls"] }
+# json feature 必须自己开：桌面上它是 tauri-plugin-updater 顺带打开的，手机目标没有 updater，
+# commands.rs 的 .json() 会直接消失
+reqwest = { version = "0.12", features = ["rustls-tls", "json"] }
 scraper = "0.26.0"
 ego-tree = "0.11.0"
 # P2P 跨网同步
