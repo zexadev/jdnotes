@@ -137,6 +137,16 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       ])
       setDeviceStatus((s) => ({ ...s, [id]: 'online' }))
       recordConnType(id, res.conn_type)
+      // 离线时添加的设备名字是占位，探活拿到真名就补上
+      const probedName = res.device_name.trim()
+      if (probedName) {
+        setDevices((prev) => {
+          if (!prev.some((d) => d.id === id && d.name === '未命名设备')) return prev
+          const next = prev.map((d) => (d.id === id && d.name === '未命名设备' ? { ...d, name: probedName } : d))
+          localStorage.setItem(DEVICES_KEY, JSON.stringify(next))
+          return next
+        })
+      }
     } catch {
       setDeviceStatus((s) => ({ ...s, [id]: 'offline' }))
     }
@@ -196,7 +206,18 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
       setNewDeviceId('')
       toast.success(`已连接并添加设备「${finalName}」`)
     } catch (e) {
-      toast.error('连接失败：' + (e instanceof Error ? e.message : String(e)) + '（请确认对方已打开应用、ID 正确）', { duration: 7000 })
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('无效的设备 ID')) {
+        toast.error('设备 ID 格式不对，请检查后重试', { duration: 7000 })
+      } else {
+        // 连不上也先记下：ID 本身就是 TLS 验证的公钥，记错人不会认错人；对方上线后探活会补上名称
+        persistDevices([...devices, { id, name: '未命名设备', kind: newDeviceKind }])
+        setNewDeviceId('')
+        toast.warning(
+          '已添加，但暂时连不上对方：' + msg + '（对方需打开 Lapis 并停在前台；连上后点「刷新状态」会补上名称）',
+          { duration: 9000 },
+        )
+      }
     }
     setAddingDevice(false)
   }
@@ -487,7 +508,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
                 <button
                   onClick={() => removeDevice(d.id, d.name)}
                   title="移除设备"
-                  className="shrink-0 p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                  className="shrink-0 p-2 md:p-1.5 text-gray-400 dark:text-gray-500 md:text-gray-300 md:dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
