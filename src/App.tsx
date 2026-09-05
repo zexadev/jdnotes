@@ -857,10 +857,11 @@ function App() {
                 {...VIEW_MOTION}
                 className="flex-1 flex h-full overflow-hidden"
               >
-                {/* 窄屏：列表与编辑器堆叠，打开笔记时列表让位。不走宽度动画——
-                    width auto↔0 每帧重排上百张卡片，是手机上进出笔记发滞的主因；直接挂载/卸载 */}
-                {isNarrow && activeNoteId === null && (
-                  <div className="h-full flex-1 min-w-0 overflow-hidden flex">
+                {/* 窄屏：列表与编辑器堆叠，打开笔记时列表让位。不卸载只隐藏——
+                    卸载再挂载上百张卡片一次 150ms 左右，隐藏/显示零成本，还保住列表滚动位置；
+                    也不走宽度动画（width auto↔0 每帧重排上百张卡片，是手机上进出笔记发滞的主因） */}
+                {isNarrow && (
+                  <div className={`h-full flex-1 min-w-0 overflow-hidden ${activeNoteId !== null ? 'hidden' : 'flex'}`}>
                     <NoteList
                       searchQuery={searchQuery}
                       onClearSearch={() => {
