@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { Editor } from '@tiptap/react'
+import { useEditorState, type Editor } from '@tiptap/react'
 import {
   Bold,
   Italic,
@@ -77,6 +77,18 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   }
 
   const [showHighlightColors, setShowHighlightColors] = useState(false)
+
+  // 按钮的选中态靠下面各处 isActive() 现算，但组件本身只在父组件重渲染时才重跑：
+  // 对齐/高亮这类不进 Markdown 的属性改了内容串不变、父组件不重渲染，按钮就一直停在旧状态。
+  // 订阅编辑器状态签名，签名变了才重渲染（useEditorState 按深比较去抖，不会每个键击都刷）
+  const activeSignature = useEditorState({
+    editor,
+    selector: ({ editor: e }) =>
+      ['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'bulletList', 'orderedList', 'taskList', 'blockquote', 'codeBlock', 'table']
+        .map((name) => (e.isActive(name) ? '1' : '0'))
+        .join('') +
+      ['left', 'center', 'right'].map((align) => (e.isActive({ textAlign: align }) ? '1' : '0')).join(''),
+  })
 
   const highlightColors = [
     { name: '黄色', color: '#fcd34d' },
@@ -218,7 +230,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   return (
     // 外层 relative 只为给高亮色盘定位：色盘不能放在横向滚动容器里——overflow-x:auto 会连带把
     // 纵向溢出裁掉，窄屏下点了「荧光标记」色盘被裁没，看起来就是按钮没反应
-    <div className="relative">
+    <div className="relative" data-active={activeSignature}>
     <div className="no-scrollbar flex items-center gap-0.5 py-1.5 overflow-x-auto md:overflow-visible">
       {buttons.map((group, groupIndex) => (
         <div key={groupIndex} className="flex items-center gap-0.5 flex-shrink-0">
