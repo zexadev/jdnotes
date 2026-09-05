@@ -794,9 +794,13 @@ async fn get_iroh_endpoint(app: AppHandle, db_path: String) -> Result<Endpoint, 
     let ep = IROH_EP
         .get_or_try_init(|| async {
             let secret = load_or_create_iroh_secret(&app)?;
+            // N0 预设只靠系统 DNS 查 TXT 记录找对端；走 TUN/代理的机器（本机 xray_tun 实测）DNS 被接管后
+            // TXT 查询回空，connect 直接报 No addressing information available，而记录在公网 DNS 里明明存在。
+            // 再挂一个 HTTPS 的 pkarr 解析器兜底（浏览器环境预设用的那个，原生同样可用），HTTPS 走代理照常可达
             let ep = Endpoint::builder(presets::N0)
                 .secret_key(secret)
                 .alpns(vec![IROH_ALPN.to_vec()])
+                .address_lookup(iroh::address_lookup::PkarrResolver::n0_dns())
                 .bind()
                 .await
                 .map_err(|e| format!("iroh 启动失败: {}", e))?;
