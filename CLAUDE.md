@@ -26,7 +26,7 @@
 
 ## 基建
 
-- **CI/CD**：GitHub Actions 构建发布（`.github/workflows/release.yml`，推 `v*` tag 触发，windows-latest）。Release body 从 `docs/src/content/changelog.mdx` 里手写的 `## vX.Y.Z` 小节抽取——**更新日志始终人写，不用 commit 自动生成**，抽不到直接让 workflow 失败。`latest.json` 由 tauri-action 生成上传，不再手工拼
+- **CI/CD**：GitHub Actions 构建发布（`.github/workflows/release.yml`，推 `v*` tag 触发，windows-latest）。Release body 从 `docs/src/content/changelog.mdx` 里手写的 `## vX.Y.Z` 小节抽取——**更新日志始终人写，不用 commit 自动生成**，抽不到直接让 workflow 失败。`latest.json` 由 tauri-action 生成上传，不再手工拼。同 workflow 第二个 job `android`（ubuntu-latest，`needs: release`）交叉编译 aarch64 签名 APK 挂到同一 Release，并给 `latest.json` 补 `android-aarch64` 条目供手机端应用内更新读取
 - **Android 构建**（手机端在做，单仓库同一 `src-tauri` 加 target，前端就是桌面 `dist` 同一份、靠窄屏自适应）：`CI=true pnpm tauri android build --debug --apk --target aarch64` → `src-tauri/gen/android/app/build/outputs/apk/universal/debug/`。本机 NDK 27 + JDK 21，Windows 主机交叉编译+链接已跑通，小米 14T Pro / Android 16 真机启动通过（2026-09-04）。Android 上 `app_data_dir()` = `/data/user/0/com.jdnotes.app`，DB 默认 WAL；Rust 日志看 logcat tag `app_lib`。小米 `adb install` 被 USER_RESTRICTED 拒 = 开发者选项「USB 安装」没开；Git Bash 下 adb 路径前要 `MSYS_NO_PATHCONV=1`。桌面专属依赖在 Cargo.toml 走 `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`（cargo 的 target 表不认 tauri-build 注入的 `cfg(desktop)`，源码里才用 `#[cfg(desktop)]`）；reqwest 必须关默认 feature（native-tls 在 Android 要 openssl-sys）。方案与实测细节见 docs/local/mobile-app.md
 - **本地出可独立运行的桌面调试包**：`pnpm tauri build --debug --no-bundle` → `src-tauri/target/debug/app.exe`（嵌前端、不打安装包、不要签名私钥）。**直接 `cargo build` 出的 debug exe 是 dev 模式**（tauri-build 打 `dev` cfg，`generate_context!` 不嵌前端而指向 devUrl），单独运行是空白页。只改前端后重打包无需 touch：build.rs 已登记 `rerun-if-changed=../dist`（`tauri_build::build()` 默认不跟踪 dist）
 - **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
@@ -43,7 +43,8 @@
 |------|------|
 | `src-tauri/tauri.conf.json` | Tauri 配置、版本号 |
 | `src-tauri/Cargo.toml` | Rust 依赖、版本号；桌面专属依赖（托盘 feature/单实例/updater/process/MCP/dirs）在末尾 target 表 |
-| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI；`MainActivity.kt`：左右刘海与键盘做原生 padding，状态栏/手势条高度经 `window.LapisNative`（`getInsets` + inset 变化时写 CSS 变量 `--safe-area-top/bottom`）交给页面自己留白自己画背景（WebView 拿不到 env(safe-area-inset)；原生涂色会和页面切主题不同步）；`setDark` 桥只管状态栏图标反色。脱离文档流的层（抽屉/AI 层/悬浮按钮/Toast/提醒卡）要按这两个变量补偏移 |
+| `src-tauri/gen/android/` | `tauri android init` 生成的 Android 工程（入库；build 产物由自带 .gitignore 排除）；`app/build.gradle.kts` 的 rustBuild 任务靠 package.json 的 `tauri` 脚本调回 CLI；`MainActivity.kt`：左右刘海与键盘做原生 padding，状态栏/手势条高度经 `window.LapisNative`（`getInsets` + inset 变化时写 CSS 变量 `--safe-area-top/bottom`）交给页面自己留白自己画背景（WebView 拿不到 env(safe-area-inset)；原生涂色会和页面切主题不同步）；`setDark` 桥只管状态栏图标反色；`installApk` 桥把 Rust 下好的 APK 经 FileProvider（file_paths.xml 的 cache-path）签 content:// URI 拉系统安装器，manifest 为此声明 REQUEST_INSTALL_PACKAGES。脱离文档流的层（抽屉/AI 层/悬浮按钮/Toast/提醒卡）要按这两个变量补偏移 |
+| `src-tauri/src/mobile_update.rs` | 手机端应用内更新（updater 插件 Android 没实现）：`mobile_update_check` 拉桌面同一份 latest.json 按 semver 比版本、读 `platforms["android-aarch64"].url`（比本地新但缺该条目→报错不装「已是最新」）；`mobile_update_download` 只接受本仓库 Release 资产 URL，流式下到 `app_cache_dir/updates`、按 `mobile-update-progress` 事件报进度。不做 minisign 验签——Android 只允许同签名覆盖安装。前端 `useUpdater` 按 `isMobilePlatform` 分流，设置页/启动弹窗两端同一套 UI |
 | `src/lib/platform.ts` | `isMobilePlatform`（UA）+ `useIsNarrow()`（<768px，与 Tailwind md 同线）。**手机端用桌面同一套页面窄屏自适应，不另写入口（用户拍板「要桌面全部功能」，独立 src/mobile 已 revert）**：侧栏→抽屉、列表与编辑器堆叠、AI 侧栏→全屏层、设置导航→横向 tab、日历日面板下沉；updater/窗口 API/沉浸模式在手机跳过，图片走 read_attachment_data_url 不走 asset:// |
 | `src/lib/backStack.ts` | 窄屏返回栈：打开笔记/抽屉/AI 层各 pushState 一层，Android 返回手势→wry goBack→popstate 逐层退；界面关闭按钮也必须走 closeLayer()（history.back）保证层数一致。新增/删除 `tauri.<platform>.conf.json` 后要 `touch tauri.conf.json` 强制 app crate 重编，否则 APK 嵌旧 dist |
 | `src-tauri/capabilities/desktop.json` | updater/process 权限，`platforms` 限定桌面——这两个插件 Android 不编译，放 default.json 会 permission not found |
@@ -158,6 +159,12 @@
    **私钥一律放仓库外**（`%USERPROFILE%\.tauri\lapis.key`）。`.gitignore` 有 `**/.tauri/` 与 `*.key` 兜底。
 
    **换 key 会断更新链**：老版本用旧 pubkey 验签，收不到新版本，必须手动下载一次。换 key 那一版的 changelog 和 Release notes 必须写明这点。
+
+   **Android 部分**（同一 workflow 的 `android` job，桌面 Release 建好后跑，约 20 分钟）：
+   - 产物 `Lapis_x.y.z_aarch64.apk` 挂到同一 Release；`latest.json` 被补上 `platforms["android-aarch64"]`（url + 空 signature，桌面 updater 只读自己平台的 key、不受影响）。手机端 `mobile_update_check` 读的就是这条——**发版漏了 APK 时手机会报「新版本尚未提供安卓安装包」而不是「已是最新」**
+   - 签名 keystore：`%USERPROFILE%\.tauri\lapis-release.jks`（alias `lapis`，仓库外；密码见记忆 reference_signing_key），本地打包读 gitignored 的 `src-tauri/gen/android/keystore.properties`，CI 由四个 secret `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` 现场还原，任一为空 job 直接失败
+   - **这把 keystore 永不能换**：Android 只允许同签名覆盖安装，换了等于换应用，所有已装用户必须卸载重装（数据清空、重新同步）。debug 包（debug keystore 签）同样不能被正式包覆盖，装过 debug 包的机器切正式包要先卸载
+   - 手机端更新流程在 `src-tauri/src/mobile_update.rs` + `MainActivity.kt` 的 `installApk` 桥，见关键文件表；versionCode 由 tauri CLI 按版本号派生（x.y.z → x*1000000+y*1000+z），单调递增，不用手管
 
 8. **等待文档站部署**
    文档站通过 Cloudflare Pages 自动部署。
