@@ -30,8 +30,16 @@ function collectPreviewParts(tokens: MdToken[]): { text: string; code: string } 
 
 // 从 Markdown 内容提取纯文本预览：真正解析 token 流而非正则替换标记符，
 // 覆盖列表/任务列表/引用块/表格/删除线/字面 [[wiki]] 引用/高亮回退 HTML 等正则难以穷举的语法
+// 按内容串缓存：预览是对整篇笔记做一次完整 markdown-it 解析，列表每次重渲染（切换选中、进出笔记）
+// 都会让上百张卡片各解析一遍，手机上返回列表一次约 100ms 全花在这。同一内容只解析一次；
+// 条目超上限整体清空，避免长期编辑累积无界增长
+const previewCache = new Map<string, string>()
+const PREVIEW_CACHE_MAX = 2000
+
 export function extractPreview(markdown: string): string {
   if (!markdown.trim()) return ''
+  const cached = previewCache.get(markdown)
+  if (cached !== undefined) return cached
   const { text: rawText, code: rawCode } = collectPreviewParts(previewMd.parse(markdown, {}))
   const text = rawText
     .replace(/\[\[([^[\]\n]+?)\]\]/g, '$1') // 字面 wiki 引用只保留标题
@@ -39,7 +47,10 @@ export function extractPreview(markdown: string): string {
     .trim()
   // 纯代码笔记没有其他文字时，用代码内容兜底，避免误显示成"空笔记"
   const result = text || rawCode.replace(/\s+/g, ' ').trim()
-  return result.slice(0, 80) + (result.length > 80 ? '...' : '')
+  const preview = result.slice(0, 80) + (result.length > 80 ? '...' : '')
+  if (previewCache.size >= PREVIEW_CACHE_MAX) previewCache.clear()
+  previewCache.set(markdown, preview)
+  return preview
 }
 
 // 格式化日期（相对时间）
