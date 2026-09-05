@@ -104,7 +104,7 @@ function ImagePreview({ src, onClose }: ImagePreviewProps) {
       />
       {/* 缩放比例提示 */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 text-white text-sm rounded-full">
-        {Math.round(scale * 100)}% · 滚轮缩放 · 双击重置
+        {Math.round(scale * 100)}% · {isMobilePlatform ? '双击重置' : '滚轮缩放 · 双击重置'}
       </div>
       <button
         onClick={onClose}

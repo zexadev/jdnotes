@@ -61,9 +61,9 @@ const MARKDOWN_EXAMPLES: SyntaxExample[] = [
     title: '链接',
     description: '创建可点击的链接',
     markdown: `[链接文字](https://example.com)
-[带标题的链接](https://example.com "鼠标悬停显示")`,
+[带标题的链接](https://example.com "悬停时显示")`,
     preview: `<a href="https://example.com">链接文字</a>
-<a href="https://example.com" title="鼠标悬停显示">带标题的链接</a>`
+<a href="https://example.com" title="悬停时显示">带标题的链接</a>`
   },
   {
     title: '图片',

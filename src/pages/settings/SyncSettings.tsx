@@ -390,7 +390,7 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
             value={deviceName}
             onChange={(e) => setDeviceName(e.target.value)}
             onBlur={saveDeviceName}
-            placeholder="给这台设备起个名（如：公司电脑）"
+            placeholder="给这台设备起个名（如：公司电脑、我的手机）"
             className={INPUT_CLASS}
           />
           <p className="mt-1.5 text-xs text-gray-400">这个名字会展示给对方、并在同步冲突时标注笔记来源。</p>

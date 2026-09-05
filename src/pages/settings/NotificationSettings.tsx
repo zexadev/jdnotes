@@ -206,7 +206,7 @@ export function NotificationSettings() {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-[#5E6AD2] mt-1">•</span>
-            <span>系统通知会在桌面右下角（Windows）或右上角（macOS）弹出</span>
+            <span>{isMobilePlatform ? '系统通知会显示在手机通知栏' : '系统通知会在桌面右下角（Windows）或右上角（macOS）弹出'}</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-[#5E6AD2] mt-1">•</span>

@@ -1,3 +1,4 @@
+import { isMobilePlatform } from '../../../lib/platform'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Square, Image as ImageIcon, X } from 'lucide-react'
@@ -257,7 +258,7 @@ export function ChatInput({
           }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder={isStreaming ? '正在生成，Esc 停止…' : '输入消息，Enter 发送…'}
+          placeholder={isStreaming ? (isMobilePlatform ? '正在生成…' : '正在生成，Esc 停止…') : (isMobilePlatform ? '输入消息…' : '输入消息，Enter 发送…')}
           rows={1}
           className="w-full bg-transparent border-none outline-none resize-none text-[13px] leading-relaxed text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
           style={{ maxHeight: '150px' }}

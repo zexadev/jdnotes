@@ -287,6 +287,8 @@ function App() {
     }
 
     const handleContextMenu = (e: MouseEvent) => {
+      // 触屏长按也会派发 contextmenu：不拦，让系统选区工具条（复制/粘贴/全选）正常出来
+      if (isMobilePlatform) return
       e.preventDefault()
       const t = e.target
       if (!(t instanceof HTMLElement)) return

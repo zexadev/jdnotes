@@ -1,3 +1,4 @@
+import { isMobilePlatform } from '../../lib/platform'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { FileText, Link2 } from 'lucide-react'
 
@@ -130,7 +131,7 @@ export function NoteRefMenu({ notes, query, currentNoteId, position, onSelect, o
       </div>
 
       <div className="px-3 py-1.5 text-[10px] text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-        <span>↑↓ 选择 · Enter 确认 · Esc 取消</span>
+        <span>{isMobilePlatform ? '点选插入' : '↑↓ 选择 · Enter 确认 · Esc 取消'}</span>
         <span>[[ 引用</span>
       </div>
     </div>

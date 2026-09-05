@@ -46,7 +46,7 @@ export function AboutSettings() {
             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">React + TypeScript</div>
           </div>
           <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">桌面框架</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">应用框架</div>
             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Tauri</div>
           </div>
           <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">

@@ -1,3 +1,4 @@
+import { isMobilePlatform } from '../../lib/platform'
 import { useState, useEffect, useRef } from 'react'
 import type { Editor } from '@tiptap/react'
 import {
@@ -178,7 +179,7 @@ export function SlashCommand({ items, position, query, onSelect, onClose }: Slas
       </div>
 
       <div className="px-3 py-1.5 text-[10px] text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-        <span>↑↓ 选择 · Enter 确认 · Esc 取消</span>
+        <span>{isMobilePlatform ? '点选插入' : '↑↓ 选择 · Enter 确认 · Esc 取消'}</span>
         <span>输入过滤</span>
       </div>
     </div>

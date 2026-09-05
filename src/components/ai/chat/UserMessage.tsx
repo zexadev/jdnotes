@@ -1,3 +1,4 @@
+import { isMobilePlatform } from '../../../lib/platform'
 import { memo, useState, useRef, useEffect } from 'react'
 import { Copy, Check, Pencil, Trash2 } from 'lucide-react'
 
@@ -70,7 +71,7 @@ export const UserMessage = memo(function UserMessage({
           rows={1}
         />
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 dark:text-slate-500">Enter 发送 · Esc 取消</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500">{isMobilePlatform ? '' : 'Enter 发送 · Esc 取消'}</span>
           <div className="flex gap-1">
             <button
               onClick={handleCancelEdit}
