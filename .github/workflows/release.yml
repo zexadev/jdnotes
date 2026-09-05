@@ -131,6 +131,9 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [ -n "${!v}" ] || { echo "::error::仓库 secret $v 未设置，拒绝出未签名/错签名的 APK"; exit 1; }
+          done
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lapis-release.jks"
           cat > src-tauri/gen/android/keystore.properties <<PROPS
           storeFile=$RUNNER_TEMP/lapis-release.jks
