@@ -49,7 +49,7 @@
 | `src-tauri/src/db.rs` | 配置管理、AI 来源、数据库路径 |
 | `src-tauri/src/commands.rs` | Tauri 后端命令 |
 | `src-tauri/src/lib.rs` | 插件注册、命令注册；托盘/单实例/updater/process/MCP/旧 identifier 迁移/启动时 LAN 监听全部 `#[cfg(desktop)]`（手机是间歇在线发起端，不常驻监听）；发布版禁 WebView2 CDP 注入（防君子）：run() 开头 remove_var 清 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 等三个变量——Playwright 靠它塞 --remote-debugging-port 开调试端口接管页面，创建 webview 前清掉即失效；仅 release，debug 保留供本机 CDP 测试。（不做注册表扫描/进程巡检那套军备竞赛，防不了同权限攻击者，数据真正保护靠 DB 落盘加密[roadmap]） |
-| `src-tauri/src/sync.rs` | 多设备同步内核（局域网 TCP + iroh 跨网 + 同步包文件、三路合并、设备 ID 持久化、probe、mDNS 自动发现、持久 fingerprint） |
+| `src-tauri/src/sync.rs` | 多设备同步内核（局域网 TCP + iroh 跨网 + 同步包文件、三路合并、设备 ID 持久化、probe、mDNS 自动发现、持久 fingerprint）。iroh 端点在 N0 预设之外加了 HTTPS pkarr 解析器：走 TUN/代理的机器系统 DNS 常吞 TXT 查询，只靠 DNS 会报 `No addressing information available`（本机 xray_tun 实测）；发起端统一 `parse_remote_package` 识别对端的 PAIRING_REQUIRED |
 | `src-tauri/src/attachments.rs` | 图片附件内容寻址存储（sha256） |
 | `src-tauri/migrations/004_sync.sql`·`005_sync_merge.sql`·`006_private.sql` | 同步 uuid + 三路合并基准/冲突标记 + 私有笔记标记 |
 | `src/pages/SettingsPage.tsx` | 设置页左侧导航容器（应用实际使用的设置 UI） |
