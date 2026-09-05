@@ -13,6 +13,16 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// release 签名：keystore 在仓库外（本地 ~/.tauri/lapis-release.jks），参数由 gen/android/keystore.properties
+// 提供（gitignored；CI 由 secrets 现场写入）。Android 只允许同一签名的包覆盖安装，
+// 这把 key 换了就等于换应用——所有已装用户都得卸载重装
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
     namespace = "com.jdnotes.app"
@@ -23,6 +33,16 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties.getProperty("storeFile") != null) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -37,6 +57,10 @@ android {
             }
         }
         getByName("release") {
+            // 没有 keystore.properties 时不签（产物是 unsigned APK，装不上），别静默用 debug 签名混过去
+            if (keystoreProperties.getProperty("storeFile") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

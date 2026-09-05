@@ -17,3 +17,5 @@ key.properties
 
 /.tauri
 /tauri.settings.gradle
+# Android release 签名：keystore 在仓库外（~/.tauri/lapis-release.jks），本文件只在本地生成，CI 由 secrets 写入
+/keystore.properties
