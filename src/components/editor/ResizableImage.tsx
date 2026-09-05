@@ -256,7 +256,7 @@ export function ResizableImage({ node, updateAttributes, selected, editor, delet
         {isEditable && (
           <button
             onClick={handleDelete}
-            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 text-white rounded-lg opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all cursor-pointer"
             title="删除图片"
           >
             <Trash2 className="h-3.5 w-3.5" />

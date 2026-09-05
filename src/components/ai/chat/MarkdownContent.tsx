@@ -77,7 +77,7 @@ function CodeBlock({ children }: { children?: ReactNode }) {
         </span>
         <button
           onClick={handleCopy}
-          className="p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 opacity-0 group-hover/code:opacity-100 transition-opacity"
+          className="p-1.5 md:p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 opacity-100 md:opacity-0 md:group-hover/code:opacity-100 transition-opacity"
           title="复制代码"
         >
           {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" strokeWidth={1.5} />}

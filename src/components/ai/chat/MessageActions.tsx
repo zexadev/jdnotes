@@ -23,7 +23,7 @@ export function MessageActions({ onCopy, onRetry, onInsert, onDelete, disabled =
     'p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
 
   return (
-    <div className="flex items-center gap-0.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="flex items-center gap-0.5 mt-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
       <button onClick={() => { onCopy(); flash(setCopied) }} className={base} title="复制" disabled={disabled}>
         {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" strokeWidth={1.5} />}
       </button>
@@ -35,7 +35,7 @@ export function MessageActions({ onCopy, onRetry, onInsert, onDelete, disabled =
       {onInsert && (
         <button
           onClick={() => { onInsert(); flash(setInserted) }}
-          className="p-1 rounded-md text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+          className="p-2 md:p-1 rounded-md text-slate-400 hover:text-[#5E6AD2] hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40"
           title="插入到笔记"
           disabled={disabled}
         >
@@ -44,7 +44,7 @@ export function MessageActions({ onCopy, onRetry, onInsert, onDelete, disabled =
       )}
       <button
         onClick={onDelete}
-        className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40"
+        className="p-2 md:p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40"
         title="删除"
         disabled={disabled}
       >

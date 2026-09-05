@@ -155,7 +155,7 @@ export function ConversationSwitcher({
                           <Check className="h-3.5 w-3.5 flex-shrink-0 opacity-70 group-hover:hidden" strokeWidth={2} />
                         )}
                         {/* 确认删除期间强制可见——藏进 hover 会让人以为点了没反应 */}
-                        <div className={`items-center gap-0.5 flex-shrink-0 ${isConfirming ? 'flex' : 'hidden group-hover:flex'}`}>
+                        <div className={`items-center gap-0.5 flex-shrink-0 ${isConfirming ? 'flex' : 'flex md:hidden md:group-hover:flex'}`}>
                           {!isConfirming && (
                             <button
                               onClick={(e) => {

@@ -165,7 +165,7 @@ function ReminderRow({
       <button
         onClick={onClear}
         title="取消提醒"
-        className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
+        className="shrink-0 p-2 md:p-1 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/[0.05] dark:hover:bg-white/[0.08] transition-colors"
       >
         <X className="h-3.5 w-3.5" strokeWidth={1.8} />
       </button>

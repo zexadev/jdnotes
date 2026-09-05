@@ -236,7 +236,7 @@ export function ChatInput({
                     />
                     <button
                       onClick={() => onRemoveImage(idx)}
-                      className="absolute -top-1.5 -right-1.5 p-0.5 bg-slate-600 dark:bg-slate-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1.5 -right-1.5 p-1 md:p-0.5 bg-slate-600 dark:bg-slate-500 text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                       title="移除"
                     >
                       <X className="h-2.5 w-2.5" />

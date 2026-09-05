@@ -108,10 +108,10 @@ export const UserMessage = memo(function UserMessage({
         <span className="whitespace-pre-wrap break-words">{message.content}</span>
       </div>
       {!isTemporary && message.id !== undefined && (
-        <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => { onCopy(message.content); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
+            className="p-2 md:p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
             title="复制"
           >
             {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" strokeWidth={1.5} />}
@@ -119,14 +119,14 @@ export const UserMessage = memo(function UserMessage({
           <button
             onClick={() => setIsEditing(true)}
             disabled={isAnyStreaming}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="p-2 md:p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title="编辑并重发"
           >
             <Pencil className="h-3 w-3" strokeWidth={1.5} />
           </button>
           <button
             onClick={() => { if (message.id !== undefined) onDelete(message.id) }}
-            className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
+            className="p-2 md:p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
             title="删除"
           >
             <Trash2 className="h-3 w-3" strokeWidth={1.5} />

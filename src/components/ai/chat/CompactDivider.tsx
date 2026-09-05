@@ -28,7 +28,7 @@ export function CompactDivider({ summary, onDelete }: CompactDividerProps) {
         {onDelete && (
           <button
             onClick={onDelete}
-            className="p-0.5 text-slate-300 dark:text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+            className="p-1.5 md:p-0.5 text-slate-300 dark:text-slate-600 hover:text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"
             title="删除压缩点（恢复携带完整历史）"
           >
             <Trash2 className="h-3 w-3" strokeWidth={1.5} />
