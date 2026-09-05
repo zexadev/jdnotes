@@ -432,7 +432,7 @@ export function Editor({
     enabled: !diffState.isActive,
   })
 
-  // Ctrl+K 内联提问
+  // Ctrl+J 内联提问；窄屏工具栏的「AI 提问」按钮走同名自定义事件（工具栏拿不到这里的回调）
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
@@ -440,8 +440,13 @@ export function Editor({
         openInlinePrompt()
       }
     }
+    const handleOpenEvent = () => openInlinePrompt()
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('lapis:open-inline-prompt', handleOpenEvent)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('lapis:open-inline-prompt', handleOpenEvent)
+    }
   }, [openInlinePrompt])
 
   // ============= 链接悬停卡 =============

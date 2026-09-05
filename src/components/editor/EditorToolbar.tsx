@@ -7,6 +7,8 @@ import {
   Strikethrough,
   Code,
   Highlighter,
+  Sparkles,
+  Slash,
   List,
   ListOrdered,
   ListChecks,
@@ -201,8 +203,23 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     ],
   ]
 
+  // 窄屏专用入口：桌面的 Ctrl+J（AI 提问）和手打「/」（斜杠命令）在触屏上没有顺手的触发方式
+  const openInlinePromptFromToolbar = () => {
+    document.dispatchEvent(new CustomEvent('lapis:open-inline-prompt'))
+  }
+  const openSlashMenuFromToolbar = () => {
+    // 斜杠菜单只认「行首或空白后的 /」，不在这两种位置就先补一个空格
+    const { from, $from } = editor.state.selection
+    const before = editor.state.doc.textBetween(Math.max(0, from - 1), from)
+    const needsSpace = $from.parentOffset > 0 && before !== '' && !/\s/.test(before)
+    editor.chain().focus().insertContent(needsSpace ? ' /' : '/').run()
+  }
+
   return (
-    <div className="no-scrollbar flex items-center gap-0.5 py-1.5 relative overflow-x-auto md:overflow-visible">
+    // 外层 relative 只为给高亮色盘定位：色盘不能放在横向滚动容器里——overflow-x:auto 会连带把
+    // 纵向溢出裁掉，窄屏下点了「荧光标记」色盘被裁没，看起来就是按钮没反应
+    <div className="relative">
+    <div className="no-scrollbar flex items-center gap-0.5 py-1.5 overflow-x-auto md:overflow-visible">
       {buttons.map((group, groupIndex) => (
         <div key={groupIndex} className="flex items-center gap-0.5 flex-shrink-0">
           {groupIndex > 0 && (
@@ -224,6 +241,26 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           ))}
         </div>
       ))}
+
+      {/* 窄屏：AI 提问（= Ctrl+J）与斜杠命令菜单的触屏入口 */}
+      <div className="md:hidden flex items-center gap-0.5 flex-shrink-0">
+        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+        <button
+          onClick={openInlinePromptFromToolbar}
+          title="AI 提问"
+          className="p-1.5 rounded-md text-[#5E6AD2] hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <Sparkles className="h-4 w-4" />
+        </button>
+        <button
+          onClick={openSlashMenuFromToolbar}
+          title="命令菜单"
+          className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <Slash className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
 
       {/* 高亮颜色选择器 */}
       {showHighlightColors && (

@@ -25,7 +25,8 @@ export function AIBubbleMenu({ editor, onOpenAIPrompt, onEditLink }: AIBubbleMen
     <BubbleMenu
       editor={editor}
       options={{
-        placement: 'top',
+        // 触屏上 Android 自带的选区工具条压在选区上方，我们的气泡改放下方错开
+        placement: window.matchMedia('(max-width: 767px)').matches ? 'bottom' : 'top',
         offset: 10,
       }}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,7 +89,7 @@ function FormatButton({ onClick, active, icon, label }: { onClick: () => void; a
   return (
     <button
       onClick={onClick}
-      className={`p-1.5 rounded-lg transition-all ${
+      className={`p-2 md:p-1.5 rounded-lg transition-all ${
         active
           ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/40 dark:text-indigo-300'
           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
