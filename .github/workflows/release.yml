@@ -76,3 +76,95 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: gh release edit "$TAG" --notes-file release_notes.md
+
+  # Android：在桌面 Release 建好之后跑，把签名 APK 挂上去，并在 latest.json 里补一段 android 条目
+  # 供手机端应用内更新读取（桌面 updater 只读自己平台的 key，多出来的 android 条目它不认也不报错）。
+  # 签名 keystore 只在 secrets 里（本地在 ~/.tauri/lapis-release.jks）；Android 只允许同签名覆盖安装，
+  # 换 key 等于换应用，所有已装用户都得卸载重装
+  android:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;35.0.0 ndk;27.0.12077973'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lapis-release.jks"
+          cat > src-tauri/gen/android/keystore.properties <<PROPS
+          storeFile=$RUNNER_TEMP/lapis-release.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          PROPS
+
+      - name: Build signed APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.0.12077973
+          CI: true
+        run: pnpm tauri android build --apk --target aarch64
+
+      - name: Upload APK and patch latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          VERSION="${TAG#v}"
+          export APK_NAME="Lapis_${VERSION}_aarch64.apk"
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk "$APK_NAME"
+          gh release upload "$TAG" "$APK_NAME" --clobber
+          gh release download "$TAG" -p latest.json -O latest.json
+          node -e '
+            const fs = require("fs");
+            const j = JSON.parse(fs.readFileSync("latest.json", "utf8"));
+            j.platforms = j.platforms || {};
+            j.platforms["android-aarch64"] = {
+              url: `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${process.env.TAG}/${process.env.APK_NAME}`,
+              signature: "",
+            };
+            fs.writeFileSync("latest.json", JSON.stringify(j, null, 2));
+          '
+          gh release upload "$TAG" latest.json --clobber
+        shell: bash
