@@ -24,6 +24,8 @@ import {
 
 interface EditorToolbarProps {
   editor: Editor
+  /** 窄屏：作为键盘上方的底栏渲染——高亮色盘向上弹，AI/命令入口钉在右端不随横滚 */
+  bottomBar?: boolean
 }
 
 interface ToolbarButton {
@@ -33,7 +35,7 @@ interface ToolbarButton {
   isActive: () => boolean
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, bottomBar }: EditorToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageInsert = () => {
@@ -230,8 +232,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   return (
     // 外层 relative 只为给高亮色盘定位：色盘不能放在横向滚动容器里——overflow-x:auto 会连带把
     // 纵向溢出裁掉，窄屏下点了「荧光标记」色盘被裁没，看起来就是按钮没反应
-    <div className="relative" data-active={activeSignature}>
-    <div className="no-scrollbar flex items-center gap-0.5 py-1.5 overflow-x-auto md:overflow-visible">
+    <div className={bottomBar ? 'relative flex items-center' : 'relative'} data-active={activeSignature}>
+    <div className={`no-scrollbar flex items-center gap-0.5 py-1.5 overflow-x-auto md:overflow-visible ${bottomBar ? 'flex-1 min-w-0' : ''}`}>
       {buttons.map((group, groupIndex) => (
         <div key={groupIndex} className="flex items-center gap-0.5 flex-shrink-0">
           {groupIndex > 0 && (
@@ -242,7 +244,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
               key={buttonIndex}
               onClick={button.action}
               title={button.title}
-              className={`p-1.5 rounded-md transition-colors ${
+              className={`p-2 md:p-1.5 rounded-md transition-colors ${
                 button.isActive()
                   ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400'
                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300'
@@ -254,29 +256,29 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </div>
       ))}
 
-      {/* 窄屏：AI 提问（= Ctrl+J）与斜杠命令菜单的触屏入口 */}
-      <div className="md:hidden flex items-center gap-0.5 flex-shrink-0">
-        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+    </div>
+
+      {/* 窄屏：AI 提问（= Ctrl+J）与斜杠命令菜单的触屏入口；放在滚动区之外钉在右端，不随横滚跑出屏幕 */}
+      <div className="md:hidden flex items-center gap-0.5 flex-shrink-0 pl-1 ml-1 border-l border-gray-200 dark:border-gray-700">
         <button
           onClick={openInlinePromptFromToolbar}
           title="AI 提问"
-          className="p-1.5 rounded-md text-[#5E6AD2] hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-md text-[#5E6AD2] hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <Sparkles className="h-4 w-4" />
         </button>
         <button
           onClick={openSlashMenuFromToolbar}
           title="命令菜单"
-          className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <Slash className="h-4 w-4" />
         </button>
       </div>
-    </div>
 
       {/* 高亮颜色选择器 */}
       {showHighlightColors && (
-        <div className="absolute top-full left-0 mt-1 p-2 bg-white dark:bg-[#16181D] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 flex items-center gap-1.5">
+        <div className={`absolute left-0 p-2 bg-white dark:bg-[#16181D] ${bottomBar ? 'bottom-full mb-1' : 'top-full mt-1'} border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 flex items-center gap-1.5`}>
           {highlightColors.map((c) => (
             <button
               key={c.color}

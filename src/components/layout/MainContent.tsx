@@ -12,6 +12,7 @@ import { isPaired } from '../../lib/pairing'
 import { PairingCodeModal } from '../modals/PairingCodeModal'
 import { invoke } from '@tauri-apps/api/core'
 import { formatTimeRemaining } from '../calendar/ReminderNotification'
+import { useIsNarrow } from '../../lib/platform'
 import type { Note } from '../../lib/db'
 import type { Editor as TiptapEditor } from '@tiptap/react'
 
@@ -64,6 +65,7 @@ export function MainContent({
   onBack,
   onDeleteNote,
 }: MainContentProps) {
+  const isNarrow = useIsNarrow()
   const [showReminderPicker, setShowReminderPicker] = useState(false)
   const reminderButtonRef = useRef<HTMLButtonElement>(null)
   const reminderPopupRef = useRef<HTMLDivElement>(null)
@@ -505,8 +507,8 @@ export function MainContent({
               />
             </div>
 
-            {/* 编辑器工具栏 - 固定不滚动 */}
-            {editorInstance && (
+            {/* 编辑器工具栏 - 固定不滚动；窄屏改为键盘上方的底栏（见下方） */}
+            {editorInstance && !isNarrow && (
               <div className="px-4 md:px-12 border-b border-black/[0.03] dark:border-white/[0.06]">
                 <EditorToolbar editor={editorInstance} />
               </div>
@@ -533,14 +535,22 @@ export function MainContent({
               onOpenNoteByTitle={onOpenNoteByTitle}
             />
 
-            {/* 写作统计栏 */}
-            {editorInstance && (
+            {/* 写作统计栏（窄屏让位给底栏工具条，键盘弹起时纵向空间紧） */}
+            {editorInstance && !isNarrow && (
               <WritingStats editor={editorInstance} />
             )}
 
             {/* 反向链接：被哪些笔记引用 */}
             {onOpenNote && (
               <Backlinks noteUuid={activeNote?.uuid} noteTitle={activeNote?.title} onOpenNote={onOpenNote} />
+            )}
+
+            {/* 窄屏：工具栏作为底栏贴在键盘上方（内容区随键盘 inset 缩高，底栏自然落在键盘之上），
+                格式按钮可横滑、AI 提问与命令菜单钉在右端，拇指够得着 */}
+            {editorInstance && isNarrow && (
+              <div className="flex-shrink-0 px-2 border-t border-black/[0.06] dark:border-white/[0.08] bg-[#F9FBFC] dark:bg-[#0B0D11]">
+                <EditorToolbar editor={editorInstance} bottomBar />
+              </div>
             )}
           </motion.div>
         ) : (
