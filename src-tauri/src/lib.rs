@@ -192,6 +192,24 @@ pub fn run() {
                 });
             }
 
+            // 手机不常驻 LAN 监听，但 iroh 端点开机即起：端点原本懒启动（打开同步页/发起同步才起），
+            // 桌面按 ID 添加或推送时手机常常不可达
+            #[cfg(mobile)]
+            {
+                let db_path_for_iroh = db_path.clone();
+                let app_handle_for_iroh = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = sync::iroh_get_id(
+                        app_handle_for_iroh,
+                        db_path_for_iroh.to_string_lossy().to_string(),
+                    )
+                    .await
+                    {
+                        log::warn!("iroh 端点启动失败: {}", e);
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
