@@ -1379,3 +1379,20 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* 窄屏（手机）关掉毛玻璃：backdrop-filter 在移动 GPU 上每帧重算，抽屉滑入 / 正文滚动明显发滞；
+   抽屉外层已自带不透明底，编辑器头部改为实色即可 */
+@media (max-width: 767px) {
+  .sidebar-gradient,
+  .ai-sidebar-glass,
+  .editor-header-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .editor-header-glass {
+    background: #F9FBFC;
+  }
+  .dark .editor-header-glass {
+    background: #0B0D11;
+  }
+}

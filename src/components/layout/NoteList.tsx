@@ -5,6 +5,7 @@ import { NoteCard } from '../common/NoteCard'
 import { NoNotesState, NoSearchResultState } from '../common/EmptyState'
 import { NoteCardSkeleton } from '../common/Skeleton'
 import type { Note } from '../../lib/db'
+import { useIsNarrow } from '../../lib/platform'
 
 interface NoteListProps {
   searchQuery: string
@@ -40,6 +41,7 @@ export function NoteList({
   onBatchPermanentDelete,
 }: NoteListProps) {
   const isTrash = currentView === 'trash'
+  const isNarrow = useIsNarrow()
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [showPermDeleteConfirm, setShowPermDeleteConfirm] = useState(false)
@@ -193,8 +195,9 @@ export function NoteList({
             <NoNotesState onCreateNote={onCreateNote} />
           )
         ) : (
-          <AnimatePresence mode="popLayout">
-            {notes.map((note) => (
+          // 窄屏：列表随打开笔记整体卸载/挂载，不走 AnimatePresence（上百张卡片逐张退场/入场是发滞主因）
+          (() => {
+            const cards = notes.map((note) => (
               <NoteCard
                 key={note.id}
                 note={note}
@@ -207,9 +210,11 @@ export function NoteList({
                 selectionMode={selectionMode}
                 selected={selectedIds.has(note.id)}
                 onToggleSelect={() => toggleSelect(note.id)}
+                animated={!isNarrow}
               />
-            ))}
-          </AnimatePresence>
+            ))
+            return isNarrow ? cards : <AnimatePresence mode="popLayout">{cards}</AnimatePresence>
+          })()
         )}
       </div>
 

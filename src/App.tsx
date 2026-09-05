@@ -857,17 +857,39 @@ function App() {
                 {...VIEW_MOTION}
                 className="flex-1 flex h-full overflow-hidden"
               >
+                {/* 窄屏：列表与编辑器堆叠，打开笔记时列表让位。不走宽度动画——
+                    width auto↔0 每帧重排上百张卡片，是手机上进出笔记发滞的主因；直接挂载/卸载 */}
+                {isNarrow && activeNoteId === null && (
+                  <div className="h-full flex-1 min-w-0 overflow-hidden flex">
+                    <NoteList
+                      searchQuery={searchQuery}
+                      onClearSearch={() => {
+                        setSearchQuery('')
+                        viewBeforeSearchRef.current = null
+                      }}
+                      currentView={currentView}
+                      notes={notes}
+                      activeNoteId={activeNoteId}
+                      onSelectNote={handleSelectNote}
+                      onCreateNote={handleCreateNote}
+                      onDeleteNote={handleDeleteNote}
+                      onRestoreNote={handleRestoreNote}
+                      onPermanentDelete={handlePermanentDelete}
+                      onBatchDelete={handleDeleteNotes}
+                      onBatchRestore={handleRestoreNotes}
+                      onBatchPermanentDelete={handlePermanentDeleteNotes}
+                    />
+                  </div>
+                )}
                 <AnimatePresence initial={false}>
-                  {/* 窄屏：列表与编辑器堆叠，打开笔记时列表让位 */}
-                  {!isImmersive && !(isNarrow && activeNoteId !== null) && (
+                  {!isImmersive && !isNarrow && (
                     <motion.div
                       key="app-notelist"
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: 'auto', opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
                       transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                      // 窄屏列表独占一行：flex-shrink-0 + width:auto 会按内容宽（长预览）撑开把卡片推出屏幕，须改 flex-1 min-w-0
-                      className={isNarrow ? 'h-full flex-1 min-w-0 overflow-hidden flex' : 'h-full flex-shrink-0 overflow-hidden flex'}
+                      className="h-full flex-shrink-0 overflow-hidden flex"
                     >
                       <NoteList
                         searchQuery={searchQuery}

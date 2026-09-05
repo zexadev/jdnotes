@@ -14,6 +14,8 @@ interface NoteCardProps {
   selectionMode?: boolean
   selected?: boolean
   onToggleSelect?: () => void
+  /** false = 不做任何 motion 动画（窄屏列表整体挂载/卸载时用） */
+  animated?: boolean
 }
 
 export function NoteCard({
@@ -27,18 +29,25 @@ export function NoteCard({
   selectionMode = false,
   selected = false,
   onToggleSelect,
+  animated = true,
 }: NoteCardProps) {
   const preview = extractPreview(note.content)
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      whileHover={{ scale: 1.01, transition: { duration: 0.2 } }}
-      whileTap={{ scale: 0.99, transition: { duration: 0.1 } }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
+      // 窄屏不做 layout/入退场/缩放动画：列表整体随打开笔记卸载、返回时整体挂载，
+      // 上百张卡片同时做 layout 测量 + 位移动画是手机上进出笔记发滞的主因
+      {...(animated
+        ? {
+            layout: true,
+            initial: { opacity: 0, y: 20 },
+            animate: { opacity: 1, y: 0 },
+            exit: { opacity: 0, x: -20 },
+            whileHover: { scale: 1.01, transition: { duration: 0.2 } },
+            whileTap: { scale: 0.99, transition: { duration: 0.1 } },
+            transition: { duration: 0.2, ease: 'easeOut' as const },
+          }
+        : {})}
       className={`note-list-item group relative w-full text-left px-3 py-3 border-b border-black/[0.03] dark:border-white/[0.06] cursor-pointer ${
         active
           ? 'note-card-active'
