@@ -28,6 +28,7 @@
 
 - **CI/CD**：GitHub Actions 构建发布（`.github/workflows/release.yml`，推 `v*` tag 触发，windows-latest）。Release body 从 `docs/src/content/changelog.mdx` 里手写的 `## vX.Y.Z` 小节抽取——**更新日志始终人写，不用 commit 自动生成**，抽不到直接让 workflow 失败。`latest.json` 由 tauri-action 生成上传，不再手工拼
 - **Android 构建**（手机端在做，单仓库同一 `src-tauri` 加 target，前端就是桌面 `dist` 同一份、靠窄屏自适应）：`CI=true pnpm tauri android build --debug --apk --target aarch64` → `src-tauri/gen/android/app/build/outputs/apk/universal/debug/`。本机 NDK 27 + JDK 21，Windows 主机交叉编译+链接已跑通，小米 14T Pro / Android 16 真机启动通过（2026-09-04）。Android 上 `app_data_dir()` = `/data/user/0/com.jdnotes.app`，DB 默认 WAL；Rust 日志看 logcat tag `app_lib`。小米 `adb install` 被 USER_RESTRICTED 拒 = 开发者选项「USB 安装」没开；Git Bash 下 adb 路径前要 `MSYS_NO_PATHCONV=1`。桌面专属依赖在 Cargo.toml 走 `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`（cargo 的 target 表不认 tauri-build 注入的 `cfg(desktop)`，源码里才用 `#[cfg(desktop)]`）；reqwest 必须关默认 feature（native-tls 在 Android 要 openssl-sys）。方案与实测细节见 docs/local/mobile-app.md
+- **本地出可独立运行的桌面调试包**：`pnpm tauri build --debug --no-bundle` → `src-tauri/target/debug/app.exe`（嵌前端、不打安装包、不要签名私钥）。**直接 `cargo build` 出的 debug exe 是 dev 模式**（tauri-build 打 `dev` cfg，`generate_context!` 不嵌前端而指向 devUrl），单独运行是空白页。只改前端后重打包无需 touch：build.rs 已登记 `rerun-if-changed=../dist`（`tauri_build::build()` 默认不跟踪 dist）
 - **文档站**：Nextra 4 (Next.js)，位于 `docs/`，静态导出
 - **文档部署**：Cloudflare Pages，域名 jdnotes.zexa.cc
 - **数据库**：SQLite（通过 tauri-plugin-sql；前端 db.ts 直接执行 SQL，plugin 在 Rust 侧原生跑）
