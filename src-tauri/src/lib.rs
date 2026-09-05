@@ -3,6 +3,7 @@ mod commands;
 mod db;
 #[cfg(desktop)]
 mod mcp_server;
+mod mobile_update;
 mod models;
 mod sync;
 
@@ -259,6 +260,9 @@ pub fn run() {
             commands::get_attachment_path,
             commands::read_attachment_data_url,
             commands::sync_gc_attachments,
+            // 手机端应用内更新（桌面走 updater 插件，前端按平台分流）
+            mobile_update::mobile_update_check,
+            mobile_update::mobile_update_download,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

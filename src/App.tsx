@@ -336,7 +336,7 @@ function App() {
 
   // 启动后延迟检查更新（避开初始化高峰）
   useEffect(() => {
-    if (!isReady || hasCheckedUpdateRef.current || isMobilePlatform) return
+    if (!isReady || hasCheckedUpdateRef.current) return
     hasCheckedUpdateRef.current = true
     const timer = setTimeout(() => {
       updaterRef.current.checkForUpdates().catch((err) => {

@@ -1,5 +1,6 @@
 package com.jdnotes.app
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
@@ -7,9 +8,11 @@ import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import java.io.File
 
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
@@ -58,6 +61,27 @@ class MainActivity : TauriActivity() {
 
     @JavascriptInterface
     fun getInsets(): String = "{\"top\":$insetTopCss,\"bottom\":$insetBottomCss}"
+
+    // 应用内更新：Rust 把 APK 下到 cacheDir 后，这里经 FileProvider（file_paths.xml 的 cache-path）
+    // 签出 content:// URI 交给系统安装器。返回空串=已拉起安装器，否则是错误信息。
+    // 首次会被系统要求允许 Lapis「安装未知应用」（manifest 声明了 REQUEST_INSTALL_PACKAGES，
+    // 安装器会就地引导）；同签名覆盖安装，数据保留
+    @JavascriptInterface
+    fun installApk(path: String): String {
+      return try {
+        val file = File(path)
+        if (!file.isFile) return "安装包不存在: $path"
+        val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+          setDataAndType(uri, "application/vnd.android.package-archive")
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(intent)
+        ""
+      } catch (e: Exception) {
+        e.message ?: e.toString()
+      }
+    }
   }
 
   private fun pushInsetsToPage() {

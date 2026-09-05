@@ -1,11 +1,8 @@
 import { useState } from 'react'
 import { RefreshCw, Download, CheckCircle, AlertCircle, Loader2, FileText } from 'lucide-react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { useUpdater } from '../../hooks/useUpdater'
 import { ChangelogModal } from '../../components/modals/ChangelogModal'
 import { isMobilePlatform } from '../../lib/platform'
-
-const RELEASES_URL = 'https://github.com/zexadev/lapisnote/releases/latest'
 
 export function UpdateSettings() {
   const updater = useUpdater()
@@ -18,7 +15,7 @@ export function UpdateSettings() {
           软件更新
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {isMobilePlatform ? '手机端通过安装新版 APK 更新' : '检查并安装 Lapis 的最新版本'}
+          检查并安装 Lapis 的最新版本
         </p>
       </div>
 
@@ -33,17 +30,7 @@ export function UpdateSettings() {
           </span>
         </div>
 
-        {/* 更新状态显示。手机端没有 updater 插件（侧载分发），只给下载入口 */}
-        {isMobilePlatform ? (
-          <button
-            onClick={() => void openUrl(RELEASES_URL)}
-            className="w-full px-4 py-3 text-sm font-medium text-white bg-[#5E6AD2] hover:bg-[#5E6AD2]/90 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            前往下载最新版
-          </button>
-        ) : (
-        <>
+        {/* 更新状态显示 */}
         {updater.status === 'idle' && (
           <button
             onClick={updater.checkForUpdates}
@@ -131,7 +118,7 @@ export function UpdateSettings() {
               onClick={updater.installUpdate}
               className="w-full px-4 py-3 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              立即安装并重启
+              {isMobilePlatform ? '立即安装' : '立即安装并重启'}
             </button>
           </div>
         )}
@@ -152,8 +139,6 @@ export function UpdateSettings() {
             </button>
           </div>
         )}
-        </>
-        )}
       </div>
 
       {/* 查看更新日志 */}
@@ -171,12 +156,23 @@ export function UpdateSettings() {
       {/* 更新说明 */}
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
-          {isMobilePlatform ? '手机端更新说明' : '自动更新说明'}
+          自动更新说明
         </h3>
         {isMobilePlatform ? (
-          <p className="text-xs leading-relaxed text-blue-700 dark:text-blue-300">
-            手机端不做应用内更新。新版本发布在 GitHub Releases，下载 APK 覆盖安装即可，笔记数据保留。
-          </p>
+        <ul className="space-y-1.5 text-xs text-blue-700 dark:text-blue-300">
+          <li className="flex items-start gap-2">
+            <span className="mt-1">•</span>
+            <span>应用会在每次启动时自动检查更新</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-1">•</span>
+            <span>下载完成后交给系统安装器，首次需要允许 Lapis 安装应用</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-1">•</span>
+            <span>覆盖安装，笔记数据保留</span>
+          </li>
+        </ul>
         ) : (
         <ul className="space-y-1.5 text-xs text-blue-700 dark:text-blue-300">
           <li className="flex items-start gap-2">

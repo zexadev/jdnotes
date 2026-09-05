@@ -50,6 +50,8 @@ base64 = "0.22"
 netdev = "0.44"
 # 局域网设备自动发现：mDNS / DNS-SD 广播 + 浏览
 mdns-sd = "0.13"
+# 手机端应用内更新：比 latest.json 里的版本号（tauri 的 PackageInfo.version 就是这个类型）
+semver = "1"
 
 # 桌面专属：托盘、单实例、自更新、进程控制、MCP HTTP server（rmcp/axum/schemars）、
 # 往桌面 AI 工具配置文件里登记（dirs）。手机没有托盘/自更新（侧载）/MCP 宿主。

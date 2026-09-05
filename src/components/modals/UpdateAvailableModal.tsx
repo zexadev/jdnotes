@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Download, Sparkles, AlertCircle, CheckCircle, Loader2, X } from 'lucide-react'
 import type { UpdateInfo, UpdateProgress, UpdateStatus } from '../../hooks/useUpdater'
+import { isMobilePlatform } from '../../lib/platform'
 
 interface UpdateAvailableModalProps {
   open: boolean
@@ -137,7 +138,7 @@ export function UpdateAvailableModal({
           {status === 'ready' && (
             <div className="mt-5 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
               <CheckCircle className="h-5 w-5 shrink-0" />
-              <span>下载完成，点击「立即重启」完成安装。</span>
+              <span>{isMobilePlatform ? '下载完成，点击「立即安装」交给系统安装器。' : '下载完成，点击「立即重启」完成安装。'}</span>
             </div>
           )}
 
@@ -161,7 +162,7 @@ export function UpdateAvailableModal({
               className="w-full px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               <CheckCircle className="h-4 w-4" />
-              立即重启并安装
+              {isMobilePlatform ? '立即安装' : '立即重启并安装'}
             </button>
           ) : (
             <>
