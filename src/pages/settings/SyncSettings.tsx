@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { save, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 import { toast } from '../../lib/toast'
-import { isPaired } from '../../lib/pairing'
+import { isPaired, unmarkPaired } from '../../lib/pairing'
 import { NoteSelectModal } from '../../components/modals/NoteSelectModal'
 import { PairingCodeModal } from '../../components/modals/PairingCodeModal'
 
@@ -222,9 +222,18 @@ export function SyncSettings({ onDataChange }: SyncSettingsProps) {
     setAddingDevice(false)
   }
 
-  const removeDevice = (id: string, name: string) => {
+  // 移除 = 不再信任：连后端权威白名单一起撤销，下次对方连进来/本机连过去都要重新对配对码。
+  // 只删列表不撤白名单的话，删掉再加回来不会再弹码，「移除」就成了假的
+  const removeDevice = async (id: string, name: string) => {
     persistDevices(devices.filter((d) => d.id !== id))
-    toast.info(`已移除设备「${name}」`)
+    const fp = id.slice(0, 16)
+    unmarkPaired(fp)
+    try {
+      await invoke('sync_revoke_pairing', { fingerprint: fp })
+    } catch (e) {
+      console.warn('撤销配对失败:', e)
+    }
+    toast.info(`已移除设备「${name}」并撤销配对，下次连接需重新确认配对码`)
   }
 
   // 跨网「我的设备」：点「同步」用存好的 ID 发起一次全量双向同步
