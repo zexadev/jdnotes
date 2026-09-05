@@ -4,6 +4,8 @@ import type { AIAction } from '../../hooks/useAIStream'
 
 interface AIInlinePromptProps {
   position: { top: number; left: number }
+  /** 窄屏：不跟光标，固定在可视区底部（底栏工具条之上）整宽显示 */
+  docked?: boolean
   hasSelection: boolean
   onSubmit: (prompt: string) => void
   onQuickAction: (action: AIAction) => void
@@ -11,7 +13,7 @@ interface AIInlinePromptProps {
 }
 
 // Ctrl+J 内联 AI 输入条：自由指令 + 快捷动作 chips（选中：改进/翻译/总结；无选中：续写）
-export function AIInlinePrompt({ position, hasSelection, onSubmit, onQuickAction, onClose }: AIInlinePromptProps) {
+export function AIInlinePrompt({ position, docked, hasSelection, onSubmit, onQuickAction, onClose }: AIInlinePromptProps) {
   const [prompt, setPrompt] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -53,10 +55,16 @@ export function AIInlinePrompt({ position, hasSelection, onSubmit, onQuickAction
   return (
     <div
       ref={containerRef}
-      className="absolute z-50 animate-in fade-in slide-in-from-top-1 duration-150"
-      style={{ top: position.top, left: position.left }}
+      // 桌面：跟着光标浮在正文里（min-w 340）；窄屏：光标处放不下 340 宽、还可能压到键盘下面，
+      // 改为固定在可视区底部、底栏工具条之上的整宽条，键盘弹起时随内容区一起上移
+      className={
+        docked
+          ? 'fixed z-50 left-2 right-2 animate-in fade-in slide-in-from-bottom-1 duration-150'
+          : 'absolute z-50 animate-in fade-in slide-in-from-top-1 duration-150'
+      }
+      style={docked ? { bottom: 'calc(3.5rem + var(--safe-area-bottom, 0px))' } : { top: position.top, left: position.left }}
     >
-      <div className="flex flex-col gap-1.5 px-3 py-2.5 bg-white/95 dark:bg-[#1C1C1F]/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 min-w-[340px]">
+      <div className={`flex flex-col gap-1.5 px-3 py-2.5 bg-white/95 dark:bg-[#1C1C1F]/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 ${docked ? 'w-full' : 'min-w-[340px]'}`}>
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#5E6AD2] shrink-0" />
           <input
@@ -94,7 +102,16 @@ export function AIInlinePrompt({ position, hasSelection, onSubmit, onQuickAction
               {label}
             </button>
           ))}
-          <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500 select-none">Esc 关闭</span>
+          {docked ? (
+            <button
+              onClick={onClose}
+              className="ml-auto px-2 py-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-black/[0.04] dark:bg-white/[0.06] rounded-md"
+            >
+              关闭
+            </button>
+          ) : (
+            <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500 select-none">Esc 关闭</span>
+          )}
         </div>
       </div>
     </div>

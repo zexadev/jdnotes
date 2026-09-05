@@ -28,6 +28,7 @@ import { NoteRefMenu, type NoteRefItem } from './NoteRefMenu'
 import { useEditorAI, useSlashCommand, useNoteRefMenu } from '../../hooks'
 import { useAutoTitle } from '../../hooks/useAutoTitle'
 import { formatDateTime, formatTime, isSameDay } from '../../lib/utils'
+import { useIsNarrow } from '../../lib/platform'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { readFile } from '@tauri-apps/plugin-fs'
@@ -393,6 +394,7 @@ export function Editor({
     title,
   })
 
+  const isNarrow = useIsNarrow()
   const [inlinePromptPos, setInlinePromptPos] = useState<{ top: number; left: number } | null>(null)
   const [inlineHasSelection, setInlineHasSelection] = useState(false)
 
@@ -862,6 +864,7 @@ export function Editor({
           {/* Ctrl+J 内联提问 */}
           {inlinePromptPos && !diffState.isActive && (
             <AIInlinePrompt
+              docked={isNarrow}
               position={inlinePromptPos}
               hasSelection={inlineHasSelection}
               onSubmit={(prompt) => {
