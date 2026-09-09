@@ -1,6 +1,9 @@
 # iOS：在 macOS runner 上出「未签名 IPA」，用户用 AltStore / Sideloadly 等工具自签安装。
-# 没有 Apple 开发者账号也没有 Mac，所以：Xcode 工程每次在 CI 现场 `tauri ios init` 生成（不入库），
-# 不走 `tauri ios build`（它必须 archive+export，没证书过不去），直接 xcodebuild 关掉签名出 .app 再打成 IPA。
+# 没有 Apple 开发者账号也没有 Mac，所以 Xcode 工程每次在 CI 现场 `tauri ios init` 生成（不入库）。
+# 构建必须经 `tauri ios build`：Xcode 里的 Rust 构建脚本要连回 CLI 父进程拿参数，直接 xcodebuild 会
+# 因为缺 <identifier>-server-addr 文件 panic。CLI 只有在设了 App Store Connect 三个 API 环境变量时才走
+# 「archive 不签名 → 自签临时证书 → export」；我们塞假值让 archive 跑完，export 拿假凭据必然失败，
+# 但 .xcarchive 里的 .app 已经在盘上，从那里打 IPA。
 # 单独 workflow_dispatch 可随时试跑（产物挂 artifact）；发版时由 release.yml 以 workflow_call 调用并挂到 Release。
 name: iOS
 
@@ -69,27 +72,26 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSBonjourServices:0 string '_lapis._tcp'" "$plist"
           /usr/libexec/PlistBuddy -c "Print" "$plist"
 
-      # 绕过 tauri ios build 就得自己跑 beforeBuildCommand；Rust 静态库由 Xcode 的 build phase 调
-      # `pnpm tauri ios xcode-script` 编（release 配置→cargo release→嵌入 dist）
-      - name: Build frontend
-        run: pnpm build
-
-      - name: Build unsigned app
+      # 假的 App Store Connect 凭据只为触发 CLI 的 skip_codesign 分支（三个变量要么全设要么全不设，
+      # 缺一个 CLI 直接报错）；archive 之后的 export 用它们必然失败，退出码不看，只认 .xcarchive 里的 .app
+      - name: Archive via tauri ios build (export expected to fail)
+        env:
+          APPLE_DEVELOPMENT_TEAM: XXXXXXXXXX
+          APPLE_API_KEY: DUMMY
+          APPLE_API_ISSUER: 00000000-0000-0000-0000-000000000000
+          APPLE_API_KEY_PATH: ${{ runner.temp }}/dummy.p8
+          CI: true
         run: |
-          set -euo pipefail
-          proj=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
-          name=$(basename "$proj" .xcodeproj)
-          xcodebuild \
-            -project "$proj" \
-            -scheme "${name}_iOS" \
-            -configuration release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build/ios \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
-            build
-          app=$(find build/ios/Build/Products/release-iphoneos -maxdepth 1 -name '*.app' | head -1)
-          test -d "$app" || { echo "::error::没找到 .app 产物"; exit 1; }
+          set -u
+          echo "dummy" > "$APPLE_API_KEY_PATH"
+          pnpm tauri ios build --export-method debugging --ci 2>&1 | tee ios_build.log
+          status=${PIPESTATUS[0]}
+          app=$(find src-tauri/gen/apple -type d -path '*.xcarchive/Products/Applications/*.app' | head -1)
+          if [ -z "$app" ]; then
+            echo "::error::archive 没产出 .app（tauri ios build 退出码 $status），见上方日志"
+            exit 1
+          fi
+          echo "tauri ios build 退出码 $status（export 阶段没有真实 Apple 凭据，失败是预期的；archive 已完成）"
           echo "APP_PATH=$app" >> "$GITHUB_ENV"
 
       - name: Package IPA
