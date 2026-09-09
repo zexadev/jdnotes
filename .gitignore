@@ -43,3 +43,5 @@ branding/
 .agents/
 skills-lock.json
 .claude/skills/ss-*
+# wrangler pages dev 的本地缓存（测文档站 Pages Function 用）
+docs/.wrangler/
