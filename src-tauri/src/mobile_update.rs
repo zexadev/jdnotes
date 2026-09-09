@@ -65,9 +65,14 @@ fn http_client(total_timeout: Option<std::time::Duration>) -> Result<reqwest::Cl
 }
 
 /// 拉 latest.json 比版本。远端不比本地新 → None；比本地新但清单里没有安卓包 → 报错，
-/// 别当"已是最新"糊弄过去——那是发版漏传 APK，得让人看见
+/// 别当"已是最新"糊弄过去——那是发版漏传 APK，得让人看见。
+/// 顺手清掉上次残留的安装包：装完系统直接杀进程，没有机会事后删；每次启动都会来这里，
+/// 前端重启后也不再记得那个路径（重新走下载），所以这里删是安全的
 #[tauri::command]
 pub async fn mobile_update_check(app: AppHandle) -> Result<Option<MobileUpdateInfo>, String> {
+    if let Ok(dir) = updates_dir(&app) {
+        clear_dir(&dir);
+    }
     let client = http_client(Some(std::time::Duration::from_secs(20)))?;
     let latest: LatestJson = client
         .get(LATEST_JSON_URL)
@@ -114,6 +119,14 @@ fn updates_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+fn clear_dir(dir: &std::path::Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 /// 把 APK 流式下到缓存目录，按 `mobile-update-progress` 事件报进度，返回落盘绝对路径。
 /// 先清掉目录里旧的安装包（上次下载完没装的），别攒
 #[tauri::command]
@@ -127,11 +140,7 @@ pub async fn mobile_update_download(
     }
 
     let dir = updates_dir(&app)?;
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let _ = std::fs::remove_file(entry.path());
-        }
-    }
+    clear_dir(&dir);
     let final_path = dir.join(format!("Lapis_{}.apk", version));
     let tmp_path = dir.join(format!("Lapis_{}.apk.part", version));
 
