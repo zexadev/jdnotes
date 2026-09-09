@@ -73,7 +73,9 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print" "$plist"
 
       # 假的 App Store Connect 凭据只为触发 CLI 的 skip_codesign 分支（三个变量要么全设要么全不设，
-      # 缺一个 CLI 直接报错）；archive 之后的 export 用它们必然失败，退出码不看，只认 .xcarchive 里的 .app
+      # 缺一个 CLI 直接报错）。archive 也会带 -authenticationKeyPath，xcodebuild 先本地解析 PEM，
+      # 随便写个文件会报 invalidPEMDocument 连 archive 都不跑，所以生成一把真的 P-256 PKCS#8 私钥充数；
+      # 不签名的 archive 用不到网络。archive 之后的 export 用假凭据必然失败，退出码不看，只认 .xcarchive 里的 .app
       - name: Archive via tauri ios build (export expected to fail)
         env:
           APPLE_DEVELOPMENT_TEAM: XXXXXXXXXX
@@ -83,15 +85,15 @@ jobs:
           CI: true
         run: |
           set -u
-          echo "dummy" > "$APPLE_API_KEY_PATH"
+          openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out "$APPLE_API_KEY_PATH"
           pnpm tauri ios build --export-method debugging --ci 2>&1 | tee ios_build.log
           status=${PIPESTATUS[0]}
           app=$(find src-tauri/gen/apple -type d -path '*.xcarchive/Products/Applications/*.app' | head -1)
           if [ -z "$app" ]; then
-            echo "::error::archive 没产出 .app（tauri ios build 退出码 $status），见上方日志"
+            echo "::error::archive 没产出 .app（tauri ios build 退出码 ${status}），见上方日志"
             exit 1
           fi
-          echo "tauri ios build 退出码 $status（export 阶段没有真实 Apple 凭据，失败是预期的；archive 已完成）"
+          echo "tauri ios build 退出码 ${status}（export 阶段没有真实 Apple 凭据，失败是预期的；archive 已完成）"
           echo "APP_PATH=$app" >> "$GITHUB_ENV"
 
       - name: Package IPA
