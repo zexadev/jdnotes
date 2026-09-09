@@ -1,23 +1,36 @@
 ---
-title: 手机端（Android）— 安装、同步与更新
-description: Lapis Android 版安装教程：下载 APK 安装、与电脑配对后 P2P 同步笔记、应用内检查更新。与桌面版同一套功能，页面按手机屏幕自适应。
+title: 手机端 — Android 与 iOS 安装、同步与更新
+description: Lapis 手机版安装教程：Android 下载 APK 安装，iOS 下载未签名 IPA 自签安装；与电脑配对后 P2P 同步笔记，应用内检查更新。与桌面版同一套功能，页面按手机屏幕自适应。
 keywords:
   - Lapis安卓版
+  - Lapis iOS
   - Android笔记软件
+  - iOS笔记软件自签
   - 手机电脑笔记同步
   - APK安装
+  - IPA自签安装
   - P2P笔记同步
 ---
 
-# 手机端（Android）
+# 手机端
 
-Android 版与桌面版是同一套程序：同样的编辑器、AI 助手、日历、提醒和同步，页面按手机屏幕自适应，不是精简版。
+手机版与桌面版是同一套程序：同样的编辑器、AI 助手、日历、提醒和同步，页面按手机屏幕自适应，不是精简版。
 
-## 安装
+## 安装（Android）
 
 1. 前往 [GitHub Releases](https://github.com/zexadev/lapisnote/releases) 下载 `Lapis_x.y.z_aarch64.apk`
 2. 打开安装包，按系统提示允许安装
 3. 需要 Android 7.0 以上的 arm64 设备
+
+## 安装（iOS，自签）
+
+Lapis 不在 App Store，iOS 版以未签名 IPA 发布，需要自己签名安装：
+
+1. 前往 [GitHub Releases](https://github.com/zexadev/lapisnote/releases) 下载 `Lapis_x.y.z_ios_unsigned.ipa`
+2. 用 [AltStore](https://altstore.io)、[Sideloadly](https://sideloadly.io) 或同类工具签名并安装到手机
+3. 免费 Apple ID 签出的应用 7 天过期，需按工具提示定期续签；付费开发者账号签的一年有效
+
+有新版本时应用内会提示，点「前往下载」拿到新的 IPA 后按同样方式重新签名安装，笔记数据保留。
 
 ## 从电脑同步过来
 
@@ -32,11 +45,11 @@ Android 版与桌面版是同一套程序：同样的编辑器、AI 助手、日
 
 ## 应用内更新
 
-启动时自动检查新版本，也可在「设置 › 软件更新」手动检查。下载完成后交给系统安装器覆盖安装，笔记数据保留。首次更新时系统会要求允许 Lapis 安装应用。
+启动时自动检查新版本，也可在「设置 › 软件更新」手动检查。Android 下载完成后交给系统安装器覆盖安装，笔记数据保留，首次更新时系统会要求允许 Lapis 安装应用。iOS 只提示并打开下载地址，安装仍需自签。
 
 ## 与桌面版的差异
 
 - 数据存放在应用私有目录，不支持更改存储位置；导入、导出走系统文件选择器
 - 没有托盘和 MCP Server，MCP 只在电脑上供 AI 工具接入
 - 编辑器工具栏位于键盘上方，AI 提问与命令菜单的入口也在那里
-- 暂无 iOS 版
+- iOS 版没有真机验收过，遇到问题请到 [Issues](https://github.com/zexadev/lapisnote/issues) 反馈
