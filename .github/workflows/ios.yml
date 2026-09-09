@@ -64,13 +64,19 @@ jobs:
           APPLE_DEVELOPMENT_TEAM: XXXXXXXXXX
         run: pnpm tauri ios init --ci --skip-targets-install
 
-      # 局域网用途声明与 Bonjour 服务名来自 src-tauri/Info.ios.plist（tauri ios init 自动合并），这里只核对
-      - name: Verify merged Info.plist
+      # iOS 14+ 访问局域网必须声明用途与 Bonjour 服务名，否则连同网段的电脑都被系统拦下。
+      # src-tauri/Info.ios.plist 里也有这两项，但实测 tauri ios init 不合并它（CLI 在 build 阶段才处理），
+      # 这里按「没有才加」补进生成的 Info.plist，两边都在也不冲突；最终以 .app 里的 Info.plist 为准核对
+      - name: Declare local network usage
         run: |
           set -euo pipefail
           plist=$(ls src-tauri/gen/apple/*_iOS/Info.plist | head -1)
-          /usr/libexec/PlistBuddy -c "Print :NSBonjourServices" "$plist"
-          /usr/libexec/PlistBuddy -c "Print :NSLocalNetworkUsageDescription" "$plist"
+          pb=/usr/libexec/PlistBuddy
+          $pb -c "Print :NSLocalNetworkUsageDescription" "$plist" >/dev/null 2>&1 \
+            || $pb -c "Add :NSLocalNetworkUsageDescription string '用于在同一局域网内与你的电脑直连同步笔记'" "$plist"
+          $pb -c "Print :NSBonjourServices" "$plist" >/dev/null 2>&1 \
+            || { $pb -c "Add :NSBonjourServices array" "$plist"; $pb -c "Add :NSBonjourServices:0 string '_lapis._tcp'" "$plist"; }
+          $pb -c "Print :NSBonjourServices" "$plist"
 
       # 假的 App Store Connect 凭据只为触发 CLI 的 skip_codesign 分支（三个变量要么全设要么全不设，
       # 缺一个 CLI 直接报错）。archive 也会带 -authenticationKeyPath，xcodebuild 先本地解析 PEM，
@@ -94,6 +100,8 @@ jobs:
             exit 1
           fi
           echo "tauri ios build 退出码 ${status}（export 阶段没有真实 Apple 凭据，失败是预期的；archive 已完成）"
+          /usr/libexec/PlistBuddy -c "Print :NSBonjourServices" "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Info.plist"
           echo "APP_PATH=$app" >> "$GITHUB_ENV"
 
       - name: Package IPA
