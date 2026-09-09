@@ -170,7 +170,7 @@ export function LandingPage() {
           </a>
         </div>
         <p className="landing-cta-footer">
-          支持 Windows 10/11 (64位) · AGPL-3.0 · <a href="https://zexa.cc">Zexa</a> 出品
+          Windows 10/11 · Android 7.0+ · iOS（自签） · AGPL-3.0 · <a href="https://zexa.cc">Zexa</a> 出品
         </p>
       </section>
     </div>

@@ -12,7 +12,7 @@
   <a href="https://github.com/zexadev/lapisnote/releases">
     <img src="https://img.shields.io/github/downloads/zexadev/lapisnote/total?style=flat-square&logo=github" alt="Downloads">
   </a>
-  <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iOS-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License">
 </p>
 
@@ -43,13 +43,14 @@
 
 ## 📖 简介
 
-**Lapis** 是一款本地优先的桌面笔记应用（Tauri 2 构建）。支持局域网 + 跨网 P2P 加密多设备同步，AI 可经 MCP 直接读写你的笔记库。数据本地存储，隐私安全。
+**Lapis** 是一款本地优先的笔记应用（Tauri 2 构建），桌面与手机同一套功能。支持局域网 + 跨网 P2P 加密多设备同步，AI 可经 MCP 直接读写你的笔记库。数据本地存储，隐私安全。
 
 > **前身是 jdnotes（JD Notes）**：自 2.0 起更名为 Lapis。同一应用、同一套数据，老版本直接安装新版即可升级，笔记原样保留。
 
 | | 特性 | 说明 |
 |---|---|---|
-| 🔄 | **多设备同步** | 局域网自动发现 + 跨网 P2P 加密直连，免费、无中心服务器 |
+| 📱 | **三端同一套功能** | Windows、Android、iOS 都是完整版：编辑器、AI、日历、提醒、同步一个不少，手机页面自适应 |
+| 🔄 | **多设备同步** | 局域网自动发现 + 跨网 P2P 加密直连，电脑与手机互通，免费、无中心服务器 |
 | 🔌 | **AI Agent 读写** | 内置 MCP Server，Claude Code / Cursor 等 AI 工具可直接在你的本地笔记库查看、创建、追加、修改笔记 |
 | 🔗 | **双向链接** | 输入 `[[` 引用其它笔记（或正文直接写 `[[标题]]`），单击跳转 + 自动反向链接 |
 | 🤖 | **AI 赋能** | 多平台 AI 助手，支持 DeepSeek / Claude / Gemini / Ollama |
@@ -162,6 +163,24 @@
 | `Lapis_x.x.x_x64_en-US.msi` | Windows MSI 安装包 |
 
 **系统要求：** Windows 10/11 (64位)
+
+### Android
+
+| 文件 | 说明 |
+|------|------|
+| `Lapis_x.x.x_aarch64.apk` | Android 安装包，需 7.0 以上的 arm64 设备 |
+
+打开安装包按提示安装。之后新版本在应用内检查更新、覆盖安装，笔记保留。
+
+### iOS（自签）
+
+| 文件 | 说明 |
+|------|------|
+| `Lapis_x.x.x_ios_unsigned.ipa` | 未签名 IPA，用 [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io) 签名安装 |
+
+不在 App Store。免费 Apple ID 签出的应用 7 天过期，需按工具提示续签。iOS 版尚未经真机验收。
+
+手机与电脑的配对同步、更新方式见[手机端文档](https://jdnotes.zexa.cc/guide/mobile)。
 
 ---
 

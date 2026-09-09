@@ -12,7 +12,7 @@
   <a href="https://github.com/zexadev/lapisnote/releases">
     <img src="https://img.shields.io/github/downloads/zexadev/lapisnote/total?style=flat-square&logo=github" alt="Downloads">
   </a>
-  <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square&logo=windows" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20iOS-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-green?style=flat-square" alt="License">
 </p>
 
@@ -43,7 +43,7 @@
 
 ## About
 
-**Lapis** is a local-first desktop note-taking app built with Tauri 2. Sync across devices over LAN or encrypted P2P — and let AI agents read and write your local notes via MCP. All data is stored locally on your device — no cloud, no tracking, full privacy.
+**Lapis** is a local-first note-taking app built with Tauri 2, with the same feature set on desktop and mobile. Sync across devices over LAN or encrypted P2P — and let AI agents read and write your local notes via MCP. All data is stored locally on your device — no cloud, no tracking, full privacy.
 
 > **Formerly jdnotes (JD Notes)**: renamed to Lapis as of 2.0. Same app, same data — existing installs upgrade in place, all notes preserved.
 
@@ -153,6 +153,24 @@ Download the latest version from [Releases](https://github.com/zexadev/lapisnote
 | `Lapis_x.x.x_x64_en-US.msi` | Windows MSI Installer |
 
 **Requirements:** Windows 10/11 (64-bit)
+
+### Android
+
+| File | Description |
+|------|-------------|
+| `Lapis_x.x.x_aarch64.apk` | Android package, arm64 devices on Android 7.0+ |
+
+Open the package and follow the prompts. Later versions are checked in-app and installed over the existing one; notes are kept.
+
+### iOS (self-signed)
+
+| File | Description |
+|------|-------------|
+| `Lapis_x.x.x_ios_unsigned.ipa` | Unsigned IPA, sign and install with [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io) |
+
+Not on the App Store. Apps signed with a free Apple ID expire after 7 days and must be re-signed. The iOS build has not been verified on a real device yet.
+
+Pairing with your computer and updating on mobile: see the [mobile guide](https://jdnotes.zexa.cc/guide/mobile).
 
 ---
 
