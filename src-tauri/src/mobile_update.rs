@@ -5,7 +5,8 @@
 //! 再由 MainActivity 的 JS 桥 `LapisNative.installApk` 交给系统安装器。
 //!
 //! 不另做 minisign 验签：Android 只允许与已装应用同签名的包覆盖安装，APK 被换过直接装不上；
-//! latest.json 与 APK 都只从 github.com 取（下载 URL 前缀在 `download` 里硬校验）。
+//! latest.json 与 APK 只认 github.com 的本仓库 Release 地址（下载 URL 前缀在 `download` 里硬校验），
+//! 传输上先走文档站的 Cloudflare 反代、不通再直连。
 //! 这两个命令桌面也能编译（都只是 HTTP），只是前端只在手机上调。
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -16,6 +17,10 @@ use tauri::{AppHandle, Emitter, Manager};
 /// 与 tauri.conf.json 里 updater 的 endpoint 同一份清单，CI 发版时给它补 android-aarch64 条目
 const LATEST_JSON_URL: &str =
     "https://github.com/zexadev/lapisnote/releases/latest/download/latest.json";
+/// 文档站的 Cloudflare Pages Function（docs/functions/api/update）反代同一份清单与资产：
+/// github.com 在国内直连不稳，先走它，不通再直连 GitHub。清单内容原样，url 仍是 github.com
+const PROXY_LATEST_JSON_URL: &str = "https://jdnotes.zexa.cc/api/update/latest.json";
+const PROXY_DOWNLOAD_PREFIX: &str = "https://jdnotes.zexa.cc/api/update/download/";
 const ANDROID_PLATFORM_KEY: &str = "android-aarch64";
 /// APK 只认本仓库的 Release 资产（github.com 会 302 到 objects.githubusercontent.com，reqwest 自动跟）
 const ALLOWED_URL_PREFIX: &str = "https://github.com/zexadev/lapisnote/releases/download/";
@@ -74,16 +79,13 @@ pub async fn mobile_update_check(app: AppHandle) -> Result<Option<MobileUpdateIn
         clear_dir(&dir);
     }
     let client = http_client(Some(std::time::Duration::from_secs(20)))?;
-    let latest: LatestJson = client
-        .get(LATEST_JSON_URL)
-        .send()
-        .await
-        .map_err(|e| format!("获取更新清单失败: {}", e))?
-        .error_for_status()
-        .map_err(|e| format!("获取更新清单失败: {}", e))?
-        .json()
-        .await
-        .map_err(|e| format!("解析更新清单失败: {}", e))?;
+    let latest = match fetch_latest(&client, PROXY_LATEST_JSON_URL).await {
+        Ok(v) => v,
+        Err(proxy_err) => {
+            log::warn!("反代取更新清单失败，改直连 GitHub: {}", proxy_err);
+            fetch_latest(&client, LATEST_JSON_URL).await?
+        }
+    };
 
     let remote = semver::Version::parse(latest.version.trim_start_matches('v'))
         .map_err(|e| format!("更新清单里的版本号无法解析 ({}): {}", latest.version, e))?;
@@ -105,6 +107,28 @@ pub async fn mobile_update_check(app: AppHandle) -> Result<Option<MobileUpdateIn
         body: latest.notes,
         url,
     }))
+}
+
+async fn fetch_latest(client: &reqwest::Client, url: &str) -> Result<LatestJson, String> {
+    client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("获取更新清单失败: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("获取更新清单失败: {}", e))?
+        .json()
+        .await
+        .map_err(|e| format!("解析更新清单失败: {}", e))
+}
+
+/// github.com 的资产地址 → 文档站反代地址；前缀校验在调用方做过
+fn proxied_url(github_url: &str) -> String {
+    format!(
+        "{}{}",
+        PROXY_DOWNLOAD_PREFIX,
+        &github_url[ALLOWED_URL_PREFIX.len()..]
+    )
 }
 
 fn updates_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -145,8 +169,26 @@ pub async fn mobile_update_download(
     let tmp_path = dir.join(format!("Lapis_{}.apk.part", version));
 
     let client = http_client(None)?;
+    // 反代不通（连不上 / 非 2xx / 中途断）就整个从头直连 GitHub 再来一次；.part 文件每次重建
+    if let Err(proxy_err) = download_to(&app, &client, &proxied_url(&url), &tmp_path).await {
+        log::warn!("反代下载安装包失败，改直连 GitHub: {}", proxy_err);
+        let _ = std::fs::remove_file(&tmp_path);
+        download_to(&app, &client, &url, &tmp_path).await?;
+    }
+    std::fs::rename(&tmp_path, &final_path).map_err(|e| format!("安装包落盘失败: {}", e))?;
+
+    Ok(final_path.to_string_lossy().into_owned())
+}
+
+/// 流式下到 tmp_path，按事件报进度；content-length 与实收不符算失败
+async fn download_to(
+    app: &AppHandle,
+    client: &reqwest::Client,
+    url: &str,
+    tmp_path: &std::path::Path,
+) -> Result<(), String> {
     let mut resp = client
-        .get(&url)
+        .get(url)
         .send()
         .await
         .map_err(|e| format!("下载安装包失败: {}", e))?
@@ -155,7 +197,7 @@ pub async fn mobile_update_download(
     let total = resp.content_length().unwrap_or(0);
 
     let mut file =
-        std::fs::File::create(&tmp_path).map_err(|e| format!("创建安装包文件失败: {}", e))?;
+        std::fs::File::create(tmp_path).map_err(|e| format!("创建安装包文件失败: {}", e))?;
     let mut downloaded: u64 = 0;
     let mut last_emitted: u64 = 0;
     let _ = app.emit(PROGRESS_EVENT, DownloadProgress { downloaded, total });
@@ -177,13 +219,11 @@ pub async fn mobile_update_download(
     drop(file);
 
     if total > 0 && downloaded != total {
-        let _ = std::fs::remove_file(&tmp_path);
         return Err(format!(
             "安装包下载不完整（{} / {} 字节）",
             downloaded, total
         ));
     }
-    std::fs::rename(&tmp_path, &final_path).map_err(|e| format!("安装包落盘失败: {}", e))?;
     let _ = app.emit(
         PROGRESS_EVENT,
         DownloadProgress {
@@ -191,6 +231,5 @@ pub async fn mobile_update_download(
             total: if total > 0 { total } else { downloaded },
         },
     );
-
-    Ok(final_path.to_string_lossy().into_owned())
+    Ok(())
 }
