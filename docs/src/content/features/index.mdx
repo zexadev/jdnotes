@@ -50,6 +50,14 @@ keywords:
 - 6 个工具：读取（get_note、search_notes、list_notes）+ 写入（create_note、append_note、update_note）
 - Agent Skill 自动安装：启动时自动安装到 Claude Code、Copilot、Gemini CLI
 
+## 多设备同步
+
+- 电脑之间、电脑与 Android 手机之间点对点同步，不经过服务器
+- 局域网直连，跨网络通过加密 P2P 直连；首次连接双方核对 6 位配对码
+- 「我的设备」全量双向同步，「分享对象」只发送选中的笔记
+- 两端同时改动同一篇时三路合并，合不拢的生成冲突副本，不覆盖任何一方
+- 标为私有的笔记不参与同步
+
 ## 数据管理
 
 - 本地 SQLite 存储，数据完全离线
