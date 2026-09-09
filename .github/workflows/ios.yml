@@ -22,7 +22,9 @@ on:
 
 jobs:
   ios:
-    runs-on: macos-latest
+    # 钉 macos-15（Xcode 16.4 默认）：macos-latest 已是 macOS 26 + Xcode 26.6，其 Swift 库搜索路径指向没装的
+    # Metal toolchain cryptex 挂载点，swiftCompatibility56/Concurrency 找不到，链接直接报 undefined symbols
+    runs-on: macos-15
     permissions:
       contents: write
 
@@ -62,15 +64,13 @@ jobs:
           APPLE_DEVELOPMENT_TEAM: XXXXXXXXXX
         run: pnpm tauri ios init --ci --skip-targets-install
 
-      # iOS 14+ 访问局域网必须声明用途与 Bonjour 服务名，否则连同网段的电脑都被系统拦下
-      - name: Declare local network usage
+      # 局域网用途声明与 Bonjour 服务名来自 src-tauri/Info.ios.plist（tauri ios init 自动合并），这里只核对
+      - name: Verify merged Info.plist
         run: |
           set -euo pipefail
           plist=$(ls src-tauri/gen/apple/*_iOS/Info.plist | head -1)
-          /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string '用于在同一局域网内与你的电脑直连同步笔记'" "$plist"
-          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" "$plist"
-          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices:0 string '_lapis._tcp'" "$plist"
-          /usr/libexec/PlistBuddy -c "Print" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :NSBonjourServices" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :NSLocalNetworkUsageDescription" "$plist"
 
       # 假的 App Store Connect 凭据只为触发 CLI 的 skip_codesign 分支（三个变量要么全设要么全不设，
       # 缺一个 CLI 直接报错）。archive 也会带 -authenticationKeyPath，xcodebuild 先本地解析 PEM，

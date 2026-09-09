@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- tauri ios init 会把这份合并进生成的 Info.plist。
+     iOS 14+ 访问局域网必须声明用途与 Bonjour 服务名，否则连同网段的电脑都被系统拦下 -->
+<plist version="1.0">
+<dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>用于在同一局域网内与你的电脑直连同步笔记</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_lapis._tcp</string>
+  </array>
+</dict>
+</plist>
