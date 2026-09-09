@@ -7,6 +7,7 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { ExportModal } from '../../components/modals/ExportModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { isMobilePlatform } from '../../lib/platform'
 
 interface DataSettingsProps {
   onDataChange?: () => void
@@ -46,6 +47,11 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
     setTimeout(() => setOperationMessage(null), 5000)
   }
 
+  // Android 上 dialog 插件的取消不是 resolve(null) 而是 reject("File picker cancelled")，
+  // 桌面才是 null；两种都当用户取消，不报错
+  const isDialogCancel = (e: unknown) =>
+    e instanceof Error ? /cancel/i.test(e.message) : /cancel/i.test(String(e))
+
   // 导出全部数据
   const handleExport = async () => {
     setIsLoading(true)
@@ -65,8 +71,10 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
         showMessage('success', '数据导出成功！')
       }
     } catch (e) {
-      console.error('Export failed:', e)
-      showMessage('error', '导出失败: ' + (e instanceof Error ? e.message : String(e)))
+      if (!isDialogCancel(e)) {
+        console.error('Export failed:', e)
+        showMessage('error', '导出失败: ' + (e instanceof Error ? e.message : String(e)))
+      }
     }
     setIsLoading(false)
   }
@@ -92,8 +100,10 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
         onDataChange?.()
       }
     } catch (e) {
-      console.error('Import failed:', e)
-      showMessage('error', '导入失败: ' + (e instanceof Error ? e.message : String(e)))
+      if (!isDialogCancel(e)) {
+        console.error('Import failed:', e)
+        showMessage('error', '导入失败: ' + (e instanceof Error ? e.message : String(e)))
+      }
     }
     setIsLoading(false)
   }
@@ -150,7 +160,7 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
           数据管理
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          管理笔记数据的导入、导出和存储位置
+          {isMobilePlatform ? '管理笔记数据的导入与导出' : '管理笔记数据的导入、导出和存储位置'}
         </p>
       </div>
 
@@ -187,6 +197,8 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
                 )}
               </span>
             </div>
+            {/* Android 没有"在文件管理器中定位"这回事（数据目录是应用私有沙盒） */}
+            {!isMobilePlatform && (
             <button
               onClick={handleOpenInExplorer}
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -194,6 +206,7 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
             >
               <FolderOpen className="h-4 w-4" />
             </button>
+            )}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5">
             <div className="flex items-center gap-2">
@@ -210,7 +223,9 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
 
       {/* 操作按钮 */}
       <div className="space-y-3">
-        {/* 更改存储位置 */}
+        {/* 更改存储位置。Android 上目录选择器给的是 SAF 的 content:// 树 URI，不是文件系统路径，
+            数据库开不到那里去；应用私有沙盒也没有"换个目录"的意义，整块不显示 */}
+        {!isMobilePlatform && (
         <button
           onClick={handleChangeLocation}
           disabled={isLoading}
@@ -222,6 +237,7 @@ export function DataSettings({ onDataChange }: DataSettingsProps) {
             <div className="text-xs text-blue-500 dark:text-blue-400/80 mt-0.5">选择新的数据库存储目录</div>
           </div>
         </button>
+        )}
 
         {/* 选择性导出 */}
         <button
