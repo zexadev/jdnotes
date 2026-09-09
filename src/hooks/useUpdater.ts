@@ -2,7 +2,8 @@
  * 软件更新 Hook
  * 桌面用 tauri-plugin-updater 检查和安装更新；
  * 手机端该插件没有实现，走自家命令：mobile_update_check 比版本 → mobile_update_download 下 APK
- * → 原生桥 LapisNative.installApk 拉系统安装器（Android 同签名覆盖安装，数据保留）
+ * → 原生桥 LapisNative.installApk 拉系统安装器（Android 同签名覆盖安装，数据保留）。
+ * iOS 没有应用内安装这回事（自签分发），检查照旧，「更新」只是打开 IPA 下载地址交给用户重签
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { check, Update } from '@tauri-apps/plugin-updater'
@@ -10,7 +11,8 @@ import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { isMobilePlatform } from '../lib/platform'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { isIOSPlatform, isMobilePlatform } from '../lib/platform'
 
 export interface UpdateInfo {
   version: string
@@ -146,6 +148,11 @@ export function useUpdater(): UseUpdaterReturn {
     }
   }, [])
 
+  // iOS：打开 IPA 地址（Safari 下到「文件」，用户用 AltStore/Sideloadly 重签），状态留在 available 可再点
+  const openIOSDownload = useCallback(async (info: MobileUpdateInfo) => {
+    await openUrl(info.url)
+  }, [])
+
   // 手机端：交给系统安装器。用户在安装器里取消了也不算错，状态留在 ready 可再点
   const installMobile = useCallback((path: string) => {
     const bridge = window.LapisNative
@@ -162,6 +169,10 @@ export function useUpdater(): UseUpdaterReturn {
         return
       }
       try {
+        if (isIOSPlatform) {
+          await openIOSDownload(pendingMobile)
+          return
+        }
         await downloadMobile(pendingMobile)
       } catch (err) {
         console.error('下载更新失败:', err)
@@ -210,7 +221,7 @@ export function useUpdater(): UseUpdaterReturn {
       setError(errorMessage(err, '下载更新失败'))
       setStatus('error')
     }
-  }, [pendingUpdate, pendingMobile, downloadMobile])
+  }, [pendingUpdate, pendingMobile, downloadMobile, openIOSDownload])
 
   // 安装更新
   const installUpdate = useCallback(async () => {
@@ -254,6 +265,10 @@ export function useUpdater(): UseUpdaterReturn {
         return
       }
       try {
+        if (isIOSPlatform) {
+          await openIOSDownload(pendingMobile)
+          return
+        }
         const path = await downloadMobile(pendingMobile)
         installMobile(path)
       } catch (err) {
@@ -304,7 +319,7 @@ export function useUpdater(): UseUpdaterReturn {
       setError(errorMessage(err, '下载安装更新失败'))
       setStatus('error')
     }
-  }, [pendingUpdate, pendingMobile, downloadMobile, installMobile])
+  }, [pendingUpdate, pendingMobile, downloadMobile, installMobile, openIOSDownload])
 
   return {
     status,

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Download, Sparkles, AlertCircle, CheckCircle, Loader2, X } from 'lucide-react'
 import type { UpdateInfo, UpdateProgress, UpdateStatus } from '../../hooks/useUpdater'
-import { isMobilePlatform } from '../../lib/platform'
+import { isIOSPlatform, isMobilePlatform } from '../../lib/platform'
 
 interface UpdateAvailableModalProps {
   open: boolean
@@ -194,7 +194,7 @@ export function UpdateAvailableModal({
                   ) : (
                     <>
                       <Download className="h-4 w-4" />
-                      立即更新
+                      {isIOSPlatform ? '前往下载' : '立即更新'}
                     </>
                   )}
                 </button>

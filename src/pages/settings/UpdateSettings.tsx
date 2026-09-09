@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { RefreshCw, Download, CheckCircle, AlertCircle, Loader2, FileText } from 'lucide-react'
 import { useUpdater } from '../../hooks/useUpdater'
 import { ChangelogModal } from '../../components/modals/ChangelogModal'
-import { isMobilePlatform } from '../../lib/platform'
+import { isIOSPlatform, isMobilePlatform } from '../../lib/platform'
 
 export function UpdateSettings() {
   const updater = useUpdater()
@@ -85,7 +85,7 @@ export function UpdateSettings() {
               className="w-full px-4 py-3 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               <Download className="h-4 w-4" />
-              下载并安装
+              {isIOSPlatform ? '前往下载 IPA' : '下载并安装'}
             </button>
           </div>
         )}
@@ -158,7 +158,18 @@ export function UpdateSettings() {
         <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
           自动更新说明
         </h3>
-        {isMobilePlatform ? (
+        {isIOSPlatform ? (
+        <ul className="space-y-1.5 text-xs text-blue-700 dark:text-blue-300">
+          <li className="flex items-start gap-2">
+            <span className="mt-1">•</span>
+            <span>应用会在每次启动时自动检查更新</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-1">•</span>
+            <span>iOS 版为未签名 IPA，下载后用 AltStore、Sideloadly 等工具重新签名安装，笔记数据保留</span>
+          </li>
+        </ul>
+        ) : isMobilePlatform ? (
         <ul className="space-y-1.5 text-xs text-blue-700 dark:text-blue-300">
           <li className="flex items-start gap-2">
             <span className="mt-1">•</span>

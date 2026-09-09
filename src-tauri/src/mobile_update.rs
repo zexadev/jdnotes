@@ -21,7 +21,11 @@ const LATEST_JSON_URL: &str =
 /// github.com 在国内直连不稳，先走它，不通再直连 GitHub。清单内容原样，url 仍是 github.com
 const PROXY_LATEST_JSON_URL: &str = "https://jdnotes.zexa.cc/api/update/latest.json";
 const PROXY_DOWNLOAD_PREFIX: &str = "https://jdnotes.zexa.cc/api/update/download/";
-const ANDROID_PLATFORM_KEY: &str = "android-aarch64";
+/// latest.json 里本平台的条目名，CI 发版时各自补上（Android 是签名 APK，iOS 是未签名 IPA 供自签）
+#[cfg(target_os = "ios")]
+const PLATFORM_KEY: &str = "ios-aarch64";
+#[cfg(not(target_os = "ios"))]
+const PLATFORM_KEY: &str = "android-aarch64";
 /// APK 只认本仓库的 Release 资产（github.com 会 302 到 objects.githubusercontent.com，reqwest 自动跟）
 const ALLOWED_URL_PREFIX: &str = "https://github.com/zexadev/lapisnote/releases/download/";
 const PROGRESS_EVENT: &str = "mobile-update-progress";
@@ -96,9 +100,9 @@ pub async fn mobile_update_check(app: AppHandle) -> Result<Option<MobileUpdateIn
 
     let url = latest
         .platforms
-        .get(ANDROID_PLATFORM_KEY)
+        .get(PLATFORM_KEY)
         .map(|p| p.url.clone())
-        .ok_or_else(|| format!("新版本 v{} 尚未提供安卓安装包", remote))?;
+        .ok_or_else(|| format!("新版本 v{} 尚未提供本平台的安装包", remote))?;
 
     Ok(Some(MobileUpdateInfo {
         version: remote.to_string(),
