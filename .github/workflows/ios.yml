@@ -1,0 +1,135 @@
+# iOS：在 macOS runner 上出「未签名 IPA」，用户用 AltStore / Sideloadly 等工具自签安装。
+# 没有 Apple 开发者账号也没有 Mac，所以：Xcode 工程每次在 CI 现场 `tauri ios init` 生成（不入库），
+# 不走 `tauri ios build`（它必须 archive+export，没证书过不去），直接 xcodebuild 关掉签名出 .app 再打成 IPA。
+# 单独 workflow_dispatch 可随时试跑（产物挂 artifact）；发版时由 release.yml 以 workflow_call 调用并挂到 Release。
+name: iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '可选：挂到这个 Release（如 v2.3.0）；留空只上传 artifact'
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # tauri ios init 需要 xcodegen 生成 .xcodeproj；先装好，别让 CLI 在非交互环境里自己折腾 brew
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      # 不签名，团队 ID 只是模板占位；rust targets 上面已装，跳过 CLI 的 rustup 安装
+      - name: Generate Xcode project
+        env:
+          APPLE_DEVELOPMENT_TEAM: XXXXXXXXXX
+        run: pnpm tauri ios init --ci --skip-targets-install
+
+      # iOS 14+ 访问局域网必须声明用途与 Bonjour 服务名，否则连同网段的电脑都被系统拦下
+      - name: Declare local network usage
+        run: |
+          set -euo pipefail
+          plist=$(ls src-tauri/gen/apple/*_iOS/Info.plist | head -1)
+          /usr/libexec/PlistBuddy -c "Add :NSLocalNetworkUsageDescription string '用于在同一局域网内与你的电脑直连同步笔记'" "$plist"
+          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices array" "$plist"
+          /usr/libexec/PlistBuddy -c "Add :NSBonjourServices:0 string '_lapis._tcp'" "$plist"
+          /usr/libexec/PlistBuddy -c "Print" "$plist"
+
+      # 绕过 tauri ios build 就得自己跑 beforeBuildCommand；Rust 静态库由 Xcode 的 build phase 调
+      # `pnpm tauri ios xcode-script` 编（release 配置→cargo release→嵌入 dist）
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build unsigned app
+        run: |
+          set -euo pipefail
+          proj=$(ls -d src-tauri/gen/apple/*.xcodeproj | head -1)
+          name=$(basename "$proj" .xcodeproj)
+          xcodebuild \
+            -project "$proj" \
+            -scheme "${name}_iOS" \
+            -configuration release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/ios \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            build
+          app=$(find build/ios/Build/Products/release-iphoneos -maxdepth 1 -name '*.app' | head -1)
+          test -d "$app" || { echo "::error::没找到 .app 产物"; exit 1; }
+          echo "APP_PATH=$app" >> "$GITHUB_ENV"
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          IPA_NAME="Lapis_${VERSION}_ios_unsigned.ipa"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qry "$IPA_NAME" Payload
+          ls -la "$IPA_NAME"
+          echo "IPA_NAME=$IPA_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_NAME }}
+          if-no-files-found: error
+
+      # 挂到 Release 并给 latest.json 补 ios-aarch64（url + 空 signature）。与 android job 串行跑，
+      # 两个 job 同时改 latest.json 会互相覆盖
+      - name: Upload IPA and patch latest.json
+        if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          export IPA_NAME
+          gh release upload "$TAG" "$IPA_NAME" --clobber
+          gh release download "$TAG" -p latest.json -O latest.json
+          node -e '
+            const fs = require("fs");
+            const j = JSON.parse(fs.readFileSync("latest.json", "utf8"));
+            j.platforms = j.platforms || {};
+            j.platforms["ios-aarch64"] = {
+              url: `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${process.env.TAG}/${process.env.IPA_NAME}`,
+              signature: "",
+            };
+            fs.writeFileSync("latest.json", JSON.stringify(j, null, 2));
+          '
+          gh release upload "$TAG" latest.json --clobber

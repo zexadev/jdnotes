@@ -171,3 +171,13 @@ jobs:
           '
           gh release upload "$TAG" latest.json --clobber
         shell: bash
+
+  # iOS：未签名 IPA 供自签，构建细节在 ios.yml。排在 android 之后串行，两者都要改 latest.json
+  ios:
+    needs: android
+    uses: ./.github/workflows/ios.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: write
