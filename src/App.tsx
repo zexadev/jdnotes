@@ -431,7 +431,13 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        await initializeDefaultNotes()
+        // 手机不种欢迎笔记：两条 seed 用的是固定 uuid，桌面早已把它们删掉或改过，
+        // 首次同步时同 uuid 相撞——桌面的墓碑只拦「本地不存在」的 uuid，手机本地已有就会让
+        // 桌面删掉的欢迎笔记复活；桌面改过的则各自 base=None 直接出冲突副本。
+        // 手机的内容靠同步拿，空库由列表的空态引导去配对；欢迎笔记里的 Ctrl+K/Ctrl+L 也全是桌面话
+        if (!isMobilePlatform) {
+          await initializeDefaultNotes()
+        }
         // 回填多设备同步所需的 uuid（历史笔记），并迁移存量内嵌图片为附件
         await initDatabase()
         // 恢复可能因意外关闭而丢失的数据

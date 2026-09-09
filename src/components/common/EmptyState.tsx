@@ -1,4 +1,5 @@
 import { FileText, SearchX } from 'lucide-react'
+import { isMobilePlatform } from '../../lib/platform'
 
 export function EmptyState({ onCreateNote }: { onCreateNote: () => void }) {
   return (
@@ -44,6 +45,12 @@ export function NoNotesState({ onCreateNote }: { onCreateNote: () => void }) {
     <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
       <FileText className="h-12 w-12 mb-3" strokeWidth={1} />
       <p className="text-[13px]">暂无笔记</p>
+      {/* 手机不种欢迎笔记（见 App.tsx 初始化），空库时把「从电脑同步过来」这条路指出来 */}
+      {isMobilePlatform && (
+        <p className="mt-1 text-[12px] text-slate-400/80 dark:text-slate-500/80 text-center px-8">
+          电脑上已有笔记？在「设置 › 设备同步」配对后同步过来
+        </p>
+      )}
       <button
         onClick={onCreateNote}
         className="mt-3 px-3 py-1.5 bg-white dark:bg-white/[0.03] text-slate-600 dark:text-slate-300 text-[12px] rounded-lg hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors shadow-sm btn-press"
