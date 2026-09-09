@@ -64,18 +64,21 @@ const blogs = [
   { title: 'Tauri 2 开发实战：构建 AI 桌面笔记应用', href: '/blog/tauri-2-ai-note-app' },
 ]
 
+// 构建时由 next.config.mjs 从根 package.json 注入；只展示 主.次
+const APP_VERSION_SHORT = (process.env.NEXT_PUBLIC_APP_VERSION ?? '3.0.0').split('.').slice(0, 2).join('.')
+
 export function LandingPage() {
   return (
     <div className="landing">
       {/* Hero */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
-        <span className="landing-hero-bignum" aria-hidden="true">2.0</span>
-        <a href="/changelog" className="landing-hero-announce">✨ 全新 2.0 · 多设备同步首发 →</a>
+        <span className="landing-hero-bignum" aria-hidden="true">{APP_VERSION_SHORT}</span>
+        <a href="/changelog" className="landing-hero-announce">✨ 全新 {APP_VERSION_SHORT} · 手机端首发，Android 与 iOS 同一套功能 →</a>
         <img src="/app-icon.png" alt="Lapis" width={88} height={88} className="landing-hero-logo" />
         <h1 className="landing-hero-title">Lapis</h1>
         <p className="landing-hero-subtitle">
-          免费开源的本地笔记应用<br />
+          免费开源的本地笔记应用，桌面与手机同一套功能<br />
           多设备同步 · 内置 AI 助手 · 数据离线、隐私安全
         </p>
         <div className="landing-hero-buttons">
